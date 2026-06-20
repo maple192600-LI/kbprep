@@ -23,9 +23,7 @@ def analyze_pdf(input_path: str) -> dict:
         warnings.append("PyMuPDF not installed. PDF analysis limited. Install: pip install pymupdf")
         # Try basic analysis with mineru's content extraction
         result["text_layer_health"] = "unavailable"
-        result["warnings"] = warnings
-        result["pdf_route_diagnostics"] = build_pdf_route_diagnostics(result)
-        return result
+        return _finalize_pdf_result(result, warnings)
 
     analysis_errors = _fitz_analysis_errors(fitz)
     doc: Any | None = None
@@ -60,6 +58,10 @@ def analyze_pdf(input_path: str) -> dict:
         if doc is not None:
             _close_pdf_doc(doc, warnings)
 
+    return _finalize_pdf_result(result, warnings)
+
+
+def _finalize_pdf_result(result: dict, warnings: list[str]) -> dict:
     result["warnings"] = warnings
     result["pdf_route_diagnostics"] = build_pdf_route_diagnostics(result)
     return result
@@ -98,12 +100,12 @@ def _initial_pdf_result() -> dict:
 
 
 def diagnostic_page_indexes(page_count: int) -> tuple[tuple[int, ...], bool]:
-    if page_count <= DIAGNOSIS_THRESHOLDS["pdf_large_page_count"]:
+    if page_count <= int(DIAGNOSIS_THRESHOLDS["pdf_large_page_count"]):
         return tuple(range(page_count)), False
 
-    head = DIAGNOSIS_THRESHOLDS["pdf_large_sample_head_pages"]
-    tail = DIAGNOSIS_THRESHOLDS["pdf_large_sample_tail_pages"]
-    stride = DIAGNOSIS_THRESHOLDS["pdf_large_sample_stride"]
+    head = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_head_pages"])
+    tail = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_tail_pages"])
+    stride = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_stride"])
     pages = set(range(min(head, page_count)))
     pages.update(range(max(page_count - tail, 0), page_count))
     pages.update(range(0, page_count, stride))
@@ -161,7 +163,12 @@ def _update_text_image_page_counts(stats: dict[str, Any], text: str, has_images:
         stats["empty_pages"] += 1
 
 
-def _page_stats_payload(page_count: int, page_indexes: tuple[int, ...], sampling_applied: bool, stats: dict[str, Any]) -> dict:
+def _page_stats_payload(
+    page_count: int,
+    page_indexes: tuple[int, ...],
+    sampling_applied: bool,
+    stats: dict[str, Any],
+) -> dict:
     total_text = stats["total_text"]
     text_pages = stats["text_pages"]
     return {
@@ -221,11 +228,11 @@ def _page_has_tables(page: Any, text: str) -> bool:
     finder = getattr(page, "find_tables", None)
     if callable(finder):
         try:
-            with contextlib.redirect_stdout(io.StringIO()):
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 tables = finder()
             return bool(getattr(tables, "tables", []))
         except (RuntimeError, ValueError, TypeError):
-            return False
+            pass
     return "\t" in text
 
 
