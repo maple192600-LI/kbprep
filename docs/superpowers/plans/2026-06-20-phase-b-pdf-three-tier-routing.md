@@ -15,7 +15,10 @@
 - B1 is landed on the current branch: `pdf_route_diagnostics` records text-layer trust, layout complexity, image coverage, structure signals, text risk, large-PDF sampling, recommended tier, recommended route, and reason.
 - The actual converter still uses `pdf_text_layer` for simple trusted PDFs and MinerU for complex or OCR paths.
 - `docs/development/development-roadmap.md` marks Phase B as partial: B2, B3, B4, and B5 remain open.
-- `docs/development/mineru-install-design.md` exists in the current working tree as an untracked file. Treat it as user or prior-agent work. Do not edit, stage, or rely on it as a committed source of truth during this plan.
+- `docs/development/mineru-install-design.md` and the current `setup-env` backend recommendation code are now part of the repository. Treat them as environment setup and operator guidance for MinerU availability, not as a new Phase B slice.
+- MinerU has two separate choices that must not be confused:
+  - runtime backend: `pipeline`, `hybrid-engine`, `vlm-engine`, or `http-client` from setup/preflight guidance.
+  - parse method: `txt`, `auto`, or `ocr` from Phase B PDF routing.
 
 ## Product Rules
 
@@ -25,6 +28,9 @@
 - Public CI tests may still generate minimal sanitized PDFs to keep the repository open-source and deterministic. Those tests prove code paths; Vault smoke proves local real-sample behavior.
 - Do not promote `pdf_diagnosis_selected` to `verified` unless the six acceptance cases pass and the evidence is named in `docs/capability-matrix.md`.
 - Use only project-environment commands as completion evidence.
+- MinerU installation or backend probing may happen before this plan or in parallel, but Phase B implementation must not mutate system-level configuration itself. It may run the project-local `setup-env` and `preflight` commands as evidence that the KBPrep-local runtime is ready.
+- B3, B4, and B5 real-sample acceptance depend on MinerU being available in the selected KBPrep Python runtime. If MinerU installation is still running or fails, keep the route implementation and public mocked tests moving, but do not claim real OCR / complex-PDF acceptance or promote PDF capability status.
+- Phase B owns MinerU parse-method selection (`txt`, `auto`, `ocr`). It does not need to solve MinerU runtime-backend installation. If the existing adapter continues to use `-b pipeline`, record that backend honestly in reports instead of implying the setup-recommended backend was used.
 
 ## File Map
 
@@ -47,6 +53,8 @@
   - Preserve legacy diagnosis fields while ensuring the B1 evidence can drive Phase B routing.
 - Modify `python/kbprep_worker/stages/pipeline_conversion.py`
   - Execute `pymupdf4llm`, MinerU `txt`, MinerU `auto`, and MinerU `ocr` modes explicitly.
+- Modify `python/kbprep_worker/mineru_adapter.py`
+  - Keep the MinerU runtime backend explicit in the command and result payload.
 - Modify `python/kbprep_worker/stages/pipeline_helpers.py`
   - Report selected tier, selected route, actual route, MinerU mode, fallback/upgrade evidence, and route reason.
 - Modify `python/kbprep_worker/converter_capabilities.py`
@@ -65,6 +73,59 @@
   - Outputs anonymized evidence only.
 - Modify `package.json`
   - Add `vault:pdf-phase-b` script.
+
+---
+
+## Task 0: Confirm MinerU Runtime Readiness
+
+**Files:**
+- Read only: `docs/development/mineru-install-design.md`
+- Read only: `python/kbprep_worker/setup_env.py`
+- Read only: `python/kbprep_worker/preflight.py`
+
+- [ ] **Step 1: Confirm the setup design is repository truth**
+
+Run:
+
+```powershell
+git ls-files docs/development/mineru-install-design.md python/kbprep_worker/setup_env.py python/kbprep_worker/preflight.py
+```
+
+Expected: all three paths are printed. If `docs/development/mineru-install-design.md` is missing, continue with code truth from `setup_env.py` and report the doc gap before executing B3-B5.
+
+- [ ] **Step 2: Probe the project-local setup environment**
+
+Run:
+
+```powershell
+'{"backend_override": "pipeline"}' | node scripts/python-venv.mjs -m kbprep_worker.cli setup-env --json-stdin
+```
+
+Expected:
+
+- JSON envelope has `ok: true`.
+- `data.mineru_backend.chosen` is one of `pipeline`, `hybrid-engine`, `vlm-engine`, or `http-client`.
+- `data.actions_taken` does not include `cuda_install_failed:*`.
+
+If this command is already running in another Claude Code task, do not start a second competing install. Wait for that task to finish, then run this probe again for evidence.
+
+- [ ] **Step 3: Run preflight before real MinerU acceptance**
+
+Run:
+
+```powershell
+'{"workspace_path": ".kbprep/preflight", "profile": "standard"}' | node scripts/python-venv.mjs -m kbprep_worker.cli preflight --json-stdin
+```
+
+Expected:
+
+- JSON envelope has `ok: true`.
+- `data.versions.mineru` is not `not installed`.
+- Warnings about CPU mode or model cache are allowed, but errors are not.
+
+If preflight fails because MinerU is still installing or the model cache is still downloading, public unit and mocked route tests may continue, but Task 5 real Vault acceptance and capability promotion must wait.
+
+Commit: no commit. This task only records runtime evidence for later tasks.
 
 ---
 
@@ -598,6 +659,7 @@ git commit -m "feat: add tier 1 pymupdf4llm pdf route"
 
 **Files:**
 - Modify: `python/kbprep_worker/diagnose/pdf_route_diagnostics.py`
+- Modify: `python/kbprep_worker/mineru_adapter.py`
 - Modify: `python/kbprep_worker/stages/pipeline_conversion.py`
 - Modify: `python/kbprep_worker/stages/pipeline_helpers.py`
 - Modify: `python/tests/test_pdf_route_diagnostics.py`
@@ -705,7 +767,38 @@ Update `_reason()` for Tier 2:
         return f"Tier 2 because text is trusted but layout is {layout['level']} ({signals})."
 ```
 
-- [ ] **Step 4: Execute MinerU mode from conversion strategy**
+- [ ] **Step 4: Keep MinerU backend explicit in adapter output**
+
+In `python/kbprep_worker/mineru_adapter.py`, add a constant near `DEFAULT_MINERU_TIMEOUT_SECONDS`:
+
+```python
+DEFAULT_MINERU_BACKEND = "pipeline"
+```
+
+Update `_mineru_command()` so it uses the constant without changing current backend behavior:
+
+```python
+def _mineru_command(mineru: str, input_p: Path, assets_dir: Path, mode: str, language: str) -> list[str]:
+    mineru_language = normalize_mineru_language(language)
+    return [
+        mineru,
+        "-p", str(input_p),
+        "-o", str(assets_dir),
+        "-b", DEFAULT_MINERU_BACKEND,
+        "-m", mode,
+        "-l", mineru_language,
+    ]
+```
+
+Update `_mineru_result_payload()` to include:
+
+```python
+        "mineru_backend": DEFAULT_MINERU_BACKEND,
+```
+
+This step is intentionally conservative: `setup-env` may recommend a runtime backend, but Phase B should first make the currently executed backend visible before changing backend selection behavior.
+
+- [ ] **Step 5: Execute MinerU parse method from conversion strategy**
 
 In `python/kbprep_worker/stages/pipeline_conversion.py`, replace `_convert_mineru_ocr_route()` body with:
 
@@ -738,7 +831,7 @@ def _mineru_mode_for_strategy(strategy: object) -> str:
     return "auto"
 ```
 
-- [ ] **Step 5: Add scenario tests for Tier 2 mode selection**
+- [ ] **Step 6: Add scenario tests for Tier 2 mode selection**
 
 In `src/test/scenarios/worker-pdf-routing.test.ts`, add a case that fakes MinerU and asserts `txt` mode:
 
@@ -794,6 +887,7 @@ In `src/test/scenarios/worker-pdf-routing.test.ts`, add a case that fakes MinerU
           "assert report['route_decision']['selected_pdf_tier'] == 'tier_2', report",
           "assert report['route_decision']['actual_route'] == 'mineru_txt', report",
           "assert report['mineru_artifacts']['mineru_mode'] == 'txt', report",
+          "assert report['mineru_artifacts'].get('mineru_backend', 'pipeline') == 'pipeline', report",
         ].join(\"\\n\"),
         [inputPath, outputRoot],
         true,
@@ -804,7 +898,7 @@ In `src/test/scenarios/worker-pdf-routing.test.ts`, add a case that fakes MinerU
   }, 10_000);
 ```
 
-- [ ] **Step 6: Update route report actual route**
+- [ ] **Step 7: Update route report actual route**
 
 In `python/kbprep_worker/stages/pipeline_helpers.py`, update `_actual_route_for_converter()`:
 
@@ -819,7 +913,7 @@ In `python/kbprep_worker/stages/pipeline_helpers.py`, update `_actual_route_for_
         return "mineru"
 ```
 
-- [ ] **Step 7: Run target checks and commit**
+- [ ] **Step 8: Run target checks and commit**
 
 Run:
 
@@ -833,7 +927,7 @@ Expected: all selected tests PASS.
 Commit:
 
 ```powershell
-git add python/kbprep_worker/diagnose/pdf_route_diagnostics.py python/kbprep_worker/stages/pipeline_conversion.py python/kbprep_worker/stages/pipeline_helpers.py python/tests/test_pdf_route_diagnostics.py src/test/scenarios/worker-pdf-routing.test.ts src/test/scenarios/worker-batch-long-docs-part2.test.ts
+git add python/kbprep_worker/diagnose/pdf_route_diagnostics.py python/kbprep_worker/mineru_adapter.py python/kbprep_worker/stages/pipeline_conversion.py python/kbprep_worker/stages/pipeline_helpers.py python/tests/test_pdf_route_diagnostics.py src/test/scenarios/worker-pdf-routing.test.ts src/test/scenarios/worker-batch-long-docs-part2.test.ts
 git commit -m "feat: split tier 2 mineru pdf modes"
 ```
 
