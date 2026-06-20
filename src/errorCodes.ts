@@ -66,6 +66,12 @@ export const KBPREP_ERROR_CODES = [
   "E_WORKER_BAD_JSON",
 ] as const;
 
+// CLI/runtime-layer error codes. Wired: CLI_ERROR, FINAL_OUTPUT_MISSING,
+// INVALID_STATE, NO_SUCCESSFUL_RUN, OOM_RISK, REVIEW_NEEDED, WORKER_NOT_READY.
+// Reserved (currently unreferenced — they mirror active worker-layer E_ codes
+// and await CLI-layer error standardisation in roadmap Phase A; keep in the
+// contract, do not remove): CANCELLED, INTERNAL, INVALID_INPUT, WORKER_BAD_JSON,
+// WORKER_TIMEOUT.
 export const KBPREP_RUNTIME_ERROR_CODES = [
   "KBPREP_CANCELLED",
   "KBPREP_CLI_ERROR",

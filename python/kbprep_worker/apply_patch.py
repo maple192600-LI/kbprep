@@ -16,7 +16,7 @@ from .atomic_io import atomic_write_json, atomic_write_text
 from .envelope import fail, ok
 from .fs_safety import safe_rmtree
 from .prepare_artifacts import publish_latest_outputs as _shared_publish_latest_outputs
-from .quality import _detail_categories, _is_known_pollution_without_detail
+from .quality import _detail_categories, _is_known_pollution_without_detail, _positive_int
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,6 @@ def run(data: dict) -> None:
 
     updated_obsidian_complete = _obsidian_complete_path(run_p / "obsidian")
     ok(data={
-        "ok": True,
         "applied": applied,
         "rejected": len(rejected),
         "rejected_details": rejected,
@@ -328,14 +327,6 @@ def _profile_from_run_metadata(run_p: Path) -> str:
         except Exception:
             pass
     return "standard"
-
-
-def _positive_int(value, default: int) -> int:
-    try:
-        parsed = int(value) if value is not None else default
-    except (TypeError, ValueError):
-        parsed = default
-    return max(1, parsed)
 
 
 def _source_title_from_previous_quality(previous_quality: dict, run_p: Path) -> str:

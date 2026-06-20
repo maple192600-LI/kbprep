@@ -55,4 +55,57 @@ describe("managed subprocess timeout behavior", () => {
     expect(error.signal).toBe("SIGTERM");
     expect(error.stderrTail).toBe("line");
   });
+
+  // Regression: multi-byte UTF-8 (e.g. Chinese) must survive even when a single
+  // character is split across two stdout/stderr chunks. The previous implementation
+  // decoded each chunk independently with chunk.toString("utf-8"), which corrupts
+  // any character straddling a chunk boundary. See AGENTS.md I/O correctness rule.
+  it("preserves multi-byte UTF-8 stdout split across chunk boundaries", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-subprocess-mb-"));
+    const scriptPath = path.join(root, "multibyte.mjs");
+    // Each CJK char is 3 bytes in UTF-8; a 4096-byte write step (4096 % 3 != 0)
+    // repeatedly splits characters across chunk boundaries.
+    const payload = "中文测试内容".repeat(4000);
+    writeFileSync(scriptPath, [
+      "const buf = Buffer.from(JSON.parse(process.argv[2]));",
+      "for (let i = 0; i < buf.length; i += 4096) {",
+      "  process.stdout.write(buf.subarray(i, i + 4096));",
+      "}",
+    ].join("\n"), "utf8");
+    try {
+      const result = await runManagedProcess({
+        command: process.execPath,
+        args: [scriptPath, JSON.stringify(payload)],
+        label: "test multibyte stdout",
+        timeoutMs: 10_000,
+      });
+      expect(result.code).toBe(0);
+      expect(result.stdout).toBe(payload);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("preserves multi-byte UTF-8 stderr split across chunk boundaries", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-subprocess-mb-"));
+    const scriptPath = path.join(root, "multibyte-stderr.mjs");
+    const payload = "日志行中文内容".repeat(4000);
+    writeFileSync(scriptPath, [
+      "const buf = Buffer.from(JSON.parse(process.argv[2]));",
+      "for (let i = 0; i < buf.length; i += 4096) {",
+      "  process.stderr.write(buf.subarray(i, i + 4096));",
+      "}",
+    ].join("\n"), "utf8");
+    try {
+      const result = await runManagedProcess({
+        command: process.execPath,
+        args: [scriptPath, JSON.stringify(payload)],
+        label: "test multibyte stderr",
+        timeoutMs: 10_000,
+      });
+      expect(result.stderr).toBe(payload);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

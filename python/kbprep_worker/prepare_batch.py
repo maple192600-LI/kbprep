@@ -614,7 +614,6 @@ def _emit_batch_result(
     max_workers: int,
 ) -> None:
     ok(data={
-        "ok": counters["failed"] == 0,
         "total": len(files),
         "discovered_total": inventory["discovered_total"],
         "succeeded": counters["succeeded"],

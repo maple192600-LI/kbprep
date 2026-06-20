@@ -146,7 +146,7 @@ def check_content_sniffing_routes(root: Path) -> dict:
 def check_pdf_text_layer_fallback_record(root: Path) -> dict:
     sys.path.insert(0, PYTHONPATH)
     from kbprep_worker.converter_registry import ConversionRoute, ConversionRouteKind
-    from kbprep_worker.stages import pipeline_core
+    from kbprep_worker.stages import pipeline_conversion, pipeline_core
 
     run_dir = root / "pdf-fallback"
     run_dir.mkdir()
@@ -161,8 +161,8 @@ def check_pdf_text_layer_fallback_record(root: Path) -> dict:
         converted.write_text("OCR 正文", encoding="utf-8")
         return {"source_md_path": str(ocr_md), "warnings": []}
 
-    with patch("kbprep_worker.stages.pipeline_core._run_mineru_conversion", side_effect=fake_mineru):
-        fallback = pipeline_core._maybe_fallback_pdf_text_layer_to_mineru(
+    with patch("kbprep_worker.stages.pipeline_conversion._run_mineru_conversion", side_effect=fake_mineru):
+        fallback = pipeline_conversion._maybe_fallback_pdf_text_layer_to_mineru(
             input_p=source,
             converted_path=converted,
             run_dir=run_dir,

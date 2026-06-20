@@ -10,6 +10,7 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 from ..envelope import fail
+from ..quality import _positive_int as _positive_int
 from ..rule_loader import load_cleaning_rules, rules_root
 
 
@@ -156,14 +157,6 @@ def _target_rules_dir(data: dict) -> Path:
     if value:
         return Path(value).expanduser().resolve()
     return rules_root()
-
-
-def _positive_int(value: object, default: int) -> int:
-    try:
-        parsed = int(value) if isinstance(value, (str, int, float)) and not isinstance(value, bool) else default
-    except (TypeError, ValueError):
-        parsed = default
-    return max(1, parsed)
 
 
 def _required_path(data: dict, key: str) -> Path:

@@ -78,8 +78,14 @@ function collectManagedProcess(
   options: ManagedProcessOptions,
 ): Promise<ManagedProcessResult> {
   return new Promise((resolve, reject) => {
-    let stdout = "";
-    let stderr = "";
+    // Accumulate raw Buffer chunks and decode once at the end. Decoding each
+    // chunk independently (chunk.toString("utf-8")) corrupts any multi-byte
+    // character split across a chunk boundary — common with CJK output where
+    // each character is 3 bytes and chunk boundaries rarely align to them.
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    const decodeStdout = () => Buffer.concat(stdoutChunks).toString("utf-8");
+    const decodeStderr = () => Buffer.concat(stderrChunks).toString("utf-8");
     let timedOut = false;
     let forcedKill = false;
     let settled = false;
@@ -102,18 +108,18 @@ function collectManagedProcess(
         settle(() => reject(new ManagedProcessTimeoutError(options.label, options.timeoutMs, {
           code: null,
           signal: "SIGKILL",
-          stderr,
-          stdout,
+          stderr: decodeStderr(),
+          stdout: decodeStdout(),
         })));
       }, options.terminateGraceMs ?? DEFAULT_TERMINATE_GRACE_MS);
     }, options.timeoutMs);
 
     child.stdout?.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString("utf-8");
+      stdoutChunks.push(chunk);
       options.onStdoutData?.(chunk);
     });
     child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString("utf-8");
+      stderrChunks.push(chunk);
       options.onStderrData?.(chunk);
     });
     child.on("error", (err) => {
@@ -123,8 +129,8 @@ function collectManagedProcess(
       const result: ManagedProcessResult = {
         code,
         signal,
-        stdout,
-        stderr,
+        stdout: decodeStdout(),
+        stderr: decodeStderr(),
         timedOut,
         forcedKill,
       };

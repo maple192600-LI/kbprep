@@ -43,6 +43,11 @@ type AiReviewContext = {
   signal?: AbortSignal;
 };
 
+// Timeout for applying a validated AI review patch to the run workspace.
+// Separate from opts.timeoutMs (the LLM review call) because this is a fast,
+// bounded filesystem operation that deserves its own explicit budget.
+const AI_REVIEW_APPLY_PATCH_TIMEOUT_MS = 120_000;
+
 const AI_REVIEWABLE_QUALITY_ERROR_CODES = new Set([
   "E_QA_FAILED",
   "E_PROTECTED_BLOCK_LOSS",
@@ -157,7 +162,7 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
     patch_json: combinedPatch,
   }, {
     pythonPath: opts.pythonPath,
-    timeoutMs: 120_000,
+    timeoutMs: AI_REVIEW_APPLY_PATCH_TIMEOUT_MS,
     signal: context.signal,
     config: opts.workerConfig,
   });

@@ -748,38 +748,3 @@ def _handle_unexpected_error(state: PipelineState, error: Exception) -> None:
     if isinstance(extra_details, dict):
         details.update(extra_details)
     fail(error_code, str(error), details=details, warnings=state.warnings)
-
-
-def _maybe_fallback_pdf_text_layer_to_mineru(
-    input_p: Path,
-    converted_path: Path,
-    run_dir: Path,
-    language: str,
-    text_layer_artifacts: dict,
-) -> dict | None:
-    text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
-    rejected_quality = _converted_text_quality(text)
-    text_layer_artifacts["post_convert_text_quality"] = rejected_quality
-    if not _pdf_text_layer_output_needs_ocr(rejected_quality):
-        return None
-    rejected_path = run_dir / "converted.pdf_text_layer.rejected.md"
-    if converted_path.exists():
-        shutil.copy2(str(converted_path), str(rejected_path))
-    fallback = _run_mineru_conversion(input_p, converted_path, run_dir, language, "ocr")
-    fallback["fallback_from"] = "pdf_text_layer"
-    fallback["fallback_reason"] = "post_convert_text_unreadable"
-    fallback["rejected_text_layer_md"] = str(rejected_path)
-    fallback["rejected_text_layer_quality"] = rejected_quality
-    ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
-    fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
-    fallback["warnings"] = [*fallback.get("warnings", []), _pdf_text_layer_fallback_warning(rejected_quality)]
-    return fallback
-
-
-def _pdf_text_layer_fallback_warning(rejected_quality: dict) -> str:
-    unreadable = rejected_quality.get("unreadable_text_ratio", 0)
-    garbled = rejected_quality.get("garbled_ratio", 0)
-    return (
-        "W_PDF_TEXT_LAYER_FALLBACK_TO_OCR: text-layer conversion produced unreadable Markdown "
-        f"(unreadable={unreadable:.2%}, garbled={garbled:.2%}); reran MinerU in OCR mode."
-    )

@@ -8,7 +8,7 @@ from .retention import (
     detail_retention_stats,
     is_known_pollution_without_detail,
 )
-from .runner import run_quality_check
+from .runner import _positive_int, run_quality_check
 from .thresholds import (
     CLEANING_THRESHOLDS,
     CONVERSION_THRESHOLDS,
@@ -18,6 +18,7 @@ from .thresholds import (
 
 __all__ = [
     "run_quality_check",
+    "_positive_int",
     "detail_categories",
     "detail_retention_stats",
     "is_known_pollution_without_detail",

@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, appendFile } from "node:fs/promises";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { StringDecoder } from "node:string_decoder";
 import Type from "typebox";
 import { Value } from "typebox/value";
 import { makeError, type KBPrepError } from "./errors.js";
@@ -136,15 +137,29 @@ export async function callWorker<T = Record<string, unknown>>(
     await mkdir(logDir, { recursive: true });
     logPath = join(logDir, `${jobId}.jsonl`);
   }
+  // Decode stderr incrementally so multi-byte characters split across chunks
+  // (common with CJK log lines) are not corrupted, and buffer partial lines so
+  // a single logical line spanning two chunks is not split in two. Raw bytes
+  // are still appended to the log file untouched.
+  const stderrDecoder = new StringDecoder("utf-8");
+  let stderrLineBuffer = "";
   const collectStderr = (chunk: Buffer) => {
-    const text = chunk.toString("utf-8");
-    for (const line of text.split("\n")) {
-      const trimmed = line.trim();
-      if (trimmed) stderrLines.push(trimmed);
-    }
     if (logPath) {
       void appendFile(logPath, chunk).catch(() => {});
     }
+    stderrLineBuffer += stderrDecoder.write(chunk);
+    const lines = stderrLineBuffer.split("\n");
+    stderrLineBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed) stderrLines.push(trimmed);
+    }
+  };
+  const flushStderr = () => {
+    const tail = stderrLineBuffer + stderrDecoder.end();
+    stderrLineBuffer = "";
+    const trimmed = tail.trim();
+    if (trimmed) stderrLines.push(trimmed);
   };
 
   try {
@@ -159,6 +174,7 @@ export async function callWorker<T = Record<string, unknown>>(
       stdin: JSON.stringify(input),
       onStderrData: collectStderr,
     });
+    flushStderr();
     const envelope = parseEnvelope<T>(result.stdout, stderrLines.slice(-120), command);
 
     if (!envelope.ok && !envelope.error) {
@@ -173,6 +189,7 @@ export async function callWorker<T = Record<string, unknown>>(
 
     return envelope;
   } catch (err: unknown) {
+    flushStderr();
     if (isAbortError(err)) {
       return {
         ok: false,

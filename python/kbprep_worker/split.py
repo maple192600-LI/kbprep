@@ -48,6 +48,7 @@ def split_into_chunks(
     run_p = Path(run_dir)
     chunks_dir = run_p / "chunks"
     chunks_dir.mkdir(exist_ok=True)
+    _clear_stale_chunks(chunks_dir)
     manifest_entries = _write_chunks(chunks, chunks_dir, source_type, split_strategy, source_hash, run_id)
     _write_chunk_manifest(run_p, manifest_entries)
     return {"chunk_count": len(manifest_entries), "warnings": warnings}
@@ -123,6 +124,17 @@ def _write_chunk_manifest(run_p: Path, manifest_entries: list[dict]) -> None:
     with open(manifest_path, "w", encoding="utf-8") as f:
         for entry in manifest_entries:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _clear_stale_chunks(chunks_dir: Path) -> None:
+    """Remove leftover chunk files before writing fresh ones.
+
+    apply_patch re-runs splitting on the same run_dir; without this, the
+    chunk_*.md files from the previous iteration linger and inflate glob-based
+    chunk counts, which then diverge from the freshly overwritten manifest.
+    """
+    for stale in chunks_dir.glob("*.md"):
+        stale.unlink()
 
 
 def _chunk_frontmatter(

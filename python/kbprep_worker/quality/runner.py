@@ -669,9 +669,12 @@ def _quality_loop_state(
         "strict_error_count": len(strict_errors),
     }
 
-def _positive_int(value: int | str | None, default: int) -> int:
+def _positive_int(value: int | float | str | None, default: int) -> int:
+    # Canonical implementation: apply_patch and feedback.support import this.
+    # Reject bool explicitly — bool is an int subclass in Python, so without
+    # this guard _positive_int(True, n) silently returns 1.
     try:
-        parsed = int(value) if value is not None else default
+        parsed = int(value) if isinstance(value, (str, int, float)) and not isinstance(value, bool) else default
     except (TypeError, ValueError):
         parsed = default
     return max(1, parsed)

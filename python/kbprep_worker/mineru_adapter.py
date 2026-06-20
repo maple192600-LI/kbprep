@@ -48,7 +48,13 @@ class MinerUOutputs:
 
 
 def find_mineru() -> str:
-    """Find the MinerU executable installed beside the selected Python runtime."""
+    """Find the MinerU executable installed beside the selected Python runtime.
+
+    Deliberately does NOT fall back to a system MinerU on PATH: KBPrep only
+    trusts the MinerU pinned inside the selected Python environment so that
+    conversion behaviour stays reproducible. This constraint is guarded by
+    src/test/scenarios/worker-core-runtime-part1.test.ts.
+    """
     import sys
     python_dir = Path(sys.executable).parent
     for name in ["mineru", "mineru.exe"]:

@@ -71,6 +71,12 @@ KBPREP_ERROR_CODES = {
     "E_WORKER_BAD_JSON",
 }
 
+# CLI/runtime-layer error codes. Wired: KBPREP_CLI_ERROR, KBPREP_FINAL_OUTPUT_MISSING,
+# KBPREP_INVALID_STATE, KBPREP_NO_SUCCESSFUL_RUN, KBPREP_OOM_RISK, KBPREP_REVIEW_NEEDED,
+# KBPREP_WORKER_NOT_READY. Reserved (currently unreferenced — they mirror active
+# worker-layer E_ codes and await CLI-layer error standardisation in roadmap Phase A;
+# keep in the contract, do not remove): KBPREP_CANCELLED, KBPREP_INTERNAL,
+# KBPREP_INVALID_INPUT, KBPREP_WORKER_BAD_JSON, KBPREP_WORKER_TIMEOUT.
 KBPREP_RUNTIME_ERROR_CODES = {
     "KBPREP_CANCELLED",
     "KBPREP_CLI_ERROR",

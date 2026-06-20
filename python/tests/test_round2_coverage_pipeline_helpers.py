@@ -9,7 +9,7 @@ from unittest.mock import patch
 from kbprep_worker.converter_registry import ConversionRoute, ConversionRouteKind
 from kbprep_worker.envelope import EnvelopeExit
 from kbprep_worker.mineru_adapter import MinerUProcessError
-from kbprep_worker.stages import pipeline_core
+from kbprep_worker.stages import pipeline_conversion, pipeline_core
 
 
 def _capture_fail(fn, *args, **kwargs):
@@ -87,11 +87,11 @@ class PipelineHelperRound2CoverageTests(unittest.TestCase):
             self.assertTrue((run_dir / "images" / "page.png").exists())
 
             converted.write_text("���" * 80, encoding="utf-8")
-            with patch("kbprep_worker.stages.pipeline_core._run_mineru_conversion", return_value={
+            with patch("kbprep_worker.stages.pipeline_conversion._run_mineru_conversion", return_value={
                 "source_md_path": str(mineru_md),
                 "warnings": [],
             }):
-                fallback = pipeline_core._maybe_fallback_pdf_text_layer_to_mineru(
+                fallback = pipeline_conversion._maybe_fallback_pdf_text_layer_to_mineru(
                     input_p=source,
                     converted_path=converted,
                     run_dir=run_dir,
