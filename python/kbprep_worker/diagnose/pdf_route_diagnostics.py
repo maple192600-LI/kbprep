@@ -44,7 +44,9 @@ def _image_coverage_summary(diagnosis: dict[str, Any]) -> dict[str, Any]:
     page_count = _int_value(diagnosis.get("page_count"))
     image_pages = _int_value(diagnosis.get("image_pages"))
     text_pages = _int_value(diagnosis.get("text_pages"))
-    ratio = round(image_pages / page_count, 4) if page_count else 0.0
+    sampled_page_count = _int_value(diagnosis.get("sampled_page_count"))
+    denominator = _coverage_denominator(diagnosis, page_count, sampled_page_count)
+    ratio = round(image_pages / denominator, 4) if denominator else 0.0
     if ratio >= 0.5:
         level = "high"
     elif ratio > 0:
@@ -53,11 +55,19 @@ def _image_coverage_summary(diagnosis: dict[str, Any]) -> dict[str, Any]:
         level = "none"
     return {
         "page_count": page_count,
+        "sampled_page_count": sampled_page_count,
         "image_pages": image_pages,
         "text_pages": text_pages,
         "ratio": ratio,
+        "ratio_basis": "sampled_pages" if denominator == sampled_page_count and denominator else "page_count",
         "level": level,
     }
+
+
+def _coverage_denominator(diagnosis: dict[str, Any], page_count: int, sampled_page_count: int) -> int:
+    if bool(diagnosis.get("large_pdf_sampling_applied")) and sampled_page_count > 0:
+        return sampled_page_count
+    return page_count
 
 
 def _structure_signals(diagnosis: dict[str, Any]) -> dict[str, bool]:

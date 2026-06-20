@@ -139,6 +139,51 @@ class PDFRouteDiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostics["large_pdf_sampling"]["sampled_pages"], 21)
         self.assertEqual(diagnostics["large_pdf_sampling"]["strategy"], "first_5_last_5_stride_10")
 
+    def test_sampled_image_coverage_uses_sampled_page_denominator(self):
+        diagnostics = build_pdf_route_diagnostics({
+            "page_count": 120,
+            "sampled_page_count": 21,
+            "text_pages": 0,
+            "image_pages": 21,
+            "image_count": 21,
+            "text_layer_health": "no_text_layer",
+            "needs_ocr": True,
+            "layout_complexity": "complex",
+            "layout_profile": "image_heavy_document",
+            "large_pdf_sampling_applied": True,
+            "large_pdf_sampled_pages": 21,
+            "large_pdf_sample_strategy": "first_5_last_5_stride_10",
+            "text_quality": {
+                "garbled_ratio": 0.0,
+                "unreadable_text_ratio": 0.0,
+                "replacement_char_ratio": 0.0,
+                "mojibake_ratio": 0.0,
+                "control_ratio": 0.0,
+            },
+        })
+
+        self.assertEqual(diagnostics["image_coverage"]["ratio"], 1.0)
+        self.assertEqual(diagnostics["image_coverage"]["level"], "high")
+
+    def test_diagnostic_page_indexes_scan_small_pdf_fully(self):
+        from kbprep_worker.diagnose.pdf_analysis import diagnostic_page_indexes
+
+        pages, applied = diagnostic_page_indexes(7)
+
+        self.assertFalse(applied)
+        self.assertEqual(pages, tuple(range(7)))
+
+    def test_diagnostic_page_indexes_sample_large_pdf_predictably(self):
+        from kbprep_worker.diagnose.pdf_analysis import diagnostic_page_indexes
+
+        pages, applied = diagnostic_page_indexes(120)
+
+        self.assertTrue(applied)
+        self.assertEqual(pages[:5], (0, 1, 2, 3, 4))
+        self.assertEqual(pages[-5:], (115, 116, 117, 118, 119))
+        self.assertIn(50, pages)
+        self.assertIn(100, pages)
+
 
 if __name__ == "__main__":
     unittest.main()
