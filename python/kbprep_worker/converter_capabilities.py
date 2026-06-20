@@ -252,6 +252,30 @@ _CAPABILITIES: tuple[Capability, ...] = (
         ),
     },
     {
+        "id": "youtube_url_routes",
+        "source_type": "remote_url",
+        "extensions": [],
+        "route": "unsupported",
+        "dependencies": ["target-only: subtitle fetcher", "target-only: media transcript fallback"],
+        "fallback": (
+            "Download or export a local subtitle, transcript, Markdown, text, PDF, "
+            "or media file before running KBPrep."
+        ),
+        "status": "design_only",
+        "test_evidence": [],
+        "required_evidence": [
+            "owner-approved YouTube URL input contract",
+            "subtitle-first golden fixtures",
+            "fallback transcript fixtures",
+            "dependency failure and no-network tests",
+        ],
+        "promotion_blocker": (
+            "No standalone CLI URL route, subtitle extraction, media download, or verified fixture support is shipped."
+        ),
+        "preserves": ["target: subtitle order", "target: transcript text", "target: source URL evidence"],
+        "risk": "URL processing can create network, copyright, dependency, and quality risks; it stays target-only.",
+    },
+    {
         "id": "mobi_unsupported",
         "source_type": "pdf_like",
         "extensions": [".mobi"],
@@ -278,7 +302,7 @@ def capability_matrix_rows() -> list[Capability]:
 
 def capability_gap_report() -> dict:
     gaps = []
-    summary = {"verified": 0, "partial": 0, "unsupported": 0, "experimental": 0}
+    summary = {"verified": 0, "partial": 0, "unsupported": 0, "experimental": 0, "design_only": 0}
     for capability in _CAPABILITIES:
         status = str(capability.get("status", "unsupported"))
         if status in summary:
@@ -306,6 +330,8 @@ def _default_promotion_blocker(capability: Capability) -> str:
     status = capability.get("status")
     if status == "partial":
         return "Needs broader golden fixtures and preservation checks before being marked verified."
+    if status == "design_only":
+        return "Target-only until a reliable route, dependency boundary, and end-to-end fixtures exist."
     return "Unsupported until a reliable conversion route and end-to-end fixtures exist."
 
 
@@ -313,6 +339,8 @@ def _default_required_evidence(capability: Capability) -> list[str]:
     status = capability.get("status")
     if status == "partial":
         return ["golden fixtures", "source-to-Markdown preservation checks"]
+    if status == "design_only":
+        return ["owner-approved route design", "subtitle-first fixtures", "dependency failure tests"]
     return ["explicit dependency/conversion route", "end-to-end fixture proving safe Markdown output"]
 
 

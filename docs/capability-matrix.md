@@ -12,6 +12,7 @@ Status values:
 - `verified`: implemented and covered by named tests or fixtures
 - `partial`: implemented with some named tests or fixtures, but known to miss important structure or lacks broad coverage
 - `experimental`: route exists, but quality depends heavily on external tools or source quality
+- `design_only`: target route is documented, but no current local CLI support is shipped
 - `unsupported`: should be reported clearly instead of pretending success
 
 | Capability ID | Source type | Current route | Status | Must preserve | Current evidence | Current risk |
@@ -28,6 +29,7 @@ Status values:
 | image_ocr | Image files | image_to_pdf_then_mineru_ocr | experimental | image text through MinerU OCR, conversion report evidence | `src/test/scenarios/worker-core-runtime-part2.test.ts::diagnoses local external-converter formats and keeps MOBI explicitly unsupported` | OCR quality depends on local MinerU and image quality; current tests mock the external OCR step |
 | legacy_office_pdf_bridge | Legacy Office | legacy_office_to_pdf_route | experimental | LibreOffice-generated PDF evidence, downstream PDF route quality checks | `src/test/scenarios/worker-core-runtime-part2.test.ts::diagnoses local external-converter formats and keeps MOBI explicitly unsupported` | LibreOffice conversion can lose layout or embedded objects; KBPrep records the generated PDF route for audit |
 | media_local_transcript | Audio/video binaries | media_to_transcript | experimental | transcript text, ASR command evidence, Whisper model metadata | `src/test/scenarios/worker-core-runtime-part2.test.ts::declares converter capabilities and exposes the chosen capability through diagnosis` | ASR quality and runtime depend on local Whisper model and media quality; batch processing still excludes media by default |
+| youtube_url_routes | YouTube URLs | unsupported | design_only | target: subtitle order, transcript text, source URL evidence | none | URL processing can create network, copyright, dependency, and quality risks; it stays target-only until the owner approves the route and fixtures prove it. |
 | mobi_unsupported | MOBI ebooks | unsupported | unsupported | n/a | `src/test/scenarios/worker-core-runtime-part2.test.ts::diagnoses local external-converter formats and keeps MOBI explicitly unsupported` | MOBI inputs are rejected with explicit guidance; convert MOBI to EPUB, PDF, Markdown, or text first |
 
 ## Target Architecture Fit
@@ -54,9 +56,9 @@ conversion.
 `python/kbprep_worker/converter_capabilities.py` also exposes
 `capability_gap_report()`. That machine-readable report lists every non-verified
 route with its current status, current route, required evidence, and promotion
-blocker. Package checks validate that every `partial` or `unsupported`
-capability appears in this gap report, so new file routes cannot silently imply
-full support before fixtures prove them.
+blocker. Package checks validate that every non-verified capability appears in
+this gap report, so new file routes cannot silently imply full support before
+fixtures prove them.
 
 1. Add golden fixtures for every `partial` route before promoting it to `verified`, including PDF Tier 1 simple single-column and English text fixtures, Tier 2 multi-column and table-heavy fixtures, and Tier 3 scanned plus CID or ToUnicode-damaged fixtures.
 2. Add real image OCR, legacy Office, and media ASR fixtures before promoting experimental routes.
