@@ -13,10 +13,14 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+
+_REPLACE_RETRY_ATTEMPTS = 50
+_REPLACE_RETRY_DELAY_SECONDS = 0.002
 
 
 def atomic_write_text(
@@ -88,7 +92,7 @@ def _atomic_replace_bytes(
             if fsync_file:
                 handle.flush()
                 os.fsync(handle.fileno())
-        os.replace(tmp, target)
+        _replace_with_retry(tmp, target)
         if fsync_dir:
             _fsync_dir(target.parent)
     except BaseException:
@@ -115,6 +119,24 @@ def _fsync_dir(directory: Path) -> None:
         pass
     finally:
         os.close(dir_fd)
+
+
+def _replace_with_retry(tmp: Path, target: Path) -> None:
+    for attempt in range(_REPLACE_RETRY_ATTEMPTS):
+        try:
+            os.replace(tmp, target)
+            return
+        except PermissionError as exc:
+            if not _should_retry_replace(exc, attempt):
+                raise
+            time.sleep(_REPLACE_RETRY_DELAY_SECONDS)
+
+
+def _should_retry_replace(exc: PermissionError, attempt: int) -> bool:
+    is_last_attempt = attempt >= _REPLACE_RETRY_ATTEMPTS - 1
+    if is_last_attempt:
+        return False
+    return os.name == "nt" and getattr(exc, "winerror", None) == 5
 
 
 @contextmanager

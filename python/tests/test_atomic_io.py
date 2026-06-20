@@ -85,9 +85,15 @@ class ConcurrentWritersTests(TestCase):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "f.txt"
             payloads = [f"payload-{i:04d}-" + "x" * 200 for i in range(50)]
+            errors: list[BaseException] = []
+            errors_lock = threading.Lock()
 
             def writer(payload: str) -> None:
-                atomic_write_text(path, payload, fsync_dir=False)
+                try:
+                    atomic_write_text(path, payload, fsync_dir=False)
+                except Exception as exc:
+                    with errors_lock:
+                        errors.append(exc)
 
             threads = [threading.Thread(target=writer, args=(p,)) for p in payloads]
             for t in threads:
@@ -95,5 +101,6 @@ class ConcurrentWritersTests(TestCase):
             for t in threads:
                 t.join()
 
+            self.assertEqual([], errors)
             final = path.read_text(encoding="utf-8")
             self.assertIn(final, payloads)
