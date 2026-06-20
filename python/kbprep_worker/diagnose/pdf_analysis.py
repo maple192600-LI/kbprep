@@ -194,9 +194,12 @@ def _page_stats_payload(
 
 def _page_has_multi_column_text(page: Any) -> bool:
     try:
-        blocks = page.get_text("dict").get("blocks", [])
+        page_dict = page.get_text("dict")
     except (RuntimeError, ValueError, TypeError):
         return False
+    if not isinstance(page_dict, dict):
+        return False
+    blocks = page_dict.get("blocks", [])
     text_boxes = [
         block["bbox"]
         for block in blocks
