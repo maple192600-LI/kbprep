@@ -46,7 +46,7 @@ kbprep-batch --input ./sources --output ./.kbprep/batch --mode rules_only
 ```
 
 Every command supports `--help`.
-Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use it to see parent status, per-file status, skipped unsupported files, and the evidence-backed rerun scope.
+Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, and the evidence-backed rerun scope. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
 
 ## Modes
 

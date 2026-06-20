@@ -29,13 +29,14 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
 | conversion_quality_gate | partial | Gate exists; must read Canonical IR evidence across every route. |
 | canonical_ir_contract | partial | Only a minimal manifest; `typed_nodes_available` and `source_spans_available` hardcoded `False`. |
-| document_type_classification | partial (not listed) | Code writes `document_classification.json`; status JSON does not list it as its own capability. |
+| document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | design_only | Reproducibility boundary defined; not the shipped cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
 | pdf_three_tier_routing | partial | Three-tier design (Tier 1 `pymupdf4llm`, Tier 2 `mineru_txt`/`mineru_auto`, Tier 3 `mineru_ocr`) is now landed in protected design §5 and stage 03; code still ships `pdf_text_layer` + `mineru_auto`/`mineru_ocr`; Tier 1 and the six fixtures are not implemented yet. |
-| media_youtube_optional_routes | design_only | Local media is experimental in capability-matrix; YouTube has no matrix row yet. |
+| media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
+| youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
 
 ## Guiding Principles
 
@@ -62,17 +63,17 @@ Slices:
 
 - **A1** Add `document_type_classification` as its own capability in
   `kbprep-implementation-status.json` (partial), with evidence pointing at the
-  classification code and test.
-- **A2** Split `media_youtube_optional_routes` into `media_local_transcript`
-  and `youtube_url_routes` in the status JSON.
-- **A3** Add an explicit YouTube row in `capability-matrix.md`
-  (target/design_only until evidence exists).
-- **A4** Strengthen governance: `implementation-status.mjs` must check stage
-  coverage and require status evidence to reference code or tests (problem
-  list P1-09).
+  classification code and tests.
+- **A2** Keep `media_local_transcript` and `youtube_url_routes` separate in
+  the status JSON.
+- **A3** Add an explicit target-only YouTube row in `capability-matrix.md`
+  while keeping the route unsupported/design-only until evidence exists.
+- **A4** Strengthen governance: `implementation-status.mjs` checks required
+  capability coverage and requires implemented/partial status evidence to
+  reference code or tests.
 - **A5** Document the two batch manifest names (`batch_manifest.json` run list
   vs `kbprep_batch_manifest.json` cleanup retention) in README and
-  `docs/standalone-cli.md` (problem list P1-10).
+  `docs/standalone-cli.md`.
 
 Acceptance: `npm run dev:check` passes; status JSON lists classification and
 the split media/YouTube capabilities; capability matrix has a YouTube row;

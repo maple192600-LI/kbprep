@@ -50,7 +50,7 @@ kbprep-batch --input ./sources --output ./.kbprep/batch
 ```
 
 The CLI prints JSON envelopes for worker results. Failures use the same shape with `ok: false`, an error code, warnings when available, and evidence paths when available.
-Batch runs also write `batch_manifest.json` with parent status, per-file status, skipped unsupported files, and evidence-backed rerun scope.
+Batch runs write `batch_manifest.json` with parent status, per-file status, skipped unsupported files, and evidence-backed rerun scope. This is the live batch status summary. After a batch output root is finalized with `kbprep-cleanup --action finalize`, cleanup writes `kbprep_batch_manifest.json`; that file is only the retention manifest proving final deliverables were preserved before temporary process artifacts were removed.
 
 ## Output
 
