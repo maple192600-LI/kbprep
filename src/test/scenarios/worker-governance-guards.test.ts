@@ -240,4 +240,127 @@ describe("kbprep worker governance guards", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("blocks implementation status files that omit required capability ids", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-implementation-status-required-"));
+    try {
+      const statusDir = path.join(root, "docs", "development");
+      mkdirSync(statusDir, { recursive: true });
+      writeFileSync(
+        path.join(statusDir, "kbprep-implementation-status.json"),
+        JSON.stringify({
+          schema: "kbprep.implementation_status.v1",
+          capabilities: [
+            {
+              id: "design_source_alignment",
+              label: "Protected design and flowchart alignment",
+              status: "implemented",
+              scope: "Design sources are aligned.",
+              evidence: ["docs/kbprep-core-flow-design.md", "scripts/checks/development-docs.mjs"],
+              prohibitedClaims: [],
+            },
+          ],
+        }, null, 2),
+        "utf8",
+      );
+
+      const result = spawnSync(process.execPath, [
+        "scripts/checks/implementation-status.mjs",
+        "--repo-root",
+        root,
+      ], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("missing required capability id: document_type_classification");
+      expect(result.stderr).toContain("missing required capability id: youtube_url_routes");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("requires implemented and partial status capabilities to cite code or test evidence", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-implementation-status-evidence-"));
+    try {
+      const statusDir = path.join(root, "docs", "development");
+      mkdirSync(statusDir, { recursive: true });
+      writeFileSync(
+        path.join(statusDir, "kbprep-implementation-status.json"),
+        JSON.stringify({
+          schema: "kbprep.implementation_status.v1",
+          capabilities: [
+            statusCapability("design_source_alignment", "implemented", [
+              "docs/kbprep-core-flow-design.md",
+              "scripts/checks/development-docs.mjs",
+            ]),
+            statusCapability("source_side_publish", "implemented", [
+              "README.md",
+              "python/tests/test_publish_safety.py",
+            ]),
+            statusCapability("conversion_quality_gate", "partial", [
+              "docs/development/04-conversion-quality-gate.md",
+              "python/tests/test_conversion_gate.py",
+            ]),
+            statusCapability("canonical_ir_contract", "partial", [
+              "docs/development/02-canonical-ir-contract.md",
+              "python/tests/test_canonical_ir_manifest.py",
+            ]),
+            statusCapability("document_type_classification", "partial", [
+              "docs/development/05-document-type-classification.md",
+            ]),
+            statusCapability("cleaning_policy_snapshot", "design_only", [
+              "docs/development/06-cleaning-policy-library.md",
+            ]),
+            statusCapability("patch_clean_view", "design_only", [
+              "docs/development/07-cleaning-unit-patch-clean-view.md",
+            ]),
+            statusCapability("feedback_rule_learning", "partial", [
+              "docs/feedback-learning.md",
+              "python/tests/test_feedback_proposals.py",
+            ]),
+            statusCapability("batch_playlist_rerun", "partial", [
+              "python/tests/test_batch_status_manifest.py",
+            ]),
+            statusCapability("media_local_transcript", "partial", [
+              "src/test/scenarios/worker-core-runtime-part2.test.ts",
+            ]),
+            statusCapability("youtube_url_routes", "design_only", [
+              "docs/development/11-multimedia-youtube-optional.md",
+            ]),
+          ],
+        }, null, 2),
+        "utf8",
+      );
+
+      const result = spawnSync(process.execPath, [
+        "scripts/checks/implementation-status.mjs",
+        "--repo-root",
+        root,
+      ], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        timeout: 30_000,
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("implemented or partial capabilities must cite at least one code or test evidence file");
+      expect(result.stderr).toContain("document_type_classification");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
+
+function statusCapability(id: string, status: string, evidence: string[]) {
+  return {
+    id,
+    label: id,
+    status,
+    scope: `${id} scope`,
+    evidence,
+    prohibitedClaims: status === "implemented" ? [] : [`${id} is fully implemented`],
+  };
+}
