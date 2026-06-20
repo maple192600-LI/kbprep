@@ -352,6 +352,30 @@ describe("kbprep worker governance guards", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("locks the code-or-test evidence exemption set to design_source_alignment only", () => {
+    const script = readFileSync(
+      path.join(repoRoot, "scripts", "checks", "implementation-status.mjs"),
+      "utf8",
+    );
+    const match = script.match(
+      /codeOrTestEvidenceExemptions\s*=\s*new Set\(\s*\[([\s\S]*?)\]\s*\)/,
+    );
+
+    expect(match, "codeOrTestEvidenceExemptions set must exist").not.toBeNull();
+
+    const ids = match[1]
+      .split(",")
+      .map((entry) => entry.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+
+    // design_source_alignment is the only capability that is genuinely
+    // documentation/script alignment work with no business code, so it is the
+    // only legitimate exemption from the code-or-test evidence rule. Adding
+    // any other id here silently bypasses the rule — update this assertion
+    // deliberately, never by accident.
+    expect(ids).toEqual(["design_source_alignment"]);
+  });
 });
 
 function statusCapability(id: string, status: string, evidence: string[]) {
