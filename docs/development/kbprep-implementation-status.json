@@ -1,16 +1,18 @@
 {
   "schema": "kbprep.implementation_status.v1",
-  "updated": "2026-06-19",
+  "updated": "2026-06-20",
   "capabilities": [
     {
       "id": "design_source_alignment",
       "label": "Protected design and flowchart alignment",
       "status": "implemented",
-      "scope": "The protected Markdown design, HTML flowchart, JSON flowchart contract, and development docs describe the new target architecture.",
+      "scope": "The protected Markdown design, HTML flowchart, JSON flowchart contract, and development docs describe the current target architecture.",
       "evidence": [
         "docs/kbprep-core-flow-design.md",
         "docs/kbprep-full-flowchart.html",
-        "docs/flowchart/kbprep-flow.json"
+        "docs/flowchart/kbprep-flow.json",
+        "scripts/checks/development-docs.mjs",
+        "scripts/checks/flowchart-drift.mjs"
       ],
       "prohibitedClaims": []
     },
@@ -18,11 +20,14 @@
       "id": "source_side_publish",
       "label": "Source-side standard deliverable",
       "status": "implemented",
-      "scope": "The standard profile publishes source-side Markdown and assets when quality gates pass, and records publish reports for published or blocked decisions.",
+      "scope": "The standard profile publishes source-side Markdown and assets when quality gates pass, preserves Markdown sources by using .cleaned.md, and records publish reports for published or blocked decisions.",
       "evidence": [
         "README.md",
         "docs/standalone-cli.md",
-        "docs/quality-loop.md"
+        "docs/quality-loop.md",
+        "python/kbprep_worker/prepare_publish.py",
+        "python/tests/test_publish_safety.py",
+        "src/test/scenarios/worker-obsidian-output-part1.test.ts"
       ],
       "prohibitedClaims": []
     },
@@ -30,9 +35,12 @@
       "id": "conversion_quality_gate",
       "label": "Conversion quality gate",
       "status": "partial",
-      "scope": "Current code has conversion quality checks; the target gate must read Canonical IR evidence across every route.",
+      "scope": "Current code has conversion quality checks and manifest checks; the target gate must read complete Canonical IR typed-node and source-span evidence across every route.",
       "evidence": [
-        "docs/development/04-conversion-quality-gate.md"
+        "docs/development/04-conversion-quality-gate.md",
+        "python/kbprep_worker/quality/conversion_gate.py",
+        "python/tests/test_conversion_gate.py",
+        "src/test/scenarios/worker-quality-gates-part1.test.ts"
       ],
       "prohibitedClaims": [
         "all conversion routes have complete Canonical IR gate coverage"
@@ -50,6 +58,20 @@
       ],
       "prohibitedClaims": [
         "Canonical IR is the complete shipped worker fact layer"
+      ]
+    },
+    {
+      "id": "document_type_classification",
+      "label": "Document type classification",
+      "status": "partial",
+      "scope": "The worker writes document_classification.json with conservative policy-use gating; the full target ClassificationPack and DocumentTypeSnapshot contract is not complete.",
+      "evidence": [
+        "docs/development/05-document-type-classification.md",
+        "python/kbprep_worker/document_type.py",
+        "python/tests/test_document_classification.py"
+      ],
+      "prohibitedClaims": [
+        "DocumentTypeSnapshot is the complete shipped classification contract"
       ]
     },
     {
@@ -83,7 +105,10 @@
       "scope": "Feedback proposals, acceptance, rejection, rerun evidence, proposal risk notes, and explicit owner confirmation status exist; the target design keeps this proposal-first model.",
       "evidence": [
         "docs/feedback-learning.md",
-        "docs/development/09-feedback-rule-learning.md"
+        "docs/development/09-feedback-rule-learning.md",
+        "python/kbprep_worker/feedback/proposals.py",
+        "python/tests/test_feedback_proposals.py",
+        "src/test/scenarios/worker-feedback-proposals-part1.test.ts"
       ],
       "prohibitedClaims": [
         "feedback learning proves every promoted rule against all future sources"
@@ -104,10 +129,27 @@
       ]
     },
     {
-      "id": "media_youtube_optional_routes",
-      "label": "Media and YouTube optional routes",
+      "id": "media_local_transcript",
+      "label": "Local media transcript route",
+      "status": "partial",
+      "scope": "Local audio/video detection and external transcript routing are declared, and dependency failures are surfaced; route-level status remains experimental until real ASR fixtures prove quality.",
+      "evidence": [
+        "docs/development/11-multimedia-youtube-optional.md",
+        "docs/capability-matrix.md",
+        "python/kbprep_worker/converter_capabilities.py",
+        "src/test/scenarios/worker-core-runtime-part2.test.ts",
+        "src/test/scenarios/worker-output-guards-part2.test.ts",
+        "python/tests/golden/formats/manifest.json"
+      ],
+      "prohibitedClaims": [
+        "local media transcript route is verified"
+      ]
+    },
+    {
+      "id": "youtube_url_routes",
+      "label": "YouTube URL route",
       "status": "design_only",
-      "scope": "The target route semantics are documented; current support must be read from the capability matrix.",
+      "scope": "YouTube URL processing is a target optional route only; no standalone CLI URL input, subtitle extraction, media download, or verified fixture support is shipped.",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
         "docs/capability-matrix.md"
