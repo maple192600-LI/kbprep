@@ -11,7 +11,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-cuda = ["torch>=2.8,<3", "torchvision>=0.23,<1"]
+# 锁 torch 2.8.0：lmdeploy 0.11.1（mineru[all] 含）要求 torch==2.8.0；装最新会和 lmdeploy 冲突被降级成 CPU 版。
+# CUDA 加速走 cu126 index（见 python/kbprep_worker/setup_env.py 的 CUDA_TORCH_INDEX_URL）。
+cuda = ["torch==2.8.0", "torchvision==0.23.0"]
 dev = [
     "coverage[toml]>=7.6,<8",
     "mypy>=1.17,<2",

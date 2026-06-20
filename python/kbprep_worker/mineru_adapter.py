@@ -4,6 +4,7 @@ Handles device detection and resource control.
 """
 import logging
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -132,10 +133,39 @@ def _mineru_command(mineru: str, input_p: Path, assets_dir: Path, mode: str, lan
     ]
 
 
+def _ensure_cuda_stub() -> str | None:
+    """Windows + lmdeploy turbomind 需要 CUDA_PATH/bin 下的 CUDA runtime DLLs。
+    从 torch/lib 自带的 CUDA DLLs 镜像出一份 stub，省掉 3GB CUDA toolkit 安装。
+    非 Windows 或无 torch 时返回 None。stub 建在 site-packages/cuda_stub（随 torch）。"""
+    if os.name != "nt":
+        return None
+    try:
+        import torch
+        torch_lib = Path(torch.__file__).parent / "lib"
+        stub_root = torch_lib.parent.parent / "cuda_stub"
+        stub_bin = stub_root / "bin"
+        if (stub_bin / "cudart64_12.dll").exists():
+            return str(stub_root)
+        cuda_dll_keys = ("cudart", "cublas", "nvrtc", "cufft", "cudnn", "curand", "cusolver", "cusparse", "nvtx", "nvjit")
+        dlls = [d for d in torch_lib.glob("*.dll") if any(k in d.name.lower() for k in cuda_dll_keys)]
+        if not dlls:
+            return None
+        stub_bin.mkdir(parents=True, exist_ok=True)
+        for dll in dlls:
+            shutil.copy2(dll, stub_bin / dll.name)
+        return str(stub_root)
+    except Exception:
+        return None
+
+
 def _mineru_environment() -> dict[str, str]:
     env = os.environ.copy()
     _append_local_proxy_bypass(env)
     _apply_optional_mineru_tools_source(env)
+    if not env.get("CUDA_PATH"):
+        stub = _ensure_cuda_stub()
+        if stub:
+            env["CUDA_PATH"] = stub
     device = detect_device()
     env["MINERU_DEVICE_MODE"] = device
     if device == "cpu":

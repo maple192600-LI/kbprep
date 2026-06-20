@@ -12,7 +12,9 @@ import sys
 logger = logging.getLogger(__name__)
 
 CUDA_TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu126"
-CUDA_TORCH_PACKAGES = ["torch>=2.8,<3", "torchvision>=0.23,<1"]
+# 锁 torch 2.8.0：lmdeploy 0.11.1（mineru[all] 含）要求 torch==2.8.0；cu126 既满足版本约束又提供 CUDA。
+# 装 cu126 最新（如 2.12）会和 lmdeploy 版本冲突，pip 会把 torch 降级成 CPU 版导致 CUDA 丢失。
+CUDA_TORCH_PACKAGES = ["torch==2.8.0", "torchvision==0.23.0"]
 CUDA_TORCH_INSTALL_TIMEOUT_SECONDS = int(os.environ.get("KBPREP_CUDA_TORCH_INSTALL_TIMEOUT_SECONDS", "1500"))
 MINERU_INSTALL_PACKAGES = ["mineru[all]>=3.2.1,<4"]
 MINERU_INSTALL_TIMEOUT_SECONDS = int(os.environ.get("KBPREP_MINERU_INSTALL_TIMEOUT_SECONDS", "1800"))
