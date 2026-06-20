@@ -34,7 +34,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
-| pdf_three_tier_routing | partial | Three-tier design (Tier 1 `pymupdf4llm`, Tier 2 `mineru_txt`/`mineru_auto`, Tier 3 `mineru_ocr`) is now landed in protected design §5 and stage 03; code still ships `pdf_text_layer` + `mineru_auto`/`mineru_ocr`; Tier 1 and the six fixtures are not implemented yet. |
+| pdf_three_tier_routing | partial | B1 diagnostic evidence now records recommended tier, route, reason, structure signals, image coverage, and large-PDF sampling; code still ships `pdf_text_layer` + `mineru_auto`/`mineru_ocr`; Tier 1 and the six fixtures are not implemented yet. |
 | media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
 | youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
 
@@ -82,12 +82,13 @@ governance catches a planted missing-coverage case.
 ### Phase B — PDF Three-Tier Routing
 
 Contract: protected design §5 and `docs/development/03-deterministic-conversion-routing.md`.
-The three-tier design is already defined at the design source (landed this cycle). This phase is implementation and fixtures only: replace the flat `pdf_text_layer` default with the three tiers and promote `pdf_diagnosis_selected` from partial toward verified.
+The three-tier design is already defined at the design source (landed this cycle). This phase is implementation and fixtures only: replace the flat `pdf_text_layer` default with the three tiers and strengthen the current partial PDF capability evidence.
 
 Slices:
 
-- **B1** Add diagnostic signals: multi-column, table, image/text interleaving,
-  CID/ToUnicode, image coverage ratio, large-PDF sampling.
+- **B1** Landed: diagnostic evidence now records multi-column, table,
+  image/text interleaving, CID/ToUnicode risk, image coverage ratio,
+  large-PDF sampling, recommended PDF tier, recommended route, and reason.
 - **B2** Tier 1 `pymupdf4llm` for trusted text layer + simple layout.
 - **B3** Tier 2 `mineru_txt` / `mineru_auto` for trusted text layer + complex
   layout.

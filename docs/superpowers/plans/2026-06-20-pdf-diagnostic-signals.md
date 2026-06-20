@@ -936,7 +936,7 @@ If the capability is not present in the current file, do not invent a new status
 Run:
 
 ```powershell
-rg -n "pdf_diagnosis_selected.*verified|PDF three-tier routing.*verified|six acceptance fixtures.*pass|pymupdf4llm.*implemented|B2.*Landed|B3.*Landed|B4.*Landed|B5.*Landed" docs python src
+rg -n "pdf_diagnosis_selected.*verified|PDF three-tier routing.*verified|six acceptance fixtures.*pass|pymupdf4llm.*implemented|B2.*Landed|B3.*Landed|B4.*Landed|B5.*Landed" docs python src -g "!docs/superpowers/plans/**"
 ```
 
 Expected result:
