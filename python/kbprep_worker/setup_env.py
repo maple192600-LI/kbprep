@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 CUDA_TORCH_INDEX_URL = "https://download.pytorch.org/whl/cu126"
 CUDA_TORCH_PACKAGES = ["torch>=2.8,<3", "torchvision>=0.23,<1"]
 CUDA_TORCH_INSTALL_TIMEOUT_SECONDS = int(os.environ.get("KBPREP_CUDA_TORCH_INSTALL_TIMEOUT_SECONDS", "1500"))
+MINERU_INSTALL_PACKAGES = ["mineru[all]>=3.2.1,<4"]
+MINERU_INSTALL_TIMEOUT_SECONDS = int(os.environ.get("KBPREP_MINERU_INSTALL_TIMEOUT_SECONDS", "1800"))
 
 # MinerU 运行时后端元数据（来源：MinerU 官方 README 硬件要求表，2026-06 no_cache 核查）。
 # 安装统一用 mineru[all]（含所有核心）；这里描述的是运行时推理后端的选择维度。
@@ -214,12 +216,29 @@ def _install_cuda_torch(python: str, result: dict, actions_taken: list[str]) -> 
         actions_taken.append(f"cuda_install_failed: {exc}")
 
 
+def install_mineru_all(python: str, actions_taken: list[str]) -> None:
+    """Install mineru[all] into the venv. Call AFTER CUDA torch so pip keeps the CUDA build
+    (otherwise a bare `pip install mineru[all]` pulls the Windows CPU torch from PyPI)."""
+    try:
+        subprocess.run(
+            [python, "-m", "pip", "install", "--upgrade", *MINERU_INSTALL_PACKAGES],
+            check=True,
+            timeout=MINERU_INSTALL_TIMEOUT_SECONDS,
+            capture_output=True,
+            text=True,
+        )
+        actions_taken.append("installed_mineru_all")
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        actions_taken.append(f"mineru_install_failed: {exc}")
+
+
 def setup_gpu(
     venv_python: str | None = None,
     device_override: str | None = None,
     backend_override: str | None = None,
+    install_mineru: bool = False,
 ) -> dict:
-    """Detect hardware, install CUDA torch when appropriate, and recommend a MinerU backend."""
+    """Detect hardware, install CUDA torch (and optionally mineru[all]), recommend a backend."""
     python = venv_python or sys.executable
     torch_probe = probe_torch(python)
     result: dict[str, object] = {
@@ -237,13 +256,17 @@ def setup_gpu(
     actions_taken: list[str] = []
     result["actions_taken"] = actions_taken
 
-    gpu_probe = result["gpu"] if isinstance(result["gpu"], dict) else {}
-    result["mineru_backend"], backend_actions = choose_mineru_backend(gpu_probe, backend_override)
-    actions_taken.extend(backend_actions)
-
     if device_override == "cpu":
         actions_taken.append("cuda_install_skipped_device_override_cpu")
+        gpu_probe = result["gpu"] if isinstance(result["gpu"], dict) else {}
+        result["mineru_backend"], backend_actions = choose_mineru_backend(gpu_probe, backend_override)
+        actions_taken.extend(backend_actions)
         return result
 
     _install_cuda_torch(python, result, actions_taken)
+    if install_mineru:
+        install_mineru_all(python, actions_taken)
+    gpu_probe = result["gpu"] if isinstance(result["gpu"], dict) else {}
+    result["mineru_backend"], backend_actions = choose_mineru_backend(gpu_probe, backend_override)
+    actions_taken.extend(backend_actions)
     return result

@@ -99,6 +99,7 @@ def cmd_setup_env(data: dict) -> None:
     ok(data=setup_gpu(
         device_override=data.get("device_override"),
         backend_override=data.get("backend_override"),
+        install_mineru=bool(data.get("install_mineru")),
     ))
 
 

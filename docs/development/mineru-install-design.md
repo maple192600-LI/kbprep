@@ -59,10 +59,14 @@ MinerU 的"规模"不是 pip extra 名，而是**推理后端**的选择：
 - `python/kbprep_worker/preflight.py`：mineru 可用性 + torch/CUDA + GPU + warnings。
 - `README.md` / `docs/standalone-cli.md` Runtime Setup：首次 4 步（建 venv → 升 packaging → 装 worker 依赖 → setup-env probe）。
 
-**待补**（本设计要落地的缺口）：
-1. `setup-env` 检测后**建议后端 + 让用户选 + 小白说明**——当前 `setup_gpu` 只装 torch，不处理后端选择与说明。
-2. 本文档（新增，描述目标设计）。
-3. 调和 `scripts/python-venv.mjs`（dev 引导刻意不装 mineru，只轻量库）与 `pyproject.toml`（`mineru[all]` 核心依赖）——给出统一受控安装入口，dev 可走轻量、终端用户走检测+选择。
+**已实现**（2026-06-21）：
+1. `setup-env` 检测后输出**建议后端 + 各后端说明 + 显存够不够**，支持 `backend_override` 让用户选（`setup_env.py`: `choose_mineru_backend` / `suggest_mineru_backend` / `mineru_backend_options`）。
+2. 本文档（`docs/development/mineru-install-design.md`）。
+3. **统一受控安装入口**：`setup-env` 支持 `install_mineru=true`，一步到位——检测硬件 → 装 cu126 torch（CUDA）→ 装 `mineru[all]` → 给后端建议。**禁止裸 `pip install mineru[all]`**：Windows 上 PyPI 的 torch 默认是 CPU 版，裸装会装错；必须先 cu126 torch 再 mineru[all]，`setup-env` 已按此顺序统筹。
+
+**两条安装路径：**
+- **开发轻量**：`scripts/python-venv.mjs`（dev venv 引导，只装 PyMuPDF/bs4/lxml + 工具，不装 mineru/torch）——用于本地开发、跑测试、CI。
+- **全量（生产 / 老李机器）**：`kbprep_worker.cli setup-env` 传 `{"install_mineru": true}`——统筹装 cu126 torch + mineru[all]，GPU 自动检测并给后端建议。首次运行 mineru 时还要按需下 VLM/OCR 模型（几个 G）。
 
 ## 6. 许可证
 
