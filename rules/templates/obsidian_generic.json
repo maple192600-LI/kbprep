@@ -1,0 +1,27 @@
+{
+  "schema": "kbprep.obsidian_template.v1",
+  "description": "Generic Obsidian knowledge-base template. This is the default Obsidian exporter and must not contain course or self-media assumptions.",
+  "categories": ["Notes"],
+  "default_category": "Notes",
+  "method_category": "Notes",
+  "cognition_category": "Notes",
+  "case_category": "Notes",
+  "social_profile_labels": [],
+  "social_profile_platforms": [],
+  "provenance_terms": ["source", "reference", "来源", "出处", "原文"],
+  "author_bio_terms": ["个人简介", "作者简介", "自我介绍"],
+  "bio_role_terms": [],
+  "author_credential_terms": [],
+  "knowledge_terms": [
+    "步骤", "流程", "参数", "代码", "表格", "数据", "结论", "原因", "风险", "限制", "证据", "示例", "案例", "方法"
+  ],
+  "case_terms": [],
+  "method_terms": [],
+  "cognition_terms": [],
+  "packaging_heading_terms": ["版权声明", "致谢", "写在最后"],
+  "packaging_heading_regexes": [],
+  "brand_heading_replacements": [],
+  "layout_table_terms": [],
+  "brand_program_packaging_terms": [],
+  "translator_back_matter_terms": []
+}

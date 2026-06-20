@@ -1,0 +1,31 @@
+# 10 Batch, Playlist, And Rerun
+
+## Purpose
+
+Run multiple sources as independent child jobs while preserving per-source evidence and final deliverables.
+
+## Flowchart Mapping
+
+This stage supports batch or Playlist controller, child job execution, and parent status summary nodes in the flowchart contract.
+
+## Contract
+
+- Each child job runs the same gates as a single source.
+- A parent job records child status, warnings, and failed items.
+- At least one successful child can produce `completed_with_warnings`.
+- All children failed means parent `failed`.
+- Rerun uses existing run metadata only when the source can be safely located.
+- `batch_manifest.json` records parent status, per-file status, skipped unsupported files, artifact paths, and rerun scope.
+
+## Acceptance
+
+- Batch failure does not hide successful child deliverables.
+- Child jobs publish source-side results independently.
+- Rerun reports unavailable metadata instead of pretending evidence exists.
+- Batch status manifest exists for successful, partially successful, and sample-failed runs.
+
+## Risk And Rollback
+
+Risk: parent status can imply all outputs succeeded when some failed.
+
+Rollback: mark the parent status conservatively and require a failed-items report.

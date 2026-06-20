@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  node:
+    name: Node, CLI, and package checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      - run: npm run release:check
+        timeout-minutes: 25
+
+      - name: Standalone CLI smoke
+        env:
+          KBPREP_SKIP_AUTO_SETUP: "1"
+        run: |
+          mkdir -p .kbprep/ci-smoke
+          cat > .kbprep/ci-smoke/sample.md <<'EOF'
+          # Sample
+
+          Step 1: set threshold=0.8 and record retry_count=3.
+
+          Scan the QR code to join the trial group.
+          EOF
+          node dist/adapters/standalone/bin/preflight.js --help
+          node dist/adapters/standalone/bin/analyze.js --input .kbprep/ci-smoke/sample.md --output .kbprep/ci-smoke/analyze
+          node dist/adapters/standalone/bin/prepare.js --input .kbprep/ci-smoke/sample.md --output .kbprep/ci-smoke/prepare --force
+          node dist/adapters/standalone/bin/cleanup.js --output .kbprep/ci-smoke/prepare --dry-run
+          if node dist/adapters/standalone/bin/apply-review.js --run-dir .kbprep/ci-smoke/missing-review > .kbprep/ci-smoke/apply-review-error.json; then
+            echo "apply-review without a patch should fail"
+            exit 1
+          fi
+          grep -q '"code": "KBPREP_CLI_ERROR"' .kbprep/ci-smoke/apply-review-error.json
+
+      - name: Python worker smoke
+        run: |
+          node scripts/python-venv.mjs -m kbprep_worker.cli --help
+          printf '{"workspace_path":".kbprep/python-ci-smoke","profile":"lite"}' | node scripts/python-venv.mjs -m kbprep_worker.cli preflight --json-stdin
+
+  python-worker:
+    name: Python worker unit tests on ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Python worker import, help, and unit tests
+        run: |
+          node scripts/python-venv.mjs -m kbprep_worker.cli --help
+          node scripts/python-venv.mjs -m unittest discover -s python/tests
+
+  dependency-upgrade-test:
+    name: Latest compatible Python dependencies
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+
+      - name: Install latest compatible worker dependencies
+        timeout-minutes: 15
+        run: node scripts/python-venv.mjs -m pip install --upgrade -e python
+
+      - run: npm run build
+
+      - name: Host-neutral worker smoke
+        env:
+          KBPREP_SKIP_AUTO_SETUP: "1"
+        run: |
+          node scripts/python-venv.mjs -m kbprep_worker.cli --help
+          printf '{"workspace_path":".kbprep/dependency-upgrade-smoke","profile":"lite"}' | node scripts/python-venv.mjs -m kbprep_worker.cli preflight --json-stdin
+          node dist/adapters/standalone/bin/preflight.js --help

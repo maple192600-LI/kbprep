@@ -1,0 +1,62 @@
+{
+  "schema": "kbprep.ocr_normalization.v1",
+  "fix_rules": [
+    {
+      "pattern": "\\bAll in Al\\b",
+      "replacement": "All in AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.99,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "Al(?=[\\u4e00-\\u9fff])",
+      "replacement": "AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.96,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "Al(?=工具|时代|使用|模型|编程|技术|应用|内容|创作|协作|问答|助手)",
+      "replacement": "AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.96,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "(?<![a-zA-Z])A(?=[\\u4e00-\\u9fff])",
+      "replacement": "AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.9,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "Google Al Studio",
+      "replacement": "Google AI Studio",
+      "rule": "ai_context_fix",
+      "confidence": 0.99,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "YouTubeAl",
+      "replacement": "YouTube AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.99,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    },
+    {
+      "pattern": "AIlinAI",
+      "replacement": "AI in AI",
+      "rule": "ai_context_fix",
+      "confidence": 0.95,
+      "warning_code": "W_OCR_AI_CONFUSION"
+    }
+  ],
+  "review_rules": [
+    {
+      "pattern": "(?<![a-zA-Z])A(?![a-zA-Z])",
+      "replacement": "AI?",
+      "rule": "ai_context_review",
+      "confidence": 0.5
+    }
+  ]
+}

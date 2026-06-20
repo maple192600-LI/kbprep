@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <title>Noisy HTML Golden Fixture</title>
+    <style>.ad-banner { display: none; }</style>
+    <script>window.__tracking = true;</script>
+  </head>
+  <body>
+    <nav>扫码加入社群领取体验卡</nav>
+    <aside class="ad-banner">关注公众号，回复资料包</aside>
+    <article>
+      <h1>Golden HTML 操作教程</h1>
+      <p>第一步：打开 ExampleTool 后台，设置 threshold=0.8，并记录 failure_reason=timeout。</p>
+      <p>第二步：导出结果后复查 retry_count=3，确认 source_id=case-42 没有丢失。</p>
+      <table>
+        <thead>
+          <tr><th>字段</th><th>值</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>threshold</td><td>0.8</td></tr>
+          <tr><td>retry_count</td><td>3</td></tr>
+        </tbody>
+      </table>
+      <pre><code>if failure_reason == "timeout":
+    retry_count = 3</code></pre>
+    </article>
+    <footer>添加微信领取更多课程优惠</footer>
+  </body>
+</html>

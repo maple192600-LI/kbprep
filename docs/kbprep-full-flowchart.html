@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KBPrep Full Flowchart</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --ink: #182033;
+      --muted: #5b6475;
+      --line: #c9d1df;
+      --card: #ffffff;
+      --accent: #2563eb;
+      --warn: #b45309;
+      --fail: #b91c1c;
+      --ok: #15803d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 24px 32px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+    main {
+      padding: 24px 32px 40px;
+    }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .flow-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    svg {
+      display: block;
+      min-width: 1420px;
+      min-height: 1120px;
+    }
+    .node rect {
+      fill: var(--card);
+      stroke: #93a4bd;
+      stroke-width: 1.2;
+      rx: 7;
+    }
+    .node text {
+      font-size: 13px;
+      fill: var(--ink);
+      text-anchor: middle;
+      dominant-baseline: middle;
+    }
+    .node.gate rect { stroke: var(--accent); stroke-width: 2; }
+    .node.fail rect { stroke: var(--fail); }
+    .node.done rect { stroke: var(--ok); }
+    .edge { stroke: #6b7280; stroke-width: 1.4; fill: none; marker-end: url(#arrowNext); }
+    .edge.branch { stroke: var(--warn); marker-end: url(#arrowBranch); }
+    .edge.fail { stroke: var(--fail); marker-end: url(#arrowFail); }
+    .edge.pass { stroke: var(--ok); marker-end: url(#arrowPass); }
+    .edge.loop { stroke: var(--accent); stroke-dasharray: 5 4; marker-end: url(#arrowLoop); }
+    .edge-label {
+      font-size: 12px;
+      fill: var(--muted);
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 4;
+    }
+    .stage-label {
+      font-size: 15px;
+      font-weight: 600;
+      fill: #24324a;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>KBPrep Full Flowchart</h1>
+    <div class="subtitle">Canonical IR, quality gates, deterministic cleanup, Clean View, and source-side publication.</div>
+  </header>
+  <main>
+    <div class="legend">
+      <span><i class="dot" style="background: var(--accent)"></i>quality gate</span>
+      <span><i class="dot" style="background: var(--ok)"></i>pass</span>
+      <span><i class="dot" style="background: var(--fail)"></i>fail</span>
+      <span><i class="dot" style="background: var(--warn)"></i>branch</span>
+    </div>
+    <div class="flow-wrap">
+      <svg id="flow" viewBox="0 0 1420 1120" role="img" aria-label="KBPrep full flowchart"></svg>
+    </div>
+  </main>
+  <script>
+const NODE_LABELS = {
+  A: "提交输入",
+  B: "创建任务",
+  C: "检查来源",
+  D: "不支持则停止",
+  E: "选择唯一转换路线",
+  F: "转换为 Canonical IR",
+  G: "转换质量门",
+  H: "PDF 一次升级 MinerU",
+  I: "失败且不更新旧成果",
+  J: "非破坏规范化",
+  K: "建立结构索引",
+  L: "构建分类材料",
+  M: "保存类型快照",
+  N: "编译清洗策略快照",
+  O: "规划内部清洗单元",
+  P: "生成清洗 Patch",
+  Q: "Patch 质量门",
+  R: "拒绝风险 Patch 并保留原文",
+  S: "组装 Clean View",
+  T: "整文清洗质量门",
+  U: "渲染 Markdown 和 assets",
+  V: "发布质量门",
+  W: "原子发布 source-side 交付物",
+  X: "完成或带警告完成",
+  Y: "记录用户反馈",
+  Z: "生成规则提案",
+  AA: "确认后进入规则库",
+  AB: "批量或 Playlist 控制器",
+  AC: "子任务独立执行",
+  AD: "汇总批量状态"
+};
+const RANKS = [
+  ["A"],
+  ["B", "AB"],
+  ["C", "AC"],
+  ["D", "E", "AD"],
+  ["F"],
+  ["G"],
+  ["H", "I", "J"],
+  ["K"],
+  ["L"],
+  ["M"],
+  ["N"],
+  ["O"],
+  ["P"],
+  ["Q"],
+  ["R", "S"],
+  ["T"],
+  ["U"],
+  ["V"],
+  ["W"],
+  ["X"],
+  ["Y"],
+  ["Z"],
+  ["AA"]
+];
+const EDGES = [
+  ["A", "B", "single", "next"],
+  ["A", "AB", "batch", "branch"],
+  ["AB", "AC", "expand", "next"],
+  ["AC", "B", "per child", "loop"],
+  ["AC", "AD", "summary", "next"],
+  ["AD", "X", "parent status", "next"],
+  ["B", "C", "", "next"],
+  ["C", "D", "unsupported", "branch"],
+  ["C", "E", "supported", "pass"],
+  ["E", "F", "", "next"],
+  ["F", "G", "", "next"],
+  ["G", "H", "PDF upgrade", "branch"],
+  ["H", "F", "retry once", "loop"],
+  ["G", "I", "strict fail", "fail"],
+  ["G", "J", "pass", "pass"],
+  ["J", "K", "", "next"],
+  ["K", "L", "", "next"],
+  ["L", "M", "", "next"],
+  ["M", "N", "", "next"],
+  ["N", "O", "", "next"],
+  ["O", "P", "", "next"],
+  ["P", "Q", "", "next"],
+  ["Q", "R", "unsafe patch", "fail"],
+  ["Q", "S", "accepted", "pass"],
+  ["R", "S", "with warning", "next"],
+  ["S", "T", "", "next"],
+  ["T", "I", "strict fail", "fail"],
+  ["T", "U", "pass", "pass"],
+  ["U", "V", "", "next"],
+  ["V", "I", "strict fail", "fail"],
+  ["V", "W", "pass", "pass"],
+  ["W", "X", "", "next"],
+  ["X", "Y", "feedback", "branch"],
+  ["Y", "Z", "", "next"],
+  ["Z", "AA", "accept", "pass"],
+  ["AA", "N", "future run", "loop"]
+];
+const STAGES = [
+  ["输入和任务", 0],
+  ["批量控制", 1],
+  ["转换和质量门", 4],
+  ["结构和分类", 7],
+  ["清洗策略和 Patch", 10],
+  ["Clean View 和发布", 14],
+  ["反馈学习", 20]
+];
+
+const NODE_TYPES = new Map([
+  ["D", "fail"], ["I", "fail"], ["X", "done"],
+  ["G", "gate"], ["Q", "gate"], ["T", "gate"], ["V", "gate"]
+]);
+const POSITIONS = {};
+const rowGap = 82;
+const colGap = 250;
+RANKS.forEach((rank, row) => {
+  const y = 70 + row * rowGap;
+  const total = (rank.length - 1) * colGap;
+  rank.forEach((id, col) => {
+    POSITIONS[id] = { x: 710 - total / 2 + col * colGap, y };
+  });
+});
+
+const svg = document.getElementById("flow");
+svg.innerHTML = `
+  <defs>
+    <marker id="arrowNext" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6b7280"/></marker>
+    <marker id="arrowBranch" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#b45309"/></marker>
+    <marker id="arrowFail" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#b91c1c"/></marker>
+    <marker id="arrowPass" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#15803d"/></marker>
+    <marker id="arrowLoop" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2563eb"/></marker>
+  </defs>
+`;
+
+for (const edge of EDGES) {
+  const [from, to, label = "", kind = "next"] = edge;
+  const a = POSITIONS[from];
+  const b = POSITIONS[to];
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  const midY = (a.y + b.y) / 2;
+  const d = kind === "loop"
+    ? `M ${a.x} ${a.y + 25} C ${a.x - 150} ${midY}, ${b.x - 150} ${midY}, ${b.x} ${b.y - 25}`
+    : `M ${a.x} ${a.y + 25} C ${a.x} ${midY}, ${b.x} ${midY}, ${b.x} ${b.y - 25}`;
+  path.setAttribute("d", d);
+  path.setAttribute("class", `edge ${kind}`);
+  svg.appendChild(path);
+  if (label) {
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", String((a.x + b.x) / 2));
+    text.setAttribute("y", String(midY - 4));
+    text.setAttribute("class", "edge-label");
+    text.textContent = label;
+    svg.appendChild(text);
+  }
+}
+
+for (const [label, rankIndex] of STAGES) {
+  const nodeId = RANKS[rankIndex]?.[0];
+  if (!nodeId) continue;
+  const y = POSITIONS[nodeId].y - 42;
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", "36");
+  text.setAttribute("y", String(y));
+  text.setAttribute("class", "stage-label");
+  text.textContent = label;
+  svg.appendChild(text);
+}
+
+for (const [id, label] of Object.entries(NODE_LABELS)) {
+  const pos = POSITIONS[id];
+  const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  group.setAttribute("class", `node ${NODE_TYPES.get(id) || ""}`);
+  const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+  rect.setAttribute("x", String(pos.x - 88));
+  rect.setAttribute("y", String(pos.y - 25));
+  rect.setAttribute("width", "176");
+  rect.setAttribute("height", "50");
+  const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+  text.setAttribute("x", String(pos.x));
+  text.setAttribute("y", String(pos.y));
+  text.textContent = label;
+  group.appendChild(rect);
+  group.appendChild(text);
+  svg.appendChild(group);
+}
+  </script>
+</body>
+</html>

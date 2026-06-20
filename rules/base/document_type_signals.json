@@ -1,0 +1,88 @@
+{
+  "schema": "kbprep.document_type_signals.v1",
+  "supported_document_types": ["report", "course", "transcript", "webpage", "ebook", "code", "unknown"],
+  "source_type_hints": [
+    {
+      "source_type": "subtitle_transcript",
+      "document_type": "transcript",
+      "score": 8,
+      "reason": "source type is subtitle_transcript"
+    },
+    {
+      "source_type": "pdf_like",
+      "document_type": "report",
+      "score": 1,
+      "reason": "pdf-like sources are often reports unless stronger signals win"
+    }
+  ],
+  "format_hints": [
+    {
+      "detected_format": "subtitle_transcript",
+      "document_type": "transcript",
+      "score": 8,
+      "reason": "detected format is subtitle_transcript"
+    },
+    {
+      "detected_format": "html",
+      "document_type": "webpage",
+      "score": 7,
+      "reason": "detected format is html"
+    },
+    {
+      "detected_format": "ebook",
+      "document_type": "ebook",
+      "score": 8,
+      "reason": "detected format is ebook"
+    },
+    {
+      "detected_format": "code",
+      "document_type": "code",
+      "score": 8,
+      "reason": "detected format is code"
+    }
+  ],
+  "content_patterns": [
+    {
+      "document_type": "code",
+      "score": 4,
+      "pattern": "```(?:python|js|ts|javascript|json|bash|sh|yaml|yml)?\\n|^\\s*(?:def|class|import|const|let|function)\\s+",
+      "flags": ["multiline"],
+      "reason": "code fences or source-code syntax detected"
+    },
+    {
+      "document_type": "ebook",
+      "score": 4,
+      "pattern": "\\b(?:chapter|table of contents)\\b|目录|第[一二三四五六七八九十\\d]+章",
+      "flags": ["ignore_case"],
+      "reason": "chapter or table-of-contents signals detected"
+    },
+    {
+      "document_type": "transcript",
+      "score": 4,
+      "pattern": "\\btranscript\\b|^\\s*\\d{1,2}:\\d{2}\\b|访谈|字幕|主持人|嘉宾",
+      "flags": ["ignore_case", "multiline"],
+      "reason": "transcript or timestamp signals detected"
+    },
+    {
+      "document_type": "course",
+      "score": 5,
+      "pattern": "第\\s*[一二三四五六七八九十\\d]+\\s*(?:课|讲)|学习目标|课程|练习[:：]|作业|lesson\\s+\\d+",
+      "flags": ["ignore_case"],
+      "reason": "course, lesson, exercise, or learning-goal signals detected"
+    },
+    {
+      "document_type": "report",
+      "score": 5,
+      "pattern": "报告|摘要|同比|环比|样本量|研究方法|市场规模|趋势|结论|白皮书|survey|report|findings",
+      "flags": ["ignore_case"],
+      "reason": "report, summary, metric, or research signals detected"
+    },
+    {
+      "document_type": "webpage",
+      "score": 4,
+      "pattern": "导航|首页|登录|注册|订阅|cookie|privacy|terms|购物车|阅读全文|上一篇|下一篇|breadcrumb",
+      "flags": ["ignore_case"],
+      "reason": "web navigation or page-wrapper signals detected"
+    }
+  ]
+}

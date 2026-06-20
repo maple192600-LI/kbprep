@@ -1,0 +1,401 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Generic cleanup signals that are not tied to one publishing platform.",
+  "rule_groups": {
+    "generic_cta": {
+      "rules": [
+        "base.promotional_line.companion_video",
+        "base.promotional_line.future_updates"
+      ],
+      "keyword_sets": [
+        "cta_keywords"
+      ]
+    },
+    "english_cta": {
+      "rules": [
+        "base.promotional_line.english_qr_claim",
+        "base.promotional_line.english_signup"
+      ],
+      "keyword_sets": [
+        "cta_keywords"
+      ]
+    },
+    "chinese_cta": {
+      "rules": [
+        "base.promotional_line.companion_video",
+        "base.promotional_line.future_updates"
+      ],
+      "keyword_sets": [
+        "cta_keywords"
+      ]
+    },
+    "web_navigation_footer": {
+      "rules": [],
+      "keyword_sets": [
+        "footer_patterns"
+      ]
+    },
+    "image_qr_signals": {
+      "rules": [],
+      "keyword_sets": [
+        "qr_image_markers",
+        "image_qr_indicators"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "id": "base.promotional_line.companion_video",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "配套视频教程[:：].*",
+      "risk_tag": "promotional_line",
+      "reason": "standalone companion-video/update packaging line"
+    },
+    {
+      "id": "base.promotional_line.future_updates",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "后续更新[:：].*",
+      "risk_tag": "promotional_line",
+      "reason": "standalone update-channel packaging line"
+    },
+    {
+      "id": "base.promotional_line.english_qr_claim",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "scan the qr code.*(?:join|claim|free)",
+      "risk_tag": "promotional_line",
+      "reason": "standalone QR claim call"
+    },
+    {
+      "id": "base.promotional_line.english_signup",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "(?:sign up for free|click here to claim|claim your free)",
+      "risk_tag": "promotional_line",
+      "reason": "standalone signup or claim call"
+    }
+  ],
+  "keyword_sets": {
+    "cta_keywords": [
+      "扫码",
+      "二维码",
+      "扫一扫",
+      "长按识别",
+      "领取福利",
+      "免费领取",
+      "体验卡",
+      "立即购买",
+      "限时优惠",
+      "scan the qr code",
+      "sign up for free",
+      "click here to claim",
+      "claim your free",
+      "free trial group"
+    ],
+    "qr_image_markers": [
+      "qr",
+      "qrcode",
+      "二维码"
+    ],
+    "image_qr_indicators": [
+      "扫码",
+      "二维码",
+      "扫一[扫下]",
+      "QR\\s*code",
+      "qrcode",
+      "添加.*(?:客服|助理|老师)",
+      "免费领取",
+      "体验卡",
+      "长按识别",
+      "全勤打卡",
+      "退款"
+    ],
+    "image_marketing_indicators": [
+      "报名",
+      "优惠",
+      "限时",
+      "特价",
+      "原价",
+      "现价",
+      "核心权益",
+      "学员专享",
+      "背书",
+      "合作伙伴",
+      "排行榜",
+      "榜单",
+      "TOP",
+      "限量名额",
+      "立即购买",
+      "立即报名",
+      "sale",
+      "discount"
+    ],
+    "image_operation_indicators": [
+      "步骤",
+      "操作",
+      "设置",
+      "配置",
+      "界面",
+      "页面",
+      "按钮",
+      "菜单",
+      "工具",
+      "平台",
+      "网站",
+      "APP",
+      "后台",
+      "管理",
+      "截图",
+      "如图",
+      "下图",
+      "点击",
+      "选择",
+      "输入",
+      "保存",
+      "安装",
+      "部署",
+      "导入",
+      "导出",
+      "step",
+      "configure",
+      "settings",
+      "dashboard",
+      "screenshot",
+      "click",
+      "select",
+      "install"
+    ],
+    "image_proof_indicators": [
+      "收入",
+      "年入",
+      "播放量",
+      "数据",
+      "成绩",
+      "案例",
+      "成果",
+      "订单",
+      "转化率",
+      "revenue",
+      "income",
+      "views",
+      "followers",
+      "conversion"
+    ],
+    "image_educational_heading_indicators": [
+      "教程",
+      "步骤",
+      "操作",
+      "设置",
+      "配置",
+      "如何",
+      "怎么",
+      "方法",
+      "案例",
+      "入门",
+      "进阶",
+      "工具"
+    ],
+    "tutorial_indicators": [
+      "步骤",
+      "操作",
+      "设置",
+      "配置",
+      "如何",
+      "怎么",
+      "方法",
+      "流程",
+      "指南",
+      "案例",
+      "复盘",
+      "教程",
+      "tutorial",
+      "step",
+      "guide",
+      "how to",
+      "setup",
+      "workflow"
+    ],
+    "knowledge_terms": [
+      "案例",
+      "示例",
+      "样本",
+      "复盘",
+      "平台规则",
+      "违规",
+      "判断标准",
+      "处理方式",
+      "处理动作",
+      "字段",
+      "代码",
+      "参数",
+      "阈值",
+      "判定",
+      "标记",
+      "记录",
+      "不要",
+      "不得",
+      "不能",
+      "如果",
+      "当",
+      "出现",
+      "限制条件",
+      "清洗",
+      "污染",
+      "污染源",
+      "正文",
+      "上下文",
+      "误删",
+      "删错",
+      "范围",
+      "测试",
+      "账号",
+      "文末引导",
+      "用户运营",
+      "验证需求",
+      "迭代",
+      "实名认证",
+      "分成",
+      "收益",
+      "policy",
+      "rule",
+      "example",
+      "case",
+      "do not",
+      "don't",
+      "should not",
+      "must not",
+      "failure",
+      "threshold",
+      "retry_count"
+    ],
+    "refund_patterns": [
+      "3\\s*天无理由退款"
+    ],
+    "footer_patterns": [
+      "^(?:第\\s*\\d+\\s*页|page\\s*\\d+)$"
+    ],
+    "evidence_patterns": [
+      {
+        "label": "benefit_claim",
+        "pattern": "核心权益|关键权益|服务权益"
+      },
+      {
+        "label": "testimonial",
+        "pattern": "实力背书|合作伙伴|学员评价"
+      },
+      {
+        "label": "revenue_claim",
+        "pattern": "播放量|收入.*年入|转化率"
+      },
+      {
+        "label": "revenue_claim",
+        "pattern": "排行榜|榜单|TOP\\s*\\d+"
+      }
+    ],
+    "marketing_wrapper_heading_terms": [
+      "核心权益",
+      "立即加入",
+      "线下链接",
+      "线下交流",
+      "实力背书",
+      "我们的实力",
+      "学员权益",
+      "限时优惠",
+      "无理由退款",
+      "扫码体验",
+      "免费领取",
+      "领取体验卡",
+      "版权声明",
+      "免责声明",
+      "法律声明",
+      "致谢",
+      "主编",
+      "责任编辑",
+      "写在最后"
+    ],
+    "marketing_wrapper_back_matter_terms": [
+      "写在最后",
+      "版权声明",
+      "致谢",
+      "主编",
+      "责任编辑",
+      "共创伙伴"
+    ],
+    "marketing_wrapper_line_patterns": [
+      "3\\s*天内无理由退款",
+      "\\d+\\s*天内无理由退款",
+      "扫码(?:体验|领取)|长按识别.*(?:体验|领取)",
+      "添加(?:客服|服务官|小助手).*(?:领取|体验)",
+      "本书内容仅供学习与参考",
+      "不构成任何形式的(?:投资|商业|法律)",
+      "任何未经授权.*复制|侵权.*追究"
+    ],
+    "business_method_context_terms": [
+      "方法",
+      "策略",
+      "步骤",
+      "平台规则",
+      "避免被平台限流",
+      "工具",
+      "流量",
+      "转化"
+    ],
+    "transcript_filler_patterns": [
+      "^\\s*(?:大家好|hello\\s*大家好|欢迎来到)[\\s。！!？?]*$",
+      "^\\s*(?:感谢(?:大家)?观看|谢谢大家)[\\s。！!？?]*$",
+      "^\\s*(?:本期|今天)(?:.{0,12})(?:到这里|就到这里)[\\s。！!？?]*$",
+      "^\\s*记得(?:点赞|关注|收藏|转发|三连).{0,20}[\\s。！!？?]*$",
+      "^\\s*点赞关注.{0,20}[\\s。！!？?]*$",
+      "^\\s*(?:下期见|拜拜|bye\\s*bye)[\\s。！!？?]*$",
+      "^\\s*(?:hey|hi|hello)\\s+(?:guys|everyone|folks|friends)[\\s。！!？?]*$",
+      "^\\s*welcome\\s+back(?:\\s+to\\s+(?:my|the)\\s+channel)?[\\s。！!？?]*$",
+      "^\\s*(?:before\\s+we\\s+start\\s+)?(?:don'?t\\s+forget\\s+to\\s+)?(?:like|subscribe|comment|share).{0,40}[\\s。！!？?]*$",
+      "^\\s*(?:smash|hit)\\s+the\\s+(?:like|subscribe)\\s+button.{0,30}[\\s。！!？?]*$",
+      "^\\s*thanks?\\s+for\\s+watching[\\s。！!？?]*$",
+      "^\\s*see\\s+you\\s+(?:next\\s+time|in\\s+the\\s+next\\s+video)[\\s。！!？?]*$",
+      "^\\s*that'?s\\s+(?:it|all)\\s+for\\s+(?:today|this\\s+video)[\\s。！!？?]*$"
+    ],
+    "protected_patterns": [
+      {
+        "label": "operation_step",
+        "pattern": "^\\s*(?:\\d+[\\.\\)）、]\\s+|step\\s*\\d+[：:\\.\\)\\-\\s]+|第?[一二三四五六七八九十百千万\\d]+(?:步|步骤)?[：:、\\.\\s]|步骤\\s*[一二三四五六七八九十百千万\\d]+[：:、\\.\\s])"
+      },
+      {
+        "label": "prompt",
+        "pattern": "提示词|prompt|指令|命令"
+      },
+      {
+        "label": "tool_instruction",
+        "pattern": "工具名|平台名|APP|网站|链接|账号设置|参数|后台|threshold|retry_count"
+      }
+    ],
+    "feedback_protect_intent_terms": [
+      "不该删",
+      "不要删",
+      "误删",
+      "保留",
+      "保护",
+      "keep",
+      "protect"
+    ],
+    "feedback_discard_intent_terms": [
+      "删除",
+      "删掉",
+      "清理",
+      "垃圾",
+      "污染",
+      "广告",
+      "二维码",
+      "扫码",
+      "关注",
+      "remove",
+      "delete"
+    ]
+  }
+}

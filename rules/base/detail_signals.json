@@ -1,0 +1,25 @@
+{
+  "schema": "kbprep.detail_signals.v1",
+  "patterns": {
+    "tool_or_platform": "工具|平台|账号|后台|网站|插件|APP|API|GitHub|YouTube|Obsidian|MinerU|\\b(?:tool|platform|account|dashboard|plugin|workflow)\\b",
+    "parameter": "参数|字段|配置|阈值|限制条件|\\b(?:threshold|retry_count|failure_reason|temperature|top_p|model|seed)\\b|\\b[a-zA-Z_][\\w-]*\\s*=\\s*[^,\\s，。]+",
+    "link": "https?://\\S+|www\\.\\S+",
+    "prompt": "提示词|prompt|指令",
+    "code": "```|`[^`]+`|\\b(?:def|class|const|let|function|import)\\b",
+    "table": "^\\s*\\|.+\\|\\s*$|<table\\b",
+    "number_or_metric": "\\d+(?:\\.\\d+)?\\s*(?:%|GB|MB|KB|ms|s|元|次|个|天)?"
+  },
+  "block_type_categories": {
+    "operation_step": "operation_step",
+    "tool_instruction": "tool_or_platform",
+    "prompt": "prompt",
+    "code": "code",
+    "table": "table"
+  },
+  "strict_categories": [
+    "operation_step",
+    "prompt",
+    "code",
+    "table"
+  ]
+}

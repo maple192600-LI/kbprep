@@ -1,0 +1,120 @@
+{
+  "schema": "kbprep.implementation_status.v1",
+  "updated": "2026-06-19",
+  "capabilities": [
+    {
+      "id": "design_source_alignment",
+      "label": "Protected design and flowchart alignment",
+      "status": "implemented",
+      "scope": "The protected Markdown design, HTML flowchart, JSON flowchart contract, and development docs describe the new target architecture.",
+      "evidence": [
+        "docs/kbprep-core-flow-design.md",
+        "docs/kbprep-full-flowchart.html",
+        "docs/flowchart/kbprep-flow.json"
+      ],
+      "prohibitedClaims": []
+    },
+    {
+      "id": "source_side_publish",
+      "label": "Source-side standard deliverable",
+      "status": "implemented",
+      "scope": "The standard profile publishes source-side Markdown and assets when quality gates pass, and records publish reports for published or blocked decisions.",
+      "evidence": [
+        "README.md",
+        "docs/standalone-cli.md",
+        "docs/quality-loop.md"
+      ],
+      "prohibitedClaims": []
+    },
+    {
+      "id": "conversion_quality_gate",
+      "label": "Conversion quality gate",
+      "status": "partial",
+      "scope": "Current code has conversion quality checks; the target gate must read Canonical IR evidence across every route.",
+      "evidence": [
+        "docs/development/04-conversion-quality-gate.md"
+      ],
+      "prohibitedClaims": [
+        "all conversion routes have complete Canonical IR gate coverage"
+      ]
+    },
+    {
+      "id": "canonical_ir_contract",
+      "label": "Canonical IR contract",
+      "status": "partial",
+      "scope": "The worker emits a minimal partial Canonical IR manifest beside conversion artifacts; full typed nodes, source spans, and universal fact-layer usage are not shipped.",
+      "evidence": [
+        "docs/development/02-canonical-ir-contract.md",
+        "python/kbprep_worker/canonical_ir.py",
+        "python/tests/test_canonical_ir_manifest.py"
+      ],
+      "prohibitedClaims": [
+        "Canonical IR is the complete shipped worker fact layer"
+      ]
+    },
+    {
+      "id": "cleaning_policy_snapshot",
+      "label": "CleaningPolicySnapshot",
+      "status": "design_only",
+      "scope": "The reproducibility boundary is defined, but full snapshot compilation is not yet the shipped cleanup contract.",
+      "evidence": [
+        "docs/development/06-cleaning-policy-library.md"
+      ],
+      "prohibitedClaims": [
+        "CleaningPolicySnapshot fully reproduces every shipped cleanup run"
+      ]
+    },
+    {
+      "id": "patch_clean_view",
+      "label": "CleaningPatch and Clean View",
+      "status": "design_only",
+      "scope": "The target patch and Clean View model is defined, but current cleanup artifacts have not fully moved to that contract.",
+      "evidence": [
+        "docs/development/07-cleaning-unit-patch-clean-view.md"
+      ],
+      "prohibitedClaims": [
+        "every shipped cleanup change is a guarded CleaningPatch"
+      ]
+    },
+    {
+      "id": "feedback_rule_learning",
+      "label": "Proposal-first feedback learning",
+      "status": "partial",
+      "scope": "Feedback proposals, acceptance, rejection, rerun evidence, proposal risk notes, and explicit owner confirmation status exist; the target design keeps this proposal-first model.",
+      "evidence": [
+        "docs/feedback-learning.md",
+        "docs/development/09-feedback-rule-learning.md"
+      ],
+      "prohibitedClaims": [
+        "feedback learning proves every promoted rule against all future sources"
+      ]
+    },
+    {
+      "id": "batch_playlist_rerun",
+      "label": "Batch, Playlist, and rerun",
+      "status": "partial",
+      "scope": "Batch behavior exists for local sources and writes a parent status manifest with evidence-backed rerun scope; Playlist and executable selective rerun still require additional implementation and evidence.",
+      "evidence": [
+        "docs/development/10-batch-playlist-rerun.md",
+        "python/kbprep_worker/batch_manifest.py",
+        "python/tests/test_batch_status_manifest.py"
+      ],
+      "prohibitedClaims": [
+        "Playlist processing is a verified shipped capability"
+      ]
+    },
+    {
+      "id": "media_youtube_optional_routes",
+      "label": "Media and YouTube optional routes",
+      "status": "design_only",
+      "scope": "The target route semantics are documented; current support must be read from the capability matrix.",
+      "evidence": [
+        "docs/development/11-multimedia-youtube-optional.md",
+        "docs/capability-matrix.md"
+      ],
+      "prohibitedClaims": [
+        "YouTube input is a verified standalone CLI capability"
+      ]
+    }
+  ]
+}

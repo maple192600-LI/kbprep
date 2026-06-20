@@ -1,0 +1,45 @@
+{
+  "schema": "kbprep.title_filters.v1",
+  "description": "Source/title packaging terms that should not become the rendered document title.",
+  "split_patterns": [
+    "Anthropic",
+    "Claude",
+    "Building an",
+    "译",
+    "横版",
+    "中文译本",
+    "仅供",
+    "内部研究"
+  ],
+  "reject_patterns": [
+    "Anthropic",
+    "Claude",
+    "译",
+    "中文译本",
+    "仅供",
+    "内部研究",
+    "YouTube"
+  ],
+  "reject_exact": [
+    "目录",
+    "资源",
+    "Resources",
+    "Contents"
+  ],
+  "structural_reject_patterns": [
+    "目录",
+    "Chapter\\d*",
+    "Resources"
+  ],
+  "keyword_score_patterns": [
+    "手册",
+    "指南",
+    "报告",
+    "白皮书",
+    "行动",
+    "Playbook",
+    "Guide",
+    "Manual",
+    "Report"
+  ]
+}

@@ -1,0 +1,11 @@
+# kbprep 项目级 Codex 配置
+# 官方文档确认：项目级 .codex/config.toml 会被自动加载（仅受信任项目）
+# kbprep 已在全局 config.toml 中标记为 trusted
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[features]
+hooks = true
+multi_agent = true
+memories = true

@@ -1,0 +1,54 @@
+{
+  "schema": "kbprep.golden_formats.v1",
+  "purpose": "Records route-level golden evidence requirements without promoting experimental routes prematurely.",
+  "samples": [
+    {
+      "id": "image_ocr_minimal_png",
+      "capability_id": "image_ocr",
+      "extension": ".png",
+      "expected_route": "image_to_pdf_then_mineru_ocr",
+      "expected_status": "experimental",
+      "required_tools": ["mineru"],
+      "real_fixture": false,
+      "manual_acceptance_evidence": false,
+      "promote_to_verified": false,
+      "promotion_blocker": "Needs a real PNG/JPG/SVG fixture and MinerU OCR text-retention evidence."
+    },
+    {
+      "id": "legacy_office_minimal_ppt",
+      "capability_id": "legacy_office_pdf_bridge",
+      "extension": ".ppt",
+      "expected_route": "legacy_office_to_pdf_route",
+      "expected_status": "experimental",
+      "required_tools": ["soffice"],
+      "real_fixture": false,
+      "manual_acceptance_evidence": false,
+      "promote_to_verified": false,
+      "promotion_blocker": "Needs a real DOC/PPT/XLS fixture and LibreOffice-to-PDF preservation evidence."
+    },
+    {
+      "id": "media_local_transcript_minimal_mp4",
+      "capability_id": "media_local_transcript",
+      "extension": ".mp4",
+      "expected_route": "media_to_transcript",
+      "expected_status": "experimental",
+      "required_tools": ["ffmpeg", "whisper"],
+      "real_fixture": false,
+      "manual_acceptance_evidence": false,
+      "promote_to_verified": false,
+      "promotion_blocker": "Needs a real MP3/MP4 fixture and local ASR transcript-quality evidence."
+    },
+    {
+      "id": "mobi_explicitly_unsupported",
+      "capability_id": "mobi_unsupported",
+      "extension": ".mobi",
+      "expected_route": "unsupported",
+      "expected_status": "unsupported",
+      "required_tools": [],
+      "real_fixture": false,
+      "manual_acceptance_evidence": false,
+      "promote_to_verified": false,
+      "promotion_blocker": "MOBI is intentionally out of scope; convert to EPUB/PDF/Markdown/text first."
+    }
+  ]
+}

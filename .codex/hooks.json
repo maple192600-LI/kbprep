@@ -1,0 +1,61 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run dev:check",
+            "commandWindows": "npm run dev:check",
+            "timeout": 180,
+            "statusMessage": "Stop: dev:check"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run python:check-size",
+            "commandWindows": "npm run python:check-size",
+            "timeout": 30,
+            "statusMessage": "Stop: file/function size"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run python:test-contract",
+            "commandWindows": "npm run python:test-contract",
+            "timeout": 60,
+            "statusMessage": "Stop: error-code contract"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run python:ruff",
+            "commandWindows": "npm run python:ruff",
+            "timeout": 60,
+            "statusMessage": "Stop: ruff"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run python:typecheck",
+            "commandWindows": "npm run python:typecheck",
+            "timeout": 90,
+            "statusMessage": "Stop: mypy"
+          }
+        ]
+      }
+    ]
+  }
+}

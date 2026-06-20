@@ -1,0 +1,34 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Report-specific cleanup and protection vocabulary.",
+  "rules": [],
+  "keyword_sets": {
+    "cta_keywords": [],
+    "qr_image_markers": [],
+    "image_qr_indicators": [],
+    "image_marketing_indicators": [],
+    "image_operation_indicators": [],
+    "image_proof_indicators": [],
+    "image_educational_heading_indicators": [],
+    "tutorial_indicators": [],
+    "knowledge_terms": [
+      "报告",
+      "摘要",
+      "样本量",
+      "同比",
+      "环比",
+      "研究方法",
+      "市场规模",
+      "结论"
+    ],
+    "refund_patterns": [],
+    "footer_patterns": [],
+    "evidence_patterns": [],
+    "marketing_wrapper_heading_terms": [],
+    "marketing_wrapper_back_matter_terms": [],
+    "marketing_wrapper_line_patterns": [],
+    "business_method_context_terms": [],
+    "transcript_filler_patterns": [],
+    "protected_patterns": []
+  }
+}

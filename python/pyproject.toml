@@ -1,0 +1,48 @@
+[project]
+name = "kbprep-worker"
+version = "0.5.2"
+description = "KBPrep Python worker: prepare local raw files into clean Markdown"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "mineru[all]>=3.2.1,<4",
+    "PyMuPDF>=1.27,<2",
+    "beautifulsoup4==4.14.3",
+    "lxml==6.0.2"
+]
+
+[project.optional-dependencies]
+cuda = ["torch>=2.8,<3", "torchvision>=0.23,<1"]
+dev = [
+    "coverage[toml]>=7.6,<8",
+    "mypy>=1.17,<2",
+    "pytest>=8,<9",
+    "ruff>=0.8,<1"
+]
+
+[tool.coverage.run]
+branch = true
+source = ["kbprep_worker"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 80
+
+[tool.ruff]
+line-length = 140
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"

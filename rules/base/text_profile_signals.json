@@ -1,0 +1,59 @@
+{
+  "schema": "kbprep.text_profile_signals.v1",
+  "profiles": {
+    "tutorial": [
+      "步骤",
+      "操作",
+      "设置",
+      "配置",
+      "教程",
+      "如何",
+      "怎么",
+      "实操",
+      "案例",
+      "prompt",
+      "提示词",
+      "tutorial",
+      "step",
+      "guide",
+      "how to",
+      "setup",
+      "workflow"
+    ],
+    "meeting_or_interview": [
+      "会议",
+      "讨论",
+      "主持人",
+      "嘉宾",
+      "提问",
+      "回答",
+      "访谈",
+      "meeting",
+      "interview",
+      "host",
+      "guest",
+      "speaker"
+    ],
+    "note": [
+      "笔记",
+      "复盘",
+      "心得",
+      "思考",
+      "总结",
+      "note",
+      "reflection",
+      "summary"
+    ],
+    "ebook_or_long_report": [
+      "目录",
+      "第一章",
+      "第二章",
+      "前言",
+      "附录",
+      "chapter",
+      "table of contents",
+      "preface",
+      "appendix"
+    ]
+  }
+}
