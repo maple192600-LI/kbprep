@@ -310,6 +310,7 @@ def _write_conversion_report(
         "text_layer_health": diagnosis.get("text_layer_health"),
         "pdf_subtype": diagnosis.get("pdf_subtype"),
         "layout_profile": diagnosis.get("layout_profile"),
+        "pdf_route_diagnostics": diagnosis.get("pdf_route_diagnostics"),
         "converted_md": str(output_path),
         "converted_bytes": output_path.stat().st_size if output_path.exists() else 0,
         "mineru_artifacts": mineru_artifacts,
@@ -340,7 +341,7 @@ def _conversion_route_decision(
     fallback_applied = bool(fallback_from) or converter == "mineru_after_pdf_text_layer_fallback"
     fallback_to = actual_route if fallback_applied else None
 
-    return {
+    decision = {
         "declared_capability_id": capability.get("id", ""),
         "declared_route": capability.get("route", ""),
         "declared_status": capability.get("status", ""),
@@ -355,6 +356,12 @@ def _conversion_route_decision(
         "fallback_from": fallback_from,
         "fallback_to": fallback_to,
     }
+    pdf_route = diagnosis.get("pdf_route_diagnostics")
+    if isinstance(pdf_route, dict):
+        decision["selected_pdf_tier"] = pdf_route.get("recommended_tier")
+        decision["pdf_route_reason"] = pdf_route.get("reason", "")
+        decision["pdf_route_diagnostics_schema"] = pdf_route.get("schema")
+    return decision
 
 
 def _selected_route_for_decision(route: ConversionRoute) -> str:

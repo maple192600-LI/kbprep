@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 from typing import Any
 
 from ..detect import detect_language_from_text
@@ -219,7 +221,8 @@ def _page_has_tables(page: Any, text: str) -> bool:
     finder = getattr(page, "find_tables", None)
     if callable(finder):
         try:
-            tables = finder()
+            with contextlib.redirect_stdout(io.StringIO()):
+                tables = finder()
             return bool(getattr(tables, "tables", []))
         except (RuntimeError, ValueError, TypeError):
             return False

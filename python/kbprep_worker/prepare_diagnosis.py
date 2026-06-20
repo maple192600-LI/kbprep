@@ -40,6 +40,7 @@ def write_diagnosis_report(
         "text_layer_health": diagnosis.get("text_layer_health"),
         "pdf_subtype": diagnosis.get("pdf_subtype"),
         "layout_profile": diagnosis.get("layout_profile"),
+        "pdf_route_diagnostics": diagnosis.get("pdf_route_diagnostics"),
         "slide_like_score": diagnosis.get("slide_like_score"),
         "needs_ocr": diagnosis.get("needs_ocr"),
         "processing_hints": diagnosis.get("processing_hints", []),
