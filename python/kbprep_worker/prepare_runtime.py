@@ -1,6 +1,7 @@
 """Runtime metadata helpers for the single-file prepare pipeline."""
 
 import hashlib
+import importlib.metadata
 import json
 import os
 import subprocess
@@ -13,6 +14,9 @@ def check_env(profile: str) -> list[str]:
 
 
 def get_mineru_version() -> str:
+    metadata_version = _mineru_package_version()
+    if metadata_version:
+        return metadata_version
     try:
         from .mineru_adapter import find_mineru
         mineru = find_mineru()
@@ -22,6 +26,15 @@ def get_mineru_version() -> str:
     except Exception:
         pass
     return "unknown"
+
+
+def _mineru_package_version() -> str | None:
+    try:
+        return importlib.metadata.version("mineru")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    except Exception:
+        return None
 
 
 def runtime_snapshot(mineru_version: str) -> dict:

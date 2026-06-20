@@ -15,7 +15,8 @@
 - B1 is landed on the current branch: `pdf_route_diagnostics` records text-layer trust, layout complexity, image coverage, structure signals, text risk, large-PDF sampling, recommended tier, recommended route, and reason.
 - The actual converter still uses `pdf_text_layer` for simple trusted PDFs and MinerU for complex or OCR paths.
 - `docs/development/development-roadmap.md` marks Phase B as partial: B2, B3, B4, and B5 remain open.
-- `docs/development/mineru-install-design.md` and the current `setup-env` backend recommendation code are now part of the repository. Treat them as environment setup and operator guidance for MinerU availability, not as a new Phase B slice.
+- `docs/development/mineru-install-design.md`, `docs/mineru-install-guide.md`, and the current `setup-env` backend recommendation code are now part of the repository. Treat them as environment setup and operator guidance for MinerU availability, not as a new Phase B slice.
+- MinerU local runtime is expected to be ready before real-sample acceptance on this machine: `mineru 3.4.0`, `torch 2.8.0+cu126`, `lmdeploy 0.11.1`, CUDA stub support, and cached PDF/VLM model packs must be rechecked with Task 0 commands before B3-B5 acceptance.
 - MinerU has two separate choices that must not be confused:
   - runtime backend: `pipeline`, `hybrid-engine`, `vlm-engine`, or `http-client` from setup/preflight guidance.
   - parse method: `txt`, `auto`, or `ocr` from Phase B PDF routing.
@@ -28,9 +29,10 @@
 - Public CI tests may still generate minimal sanitized PDFs to keep the repository open-source and deterministic. Those tests prove code paths; Vault smoke proves local real-sample behavior.
 - Do not promote `pdf_diagnosis_selected` to `verified` unless the six acceptance cases pass and the evidence is named in `docs/capability-matrix.md`.
 - Use only project-environment commands as completion evidence.
-- MinerU installation or backend probing may happen before this plan or in parallel, but Phase B implementation must not mutate system-level configuration itself. It may run the project-local `setup-env` and `preflight` commands as evidence that the KBPrep-local runtime is ready.
-- B3, B4, and B5 real-sample acceptance depend on MinerU being available in the selected KBPrep Python runtime. If MinerU installation is still running or fails, keep the route implementation and public mocked tests moving, but do not claim real OCR / complex-PDF acceptance or promote PDF capability status.
-- Phase B owns MinerU parse-method selection (`txt`, `auto`, `ocr`). It does not need to solve MinerU runtime-backend installation. If the existing adapter continues to use `-b pipeline`, record that backend honestly in reports instead of implying the setup-recommended backend was used.
+- MinerU installation is now handled by the project-local setup flow. Phase B must not run `install_mineru=true` unless Task 0 evidence shows the selected KBPrep Python runtime is missing MinerU or has a broken torch/lmdeploy combination.
+- B3, B4, and B5 real-sample acceptance depend on MinerU being available in the selected KBPrep Python runtime. If Task 0 preflight or version probes fail, keep the route implementation and public mocked tests moving, but do not claim real OCR / complex-PDF acceptance or promote PDF capability status.
+- Phase B owns MinerU parse-method selection (`txt`, `auto`, `ocr`). It does not solve MinerU runtime-backend installation. The current KBPrep adapter still executes `-b pipeline`; record that backend honestly in reports instead of implying the setup-recommended `hybrid-engine` backend was used.
+- Preserve the existing MinerU install lock and Windows CUDA stub behavior in `setup_env.py`, `python/pyproject.toml`, and `mineru_adapter.py`. Phase B route work must not downgrade torch/lmdeploy, remove `_ensure_cuda_stub()`, or reintroduce bare `pip install mineru[all]` guidance.
 
 ## File Map
 
@@ -80,6 +82,7 @@
 
 **Files:**
 - Read only: `docs/development/mineru-install-design.md`
+- Read only: `docs/mineru-install-guide.md`
 - Read only: `python/kbprep_worker/setup_env.py`
 - Read only: `python/kbprep_worker/preflight.py`
 
@@ -88,26 +91,28 @@
 Run:
 
 ```powershell
-git ls-files docs/development/mineru-install-design.md python/kbprep_worker/setup_env.py python/kbprep_worker/preflight.py
+git ls-files docs/development/mineru-install-design.md docs/mineru-install-guide.md python/kbprep_worker/setup_env.py python/kbprep_worker/preflight.py
 ```
 
-Expected: all three paths are printed. If `docs/development/mineru-install-design.md` is missing, continue with code truth from `setup_env.py` and report the doc gap before executing B3-B5.
+Expected: all four paths are printed. If either MinerU doc is missing, continue with code truth from `setup_env.py` and report the doc gap before executing B3-B5.
 
 - [ ] **Step 2: Probe the project-local setup environment**
 
 Run:
 
 ```powershell
-'{"backend_override": "pipeline"}' | node scripts/python-venv.mjs -m kbprep_worker.cli setup-env --json-stdin
+'{"install_mineru": false, "backend_override": "hybrid-engine"}' | node scripts/python-venv.mjs -m kbprep_worker.cli setup-env --json-stdin
 ```
 
 Expected:
 
 - JSON envelope has `ok: true`.
 - `data.mineru_backend.chosen` is one of `pipeline`, `hybrid-engine`, `vlm-engine`, or `http-client`.
+- On the owner machine with RTX 4060 Ti, `data.torch.version` should be `2.8.0+cu126`, `data.torch_cuda` should be `true`, and `data.mineru_backend.chosen` should be `hybrid-engine`.
 - `data.actions_taken` does not include `cuda_install_failed:*`.
+- `data.actions_taken` does not include `installed_mineru_all` unless Task 0 is deliberately repairing a missing runtime.
 
-If this command is already running in another Claude Code task, do not start a second competing install. Wait for that task to finish, then run this probe again for evidence.
+If this command is already running in another Claude Code task, do not start a second competing probe/install. Wait for that task to finish, then run this probe again for evidence.
 
 - [ ] **Step 3: Run preflight before real MinerU acceptance**
 
@@ -122,8 +127,25 @@ Expected:
 - JSON envelope has `ok: true`.
 - `data.versions.mineru` is not `not installed`.
 - Warnings about CPU mode or model cache are allowed, but errors are not.
+- Current preflight reports the HuggingFace `PDF-Extract-Kit-1.0` cache only. If B5 acceptance uses hybrid/turbomind evidence, separately verify the ModelScope `MinerU2.5-Pro-2605-1.2B` cache or a real hybrid run; do not treat preflight alone as proof of the VLM model cache.
 
-If preflight fails because MinerU is still installing or the model cache is still downloading, public unit and mocked route tests may continue, but Task 5 real Vault acceptance and capability promotion must wait.
+- [ ] **Step 4: Verify locked versions and CUDA stub**
+
+Run:
+
+```powershell
+node scripts/python-venv.mjs -c "import json, subprocess, sys; import torch, lmdeploy; import kbprep_worker.mineru_adapter as m; p=m.find_mineru(); v=subprocess.run([p,'--version'],capture_output=True,text=True,timeout=30); stub=m._ensure_cuda_stub(); print(json.dumps({'python': sys.executable, 'torch': torch.__version__, 'torch_cuda': torch.cuda.is_available(), 'cuda_version': torch.version.cuda, 'lmdeploy': getattr(lmdeploy,'__version__','unknown'), 'mineru_path': p, 'mineru_version': v.stdout.strip(), 'cuda_stub': stub}, ensure_ascii=False))"
+```
+
+Expected:
+
+- `torch` is `2.8.0+cu126`.
+- `torch_cuda` is `true` on the owner machine.
+- `lmdeploy` is `0.11.1`.
+- `mineru_version` is `mineru, version 3.4.0`.
+- On Windows, `cuda_stub` points under the selected KBPrep venv `site-packages`.
+
+If preflight or the version probe fails because MinerU is still installing or the model cache is still downloading, public unit and mocked route tests may continue, but Task 5 real Vault acceptance and capability promotion must wait.
 
 Commit: no commit. This task only records runtime evidence for later tasks.
 
@@ -769,7 +791,7 @@ Update `_reason()` for Tier 2:
 
 - [ ] **Step 4: Keep MinerU backend explicit in adapter output**
 
-In `python/kbprep_worker/mineru_adapter.py`, add a constant near `DEFAULT_MINERU_TIMEOUT_SECONDS`:
+In `python/kbprep_worker/mineru_adapter.py`, preserve the existing `_ensure_cuda_stub()` / `_mineru_environment()` behavior. Add a constant near `DEFAULT_MINERU_TIMEOUT_SECONDS` so the currently executed backend is named in code and reports:
 
 ```python
 DEFAULT_MINERU_BACKEND = "pipeline"

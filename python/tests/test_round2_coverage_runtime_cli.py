@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from kbprep_worker import cli, mineru_adapter, prepare_diagnosis
+from kbprep_worker import cli, mineru_adapter, prepare_diagnosis, prepare_runtime
 from kbprep_worker.diagnose import runtime as diagnose_runtime
 
 
@@ -68,6 +68,18 @@ class PrepareDiagnosisRound2CoverageTests(unittest.TestCase):
                 [],
             )
             self.assertNotIn("ok", diagnosis)
+
+
+class PrepareRuntimeRound2CoverageTests(unittest.TestCase):
+    def test_get_mineru_version_reads_package_metadata_without_cli(self):
+        with (
+            patch("importlib.metadata.version", return_value="3.4.0"),
+            patch(
+                "kbprep_worker.prepare_runtime.subprocess.run",
+                side_effect=AssertionError("mineru CLI should not run when package metadata is available"),
+            ),
+        ):
+            self.assertEqual(prepare_runtime.get_mineru_version(), "3.4.0")
 
 
 class MinerUAdapterRound2CoverageTests(unittest.TestCase):

@@ -191,8 +191,8 @@ describe("kbprep worker pipeline - core/runtime part 1", () => {
         "result = setup_env.setup_gpu('venv-python')",
         "pip_calls = [cmd for cmd in calls if cmd[:3] == ['venv-python', '-m', 'pip']]",
         "assert len(pip_calls) == 1, calls",
-        "assert 'torch>=2.8,<3' in pip_calls[0], pip_calls",
-        "assert 'torchvision>=0.23,<1' in pip_calls[0], pip_calls",
+        "assert 'torch==2.8.0' in pip_calls[0], pip_calls",
+        "assert 'torchvision==0.23.0' in pip_calls[0], pip_calls",
         "assert '--force-reinstall' in pip_calls[0], pip_calls",
         "assert 'https://download.pytorch.org/whl/cu126' in pip_calls[0], pip_calls",
         "assert calls[-2][2] == setup_env._torch_probe_code(), calls",
@@ -355,4 +355,3 @@ describe("kbprep worker pipeline - core/runtime part 1", () => {
   });
 
 });
-
