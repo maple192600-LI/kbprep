@@ -821,7 +821,7 @@ git add src/test/scenarios/worker-governance-guards.test.ts scripts/checks/imple
 git commit -m "fix: close status governance verification"
 ```
 
-- [ ] **Step 6: Push the branch**
+- [x] **Step 6: Push the branch**
 
 ```powershell
 git status --short --branch
