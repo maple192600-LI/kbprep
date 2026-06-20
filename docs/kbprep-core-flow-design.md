@@ -98,14 +98,40 @@ Route policy:
 - Markdown, text, code, JSON, CSV, TSV, subtitles, and similar text sources use direct readers.
 - Modern Office sources use the declared Office route.
 - EPUB uses the declared EPUB route.
-- PDF uses diagnosis-selected routing.
+- PDF uses the diagnosis-selected three-tier route defined below.
 - Images use the declared OCR route only when the dependency is available.
 - Legacy Office uses the declared PDF bridge only when the dependency is available.
 - Local audio and video must become transcript evidence before classification.
 - YouTube uses available subtitles first; if subtitles are unavailable, the media transcript route may be used when dependencies are available.
 - MOBI remains unsupported until the owner reopens the scope.
 
-PDF may perform one automatic upgrade from a trusted text-layer attempt to MinerU OCR when the conversion quality gate rejects the first result. Other source kinds do not silently cascade through multiple engines.
+PDF route policy:
+
+1. Tier 1, `pymupdf4llm`: use when the text layer is trusted and layout is simple, such as single-column pages with low image density and no complex table or mixed visual structure. This tier replaces flat `get_text("text")` output as the target lightweight PDF path.
+2. Tier 2, `mineru_txt` or `mineru_auto`: use when the text layer is trusted but layout is complex, such as multi-column papers, table-heavy reports, image/text interleaving, slide-like pages, or sources where reading order cannot be trusted from flat text extraction.
+3. Tier 3, `mineru_ocr`: use when the text layer is not trusted, including scanned pages, garbled text, CID or ToUnicode mapping risk, high image coverage, or other evidence that embedded text should be superseded.
+
+PDF diagnosis must record the evidence used to choose the tier. The minimum evidence set is:
+
+- text-layer trust signals
+- layout complexity signals
+- image coverage signals
+- table or multi-column signals when available
+- CID, ToUnicode, replacement-character, private-use, or control-character signals when available
+- dependency availability and selected route
+
+For large PDFs, diagnosis may use representative page sampling, but the sample strategy must be recorded. Sampling must not hide a hard failure discovered by the conversion quality gate.
+
+PDF may perform one automatic upgrade after the first conversion attempt when the conversion quality gate rejects the result. The upgrade must use recorded evidence and must not become an engine competition. Other source kinds do not silently cascade through multiple engines.
+
+Required PDF routing acceptance cases:
+
+- simple single-column PDF -> Tier 1 `pymupdf4llm`
+- English simple text PDF -> Tier 1 without Chinese-ratio false rejection
+- multi-column paper -> Tier 2 `mineru_txt` or `mineru_auto`
+- table-heavy PDF -> Tier 2 `mineru_txt` or `mineru_auto`
+- scanned PDF -> Tier 3 `mineru_ocr`
+- CID or ToUnicode-damaged PDF -> Tier 3 `mineru_ocr`
 
 ## 6. Canonical IR
 
