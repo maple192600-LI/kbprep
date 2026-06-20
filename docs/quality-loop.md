@@ -59,6 +59,10 @@ Publish safety:
 
 `quality_report.json` is the user-readable and machine-readable gate summary.
 `publish_report.json` records whether the final deliverable was published or blocked.
+Runs that fail at the pre-clean conversion gate stop before cleanup, quality
+summary, and publication. For those runs, use the error envelope details,
+`conversion_quality_report.json`, and `error_report.json`; `quality_report.json`
+and `publish_report.json` may not exist yet.
 It should identify:
 
 - gate status

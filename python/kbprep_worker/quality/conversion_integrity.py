@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ..supported_formats import HTML_EXTENSIONS, JSON_EXTENSIONS
 from .io import _read_json_file
 from .markdown_signals import (
     _contains_normalized,
@@ -12,7 +13,9 @@ from .markdown_signals import (
     _strip_fenced_code,
 )
 
-TEXT_SOURCE_INTEGRITY_EXTENSIONS = {".md", ".markdown", ".txt", ".rst", ".adoc"}
+TEXT_SOURCE_INTEGRITY_EXTENSIONS = (
+    {".md", ".markdown", ".txt", ".rst", ".adoc"} | HTML_EXTENSIONS | JSON_EXTENSIONS
+)
 
 def _source_text_layer_status(diagnosis: dict, conversion_report: dict) -> dict:
     text_quality = diagnosis.get("text_quality", {})
@@ -77,7 +80,7 @@ def _source_conversion_integrity(run_p: Path, conversion_report: dict) -> dict:
             converter=converter,
         )
 
-    source_counts = _markdown_structure_counts(input_path.read_text(encoding="utf-8", errors="replace"))
+    source_counts = _markdown_structure_counts(_source_integrity_markdown(input_path, input_extension))
     converted_counts = _markdown_structure_counts(converted_path.read_text(encoding="utf-8", errors="replace"))
     missing_headings = _missing_headings(source_counts["headings"], converted_counts["headings"])
     return {
@@ -99,6 +102,17 @@ def _source_conversion_integrity(run_p: Path, conversion_report: dict) -> dict:
         "converted_image_refs": converted_counts["image_refs"],
         "missing_image_ref_count": max(0, source_counts["image_refs"] - converted_counts["image_refs"]),
     }
+
+def _source_integrity_markdown(input_path: Path, input_extension: str) -> str:
+    text = input_path.read_text(encoding="utf-8", errors="replace")
+    if input_extension in HTML_EXTENSIONS:
+        from ..converters.html import html_to_markdown
+        return html_to_markdown(text, run_dir=None, source_stem=input_path.stem or "html", source_root=input_path.parent)
+    if input_extension in JSON_EXTENSIONS:
+        from ..converters.direct import json_to_markdown
+        return json_to_markdown(text)
+    return text
+
 
 def _empty_source_conversion_integrity(checked: bool, reason: str, input_path: str, converter: str) -> dict:
     return {

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .atomic_io import atomic_write_json
 from .converter_capabilities import get_capability_for_extension
-from .converter_registry import ConversionRoute, select_conversion_route
+from .converter_registry import ConversionRoute, FileIdentity, file_identity_for_path, select_conversion_route
 from .supported_formats import (
     DIRECT_EXTENSIONS,
     FORMAT_BY_EXTENSION,
@@ -56,10 +56,11 @@ def write_diagnosis_report(
 
 
 def diagnosis_fallback(input_path: Path) -> dict:
-    ext = input_path.suffix.lower()
+    identity = file_identity_for_path(input_path)
+    ext = _fallback_extension(input_path, identity)
     detected_format = FORMAT_BY_EXTENSION.get(ext, "unknown")
     capability = get_capability_for_extension(ext)
-    route = select_conversion_route(ext, {})
+    route = select_conversion_route(ext, {}, file_identity=identity)
     pipeline, strategy = _public_diagnosis_route(route)
     return {
         "detected_format": detected_format,
@@ -67,6 +68,21 @@ def diagnosis_fallback(input_path: Path) -> dict:
         "conversion_strategy": strategy,
         "capability": capability,
     }
+
+
+def _fallback_extension(input_path: Path, identity: FileIdentity) -> str:
+    ext = input_path.suffix.lower()
+    if ext:
+        return ext
+    if "pdf_header" in identity.signatures:
+        return ".pdf"
+    if "html_signature" in identity.signatures:
+        return ".html"
+    if "office_content_types" in identity.signatures:
+        return ".docx"
+    if "epub_mimetype" in identity.signatures:
+        return ".epub"
+    return ""
 
 
 def _public_diagnosis_route(route: ConversionRoute) -> tuple[str, str]:

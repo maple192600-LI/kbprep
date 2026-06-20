@@ -11,6 +11,7 @@ from ..converter_registry import ConversionRouteKind, file_identity_for_path, se
 from ..supported_formats import CODE_EXTENSIONS, NOTEBOOK_EXTENSIONS
 from .pipeline_helpers import (
     _converted_text_quality,
+    _pdf_text_layer_fallback_warning,
     _pdf_text_layer_output_needs_ocr,
     _run_mineru_conversion,
     _validate_convertible_container,
@@ -189,6 +190,8 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return "direct_code"
     if ext in NOTEBOOK_EXTENSIONS:
         return "notebook_json"
+    if route == ConversionRouteKind.LEGACY_OFFICE_TO_PDF:
+        return str(artifacts.get("converter") or "legacy_office_to_pdf")
     if artifacts.get("fallback_from") == "pdf_text_layer":
         return "mineru_after_pdf_text_layer_fallback"
     if route == ConversionRouteKind.DIRECT_TEXT:
@@ -199,8 +202,6 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return "epub_xhtml"
     if route == ConversionRouteKind.IMAGE_TO_PDF_OCR:
         return "image_to_pdf_ocr"
-    if route == ConversionRouteKind.LEGACY_OFFICE_TO_PDF:
-        return str(artifacts.get("converter") or "legacy_office_to_pdf")
     if route == ConversionRouteKind.MEDIA_TRANSCRIPT:
         return "media_transcript"
     if route == ConversionRouteKind.PDF_TEXT_LAYER:
@@ -241,14 +242,5 @@ def _maybe_fallback_pdf_text_layer_to_mineru(
     fallback["rejected_text_layer_quality"] = rejected_quality
     ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
     fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
-    fallback["warnings"] = [*fallback.get("warnings", []), _fallback_warning(rejected_quality)]
+    fallback["warnings"] = [*fallback.get("warnings", []), _pdf_text_layer_fallback_warning(rejected_quality)]
     return fallback
-
-
-def _fallback_warning(rejected_quality: dict) -> str:
-    unreadable = rejected_quality.get("unreadable_text_ratio", 0)
-    garbled = rejected_quality.get("garbled_ratio", 0)
-    return (
-        "W_PDF_TEXT_LAYER_FALLBACK_TO_OCR: text-layer conversion produced unreadable Markdown "
-        f"(unreadable={unreadable:.2%}, garbled={garbled:.2%}); reran MinerU in OCR mode."
-    )

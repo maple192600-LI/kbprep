@@ -125,6 +125,7 @@ class ApplyPatchCoverageTests(unittest.TestCase):
             self.assertTrue(Path(outputs["final_assets_dir"], "a.png").exists())
             self.assertIn("source.assets/a.png", Path(outputs["final_md"]).read_text(encoding="utf-8"))
             self.assertEqual(apply_patch_mod._positive_int("bad", 2), 2)
+            self.assertEqual(apply_patch_mod._positive_int(True, 2), 2)
             self.assertEqual(apply_patch_mod._source_title_from_previous_quality({"input_file": str(source)}, run_dir), "source")
 
 
@@ -156,6 +157,7 @@ class PreflightCoverageTests(unittest.TestCase):
                 code, envelope = _capture_envelope(preflight_mod.run, {"workspace_path": tmp, "profile": "lite"})
 
         self.assertEqual(code, 0)
+        self.assertNotIn("ok", envelope["data"])
         versions = envelope["data"]["versions"]
         self.assertEqual(versions["pymupdf"], "1.27.0")
         self.assertEqual(versions["mineru"], "mineru 3.2.1")

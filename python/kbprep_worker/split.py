@@ -42,13 +42,15 @@ def split_into_chunks(
     """
     chunks, warnings = _select_chunks(blocks, source_type, split_strategy)
 
-    if not chunks:
-        return {"chunk_count": 0, "warnings": warnings + ["No chunks produced"]}
-
     run_p = Path(run_dir)
     chunks_dir = run_p / "chunks"
     chunks_dir.mkdir(exist_ok=True)
     _clear_stale_chunks(chunks_dir)
+
+    if not chunks:
+        _write_chunk_manifest(run_p, [])
+        return {"chunk_count": 0, "warnings": warnings + ["No chunks produced"]}
+
     manifest_entries = _write_chunks(chunks, chunks_dir, source_type, split_strategy, source_hash, run_id)
     _write_chunk_manifest(run_p, manifest_entries)
     return {"chunk_count": len(manifest_entries), "warnings": warnings}

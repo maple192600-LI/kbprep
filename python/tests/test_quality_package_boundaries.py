@@ -62,6 +62,31 @@ class QualityPackageBoundaryTests(unittest.TestCase):
         self.assertEqual(integrity["missing_table_count"], 1)
         self.assertTrue(layer["superseded_by_conversion"])
 
+    def test_source_conversion_integrity_checks_html_direct_sources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "source.html"
+            converted = run_dir / "converted.md"
+            source.write_text(
+                "<html><body><h1>Title</h1><h2>Critical Section</h2>"
+                "<table><tr><th>A</th></tr><tr><td>B</td></tr></table></body></html>",
+                encoding="utf-8",
+            )
+            converted.write_text("# Title\n\nBody only.\n", encoding="utf-8")
+            (run_dir / "run_metadata.json").write_text(json.dumps({"input_path": str(source)}), encoding="utf-8")
+            report = {
+                "input_extension": ".html",
+                "converter": "direct_text",
+                "converted_md": str(converted),
+            }
+
+            integrity = source_conversion_integrity(run_dir, report)
+
+        self.assertTrue(integrity["checked"])
+        self.assertEqual(integrity["missing_heading_count"], 1)
+        self.assertEqual(integrity["missing_headings"], ["critical section"])
+        self.assertEqual(integrity["missing_table_count"], 1)
+
     def test_retention_and_gate_helpers_remain_importable(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)

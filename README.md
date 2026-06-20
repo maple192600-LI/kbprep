@@ -70,7 +70,7 @@ When the source is Markdown, KBPrep avoids overwriting it:
 
 Process artifacts remain under the chosen output directory or job directory. Failed runs must not update the previous successful deliverable.
 
-Successful runs expose `latest_outputs.publish_report`. Blocked runs keep `publish_report.json` in the run directory so the owner can see why final publication did not happen.
+Successful runs expose `latest_outputs.publish_report`. Runs blocked after quality checks keep `publish_report.json` in the run directory so the owner can see why final publication did not happen. Runs blocked earlier by the pre-clean conversion gate report `conversion_quality_report.json` and `error_report.json` in the error envelope details instead.
 
 ## Runtime
 

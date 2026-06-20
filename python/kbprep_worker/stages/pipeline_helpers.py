@@ -265,6 +265,15 @@ def _pdf_text_layer_output_needs_ocr(quality: dict) -> bool:
     )
 
 
+def _pdf_text_layer_fallback_warning(rejected_quality: dict) -> str:
+    unreadable = rejected_quality.get("unreadable_text_ratio", 0)
+    garbled = rejected_quality.get("garbled_ratio", 0)
+    return (
+        "W_PDF_TEXT_LAYER_FALLBACK_TO_OCR: text-layer conversion produced unreadable Markdown "
+        f"(unreadable={unreadable:.2%}, garbled={garbled:.2%}); reran MinerU in OCR mode."
+    )
+
+
 
 
 
@@ -326,7 +335,7 @@ def _conversion_route_decision(
     if not capability:
         capability = get_capability_for_extension(input_path.suffix.lower())
 
-    actual_route = _actual_route_for_converter(converter, diagnosis)
+    actual_route = _actual_route_for_converter(converter, diagnosis, mineru_artifacts)
     fallback_from = mineru_artifacts.get("fallback_from") or None
     fallback_applied = bool(fallback_from) or converter == "mineru_after_pdf_text_layer_fallback"
     fallback_to = actual_route if fallback_applied else None
@@ -341,14 +350,24 @@ def _conversion_route_decision(
         "actual_route": actual_route,
         "matched_converter": route.matched_converter,
         "match_evidence": list(route.match_evidence),
-        "selected_route": route.kind.value,
+        "selected_route": _selected_route_for_decision(route),
         "fallback_applied": fallback_applied,
         "fallback_from": fallback_from,
         "fallback_to": fallback_to,
     }
 
 
-def _actual_route_for_converter(converter: str, diagnosis: dict) -> str:
+def _selected_route_for_decision(route: ConversionRoute) -> str:
+    if route.kind.value == "mineru_ocr" and route.conversion_strategy in {
+        "mineru_ocr",
+        "mineru_auto",
+        "mineru_mixed_text_image",
+    }:
+        return route.conversion_strategy
+    return route.kind.value
+
+
+def _actual_route_for_converter(converter: str, diagnosis: dict, mineru_artifacts: dict | None = None) -> str:
     if converter == "mineru_after_pdf_text_layer_fallback":
         return "mineru_ocr"
     if converter == "mineru":
@@ -359,6 +378,8 @@ def _actual_route_for_converter(converter: str, diagnosis: dict) -> str:
     if converter == "image_to_pdf_ocr":
         return "image_to_pdf_then_mineru_ocr"
     if converter.startswith("legacy_office_"):
+        if isinstance(mineru_artifacts, dict) and mineru_artifacts.get("fallback_from") == "pdf_text_layer":
+            return "legacy_office_to_pdf_then_mineru_ocr"
         generated = diagnosis.get("generated_pdf_diagnosis")
         if isinstance(generated, dict):
             return f"legacy_office_to_pdf_then_{generated.get('conversion_strategy', 'pdf_route')}"

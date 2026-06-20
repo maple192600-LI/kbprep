@@ -39,7 +39,7 @@ def run(data: dict) -> None:
     if errors:
         fail("KBPREP_WORKER_NOT_READY", "; ".join(errors), details={"versions": versions}, warnings=warnings)
     else:
-        ok(data={"ok": True, "versions": versions, "warnings": warnings, "errors": errors})
+        ok(data={"versions": versions, "warnings": warnings, "errors": errors})
 
 
 def _record_python_versions(versions: dict[str, Any]) -> None:

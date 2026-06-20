@@ -44,6 +44,30 @@ class SplitRerunCleansStaleChunksTests(unittest.TestCase):
         finally:
             shutil.rmtree(run_dir, ignore_errors=True)
 
+    def test_rerun_to_zero_chunks_clears_stale_files_and_manifest(self) -> None:
+        run_dir = Path(tempfile.mkdtemp(prefix="kbprep-split-rerun-zero-"))
+        try:
+            first_blocks = [_kept_block("kept chunk " + ("x" * 1300), 0)]
+            first = split.split_into_chunks(first_blocks, str(run_dir), "pdf_like", "hash1", "run1")
+            chunks_dir = run_dir / "chunks"
+            self.assertEqual(first["chunk_count"], 1)
+            self.assertEqual(len(list(chunks_dir.glob("*.md"))), 1)
+            self.assertTrue((run_dir / "chunk_manifest.jsonl").read_text(encoding="utf-8").strip())
+
+            discarded_blocks = [{
+                "block_id": "b0",
+                "type": "paragraph",
+                "status": "discard",
+                "text": "discarded content " + ("y" * 1300),
+            }]
+            second = split.split_into_chunks(discarded_blocks, str(run_dir), "pdf_like", "hash2", "run2")
+
+            self.assertEqual(second["chunk_count"], 0)
+            self.assertEqual(list(chunks_dir.glob("*.md")), [])
+            self.assertEqual((run_dir / "chunk_manifest.jsonl").read_text(encoding="utf-8"), "")
+        finally:
+            shutil.rmtree(run_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

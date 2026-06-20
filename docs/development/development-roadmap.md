@@ -96,7 +96,7 @@ Slices:
   English simple text, multi-column paper, table-heavy, scanned,
   CID/ToUnicode-damaged.
 
-Acceptance: `route_decision.json` records selected tier, actual route, and
+Acceptance: `conversion_report.json.route_decision` records selected tier, actual route, and
 reason for every PDF; the six fixtures pass; `pdf_diagnosis_selected` moves
 toward verified in `capability-matrix.md`.
 

@@ -66,7 +66,7 @@ The CLI-safe path is `rules_plus_review_pack`, then `kbprep-apply-review` with a
 - explicit `--profile obsidian_kb`: use `latest_outputs.obsidian_dir`, `latest_outputs.obsidian_index`, and `latest_outputs.obsidian_complete`
 - explicit `--profile curated_obsidian_kb`: compatibility Obsidian template for private local document families
 
-Check `latest_outputs.publish_report` after a successful run. If publication is blocked, inspect the run directory's `publish_report.json` and `quality_report.json`; blocked runs do not update `latest.json`.
+Check `latest_outputs.publish_report` after a successful run. If publication is blocked after cleanup and quality checks, inspect the run directory's `publish_report.json` and `quality_report.json`; blocked runs do not update `latest.json`. If the run stopped at the pre-clean conversion gate, inspect the error envelope details for `conversion_quality_report.json` and `error_report.json` instead; `quality_report.json` and `publish_report.json` may not exist yet.
 
 Use `kbprep-cleanup --action finalize` only after checking `quality_report.json`, `discarded.md`, and `review_needed.md`. Finalize preserves the final deliverable: Obsidian output for Obsidian profiles, or source-side Markdown and assets for standard runs.
 

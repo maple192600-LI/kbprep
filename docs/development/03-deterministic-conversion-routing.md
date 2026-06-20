@@ -49,7 +49,7 @@ Required PDF acceptance fixtures before promotion beyond `partial`:
 ## Acceptance
 
 - `diagnosis_report.json` records selected capability and dependency status.
-- `route_decision.json` records declared route, selected PDF tier when relevant, actual route, fallback or upgrade, and reason.
+- `conversion_report.json.route_decision` records declared route, selected PDF tier when relevant, actual route, fallback or upgrade, and reason.
 - Capability status matches `docs/capability-matrix.md`.
 
 ## Risk And Rollback

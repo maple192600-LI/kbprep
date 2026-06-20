@@ -156,6 +156,12 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
       warnings: [...(result.warnings ?? []), ...aiWarnings, "W_LLM_REVIEW_SKIPPED: all AI review batches failed."],
     };
   }
+  if (combinedPatch.length === 0) {
+    return {
+      ...result,
+      warnings: [...(result.warnings ?? []), ...aiWarnings, "W_LLM_REVIEW_SKIPPED: AI review returned no patch operations."],
+    };
+  }
 
   const applied = await callWorker<T>("apply_review", {
     run_dir: runDir,

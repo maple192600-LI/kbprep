@@ -7,7 +7,12 @@ from pathlib import Path
 
 from ..atomic_io import atomic_write_text
 from ..converter_registry import ConversionRouteKind
-from .pipeline_helpers import _converted_text_quality, _pdf_text_layer_output_needs_ocr, _run_mineru_conversion
+from .pipeline_helpers import (
+    _converted_text_quality,
+    _pdf_text_layer_fallback_warning,
+    _pdf_text_layer_output_needs_ocr,
+    _run_mineru_conversion,
+)
 from .pipeline_state import PipelineError, PipelineState
 
 
@@ -122,6 +127,13 @@ def _maybe_fallback_pdf_text_layer_to_mineru(
         "rejected_text_layer_md": str(rejected_path),
         "rejected_text_layer_quality": rejected_quality,
     })
+    ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
+    fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
+    fallback["warnings"] = [
+        *text_layer_artifacts.get("warnings", []),
+        *fallback.get("warnings", []),
+        _pdf_text_layer_fallback_warning(rejected_quality),
+    ]
     return fallback
 
 

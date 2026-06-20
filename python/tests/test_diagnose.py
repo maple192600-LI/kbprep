@@ -18,7 +18,7 @@ class DiagnoseTests(unittest.TestCase):
                 "source_type": "auto",
             })
 
-        self.assertTrue(result["ok"])
+        self.assertNotIn("ok", result)
         self.assertEqual(result["file_name"], "note.md")
         self.assertEqual(result["detected_format"], "markdown")
         self.assertIsInstance(warnings, list)

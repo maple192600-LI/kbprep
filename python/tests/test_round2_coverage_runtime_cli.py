@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kbprep_worker import cli, mineru_adapter, prepare_diagnosis
+from kbprep_worker.diagnose import runtime as diagnose_runtime
 
 
 class PrepareDiagnosisRound2CoverageTests(unittest.TestCase):
@@ -33,6 +34,9 @@ class PrepareDiagnosisRound2CoverageTests(unittest.TestCase):
             self.assertEqual(prepare_diagnosis.diagnosis_fallback(root / "x.docx")["conversion_strategy"], "office_xml")
             self.assertEqual(prepare_diagnosis.diagnosis_fallback(root / "x.epub")["conversion_strategy"], "epub_xhtml")
             self.assertEqual(prepare_diagnosis.diagnosis_fallback(root / "x.mp3")["conversion_strategy"], "media_to_transcript")
+            extensionless_pdf = root / "extensionless-pdf"
+            extensionless_pdf.write_bytes(b"%PDF-1.7\n% fixture")
+            self.assertEqual(prepare_diagnosis.diagnosis_fallback(extensionless_pdf)["conversion_strategy"], "mineru_ocr")
             self.assertEqual(
                 prepare_diagnosis.diagnosis_fallback(root / "x.unknown")["conversion_strategy"],
                 "unsupported_extension",
@@ -52,6 +56,18 @@ class PrepareDiagnosisRound2CoverageTests(unittest.TestCase):
             report = json.loads((run_dir / "diagnosis_report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["source_sha256"], "hash")
             self.assertTrue(report["needs_ocr"])
+
+            diagnosis = diagnose_runtime._diagnosis_result(
+                pdf_source,
+                "hash",
+                12,
+                "pdf",
+                "book",
+                {"level": "partial"},
+                {"recommended_pipeline": "mineru_ocr"},
+                [],
+            )
+            self.assertNotIn("ok", diagnosis)
 
 
 class MinerUAdapterRound2CoverageTests(unittest.TestCase):

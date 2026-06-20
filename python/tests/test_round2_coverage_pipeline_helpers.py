@@ -165,6 +165,39 @@ class PipelineHelperRound2CoverageTests(unittest.TestCase):
             fallback_issue = pipeline_core._primary_quality_issue({"strict_errors": ["E_CONVERTED_TEXT_UNREADABLE: bad"]})
             self.assertEqual(fallback_issue["gate"], "conversion_integrity")
 
+    def test_conversion_report_preserves_selected_mineru_strategy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            run_dir.mkdir()
+            converted = run_dir / "converted.md"
+            converted.write_text("OCR text", encoding="utf-8")
+            route = ConversionRoute(
+                kind=ConversionRouteKind.MINERU_OCR,
+                converter="mineru",
+                conversion_strategy="mineru_auto",
+                matched_converter="mineru",
+                match_evidence=("extension:.pdf", "pdf_header"),
+            )
+
+            pipeline_core._write_conversion_report(
+                run_dir=run_dir,
+                input_path=root / "input.pdf",
+                output_path=converted,
+                converter="mineru",
+                route=route,
+                source_type="pdf",
+                mineru_artifacts={},
+                runtime={},
+                diagnosis={"conversion_strategy": "mineru_auto"},
+                warnings=[],
+            )
+
+            report = json.loads((run_dir / "conversion_report.json").read_text(encoding="utf-8"))
+            decision = report["route_decision"]
+            self.assertEqual(decision["selected_route"], "mineru_auto")
+            self.assertEqual(decision["actual_route"], "mineru_auto")
+
     def test_error_handlers_source_identity_and_run_outputs_are_explainable(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -212,6 +245,27 @@ class PipelineHelperRound2CoverageTests(unittest.TestCase):
             )
             self.assertEqual(envelope["error"]["code"], "E_CONVERT_FAILED")
             self.assertEqual(envelope["error"]["details"]["mineru_exit_code"], 2)
+
+    def test_prepare_success_payload_does_not_duplicate_envelope_ok(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "input.md"
+            source.write_text("# Title", encoding="utf-8")
+            state = pipeline_core.PipelineState({
+                "input_path": str(source),
+                "output_root": str(root / "out"),
+            })
+            run_dir = root / "out" / "runs" / "r1"
+            (run_dir / "chunks").mkdir(parents=True)
+            (run_dir / "chunks" / "chunk-001.md").write_text("content", encoding="utf-8")
+            state.run_id = "r1"
+            state.latest_outputs = {"final_md": str(root / "input.cleaned.md")}
+
+            code, envelope = _capture_fail(pipeline_core._emit_success, state, run_dir, {})
+
+        self.assertEqual(code, 0)
+        self.assertNotIn("ok", envelope["data"])
+        self.assertEqual(envelope["data"]["run_id"], "r1")
 
 
 if __name__ == "__main__":

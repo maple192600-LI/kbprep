@@ -104,7 +104,6 @@ def _diagnosis_result(
     warnings: list[str],
 ) -> dict:
     result = {
-        "ok": True,
         "file_id": file_hash,
         "file_name": input_p.name,
         "file_size": file_size,

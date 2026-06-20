@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -220,6 +220,87 @@ describe("agent-independent AI review protocol", () => {
       expect(reviewed.data?.ai_review).toBeUndefined();
       expect(reviewed.warnings?.some((warning) => warning.includes("not built into standalone KBPrep"))).toBe(true);
       expect(reviewed.warnings?.some((warning) => warning.includes("all AI review batches failed"))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not apply or publish review when the AI returns an empty patch", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-ai-review-empty-patch-"));
+    try {
+      const outputRoot = path.join(root, "output");
+      const runDir = path.join(outputRoot, "runs", "run-ai-review-empty");
+      mkdirSync(runDir, { recursive: true });
+      mkdirSync(path.join(runDir, "chunks"));
+
+      const block = {
+        block_id: "b_review",
+        source_sha256: "ai-review-source",
+        status: "keep",
+        type: "paragraph",
+        text: "No change is needed.",
+        protected: false,
+        risk_tags: [],
+        confidence: 0.9,
+      };
+      const blocksPath = path.join(runDir, "blocks.jsonl");
+      writeFileSync(blocksPath, `${JSON.stringify(block)}\n`, "utf8");
+      writeFileSync(path.join(runDir, "diagnosis_report.json"), JSON.stringify({ diagnosis: { file_id: "ai-review-source" } }), "utf8");
+      writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
+        source_type: "generic_block",
+        source_sha256: "ai-review-source",
+        plugin_version: "0.5.1",
+      }), "utf8");
+      const reviewPackPath = path.join(runDir, "review_pack.json");
+      writeFileSync(reviewPackPath, JSON.stringify({
+        schema: "kbprep.review_pack.v1",
+        blocks: [block],
+      }), "utf8");
+
+      const seenPrompts: string[] = [];
+      const backend: AIReviewBackend = {
+        async review(params) {
+          seenPrompts.push(params.message);
+          return {
+            messages: [JSON.stringify([])],
+            warning: "W_TEST_BACKEND_USED",
+          };
+        },
+      };
+
+      const initial: WorkerResult<Record<string, unknown>> = {
+        ok: true,
+        data: {
+          run_id: "run-ai-review-empty",
+          run_dir: runDir,
+          outputs: { review_pack: reviewPackPath },
+          latest_outputs: {},
+        },
+        warnings: [],
+      };
+
+      const reviewed = await maybeRunAiReview(
+        initial,
+        { mode: "ai_review", ai_review_backend: "external" },
+        {},
+        {
+          api: { runtime: { aiReviewBackend: backend } },
+          toolCallId: "test-review-empty",
+        },
+        {
+          pythonPath: "python",
+          timeoutMs: 60_000,
+          workerConfig: {},
+        },
+      );
+
+      expect(reviewed.ok).toBe(true);
+      expect(seenPrompts).toHaveLength(1);
+      expect(reviewed.data?.ai_review).toBeUndefined();
+      expect(reviewed.warnings).toContain("W_TEST_BACKEND_USED");
+      expect(reviewed.warnings?.some((warning) => warning.includes("W_LLM_REVIEW_SKIPPED") && warning.includes("no patch operations"))).toBe(true);
+      expect(existsSync(path.join(outputRoot, "latest.json"))).toBe(false);
+      expect(readFileSync(blocksPath, "utf8")).toBe(`${JSON.stringify(block)}\n`);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

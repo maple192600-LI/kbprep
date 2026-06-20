@@ -215,7 +215,6 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
     _stderr_log("info", "original_preserve", f"Skipping: matching run {existing['run_id']}")
     latest_outputs = _publish_latest_outputs(Path(existing["run_dir"]), state.root_p, state.input_p, state.profile)
     ok(data={
-        "ok": True,
         "run_id": existing["run_id"],
         "run_dir": existing["run_dir"],
         "latest_outputs": latest_outputs,
@@ -661,7 +660,6 @@ def _fail_quality_gate(state: PipelineState, run_outputs: dict[str, Any]) -> Non
 def _emit_success(state: PipelineState, run_dir: Path, run_outputs: dict[str, Any]) -> None:
     chunks_dir = run_dir / "chunks"
     ok(data={
-        "ok": True,
         "run_id": state.run_id,
         "run_dir": str(run_dir),
         "latest_outputs": state.latest_outputs,

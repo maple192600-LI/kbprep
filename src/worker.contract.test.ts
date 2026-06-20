@@ -69,6 +69,31 @@ describe("worker command data schemas", () => {
     expect(result.data?.run_dir).toBe("C:/tmp/run-1");
   });
 
+  it("rejects success command data that duplicates the envelope ok field", () => {
+    const envelope = JSON.stringify({
+      ok: true,
+      data: {
+        ok: true,
+        run_id: "run-1",
+        run_dir: "C:/tmp/run-1",
+        latest_outputs: {},
+      },
+    });
+
+    const result = parseEnvelope(envelope, [], "prepare");
+
+    expect(result.ok).toBe(false);
+    expect(result.error?.code).toBe("E_WORKER_BAD_JSON");
+    expect(result.error?.details.command).toBe("prepare");
+    expect(result.error?.details.validation_errors).toEqual([
+      {
+        path: "/data/ok",
+        message: "Success data must not duplicate the envelope ok field.",
+      },
+    ]);
+    expect(parseEnvelope(envelope, []).ok).toBe(false);
+  });
+
   it("rejects cleanup envelopes with non-object data", () => {
     const envelope = JSON.stringify({
       ok: true,

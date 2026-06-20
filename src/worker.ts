@@ -273,9 +273,28 @@ function validateCommandData(
   stdout: string,
   stderrTail: string[],
 ): WorkerResult<Record<string, unknown>> | null {
-  if (!command || !parsed || typeof parsed !== "object") return null;
+  if (!parsed || typeof parsed !== "object") return null;
   const envelope = parsed as { ok?: unknown; data?: unknown };
   if (envelope.ok !== true) return null;
+  if (hasOwnDataOk(envelope.data)) {
+    return {
+      ok: false,
+      error: makeError("E_WORKER_BAD_JSON", "Worker success data duplicated the envelope ok field.", {
+        details: {
+          command,
+          validation_errors: [
+            {
+              path: "/data/ok",
+              message: "Success data must not duplicate the envelope ok field.",
+            },
+          ],
+          stdout_preview: stdout.slice(0, 500),
+          stderr_tail: stderrTail,
+        },
+      }),
+    };
+  }
+  if (!command) return null;
   const schema = WorkerDataSchemas[command as keyof typeof WorkerDataSchemas];
   if (!schema || Value.Check(schema, envelope.data)) return null;
 
@@ -296,6 +315,13 @@ function validateCommandData(
       },
     }),
   };
+}
+
+function hasOwnDataOk(data: unknown): boolean {
+  return typeof data === "object"
+    && data !== null
+    && !Array.isArray(data)
+    && Object.prototype.hasOwnProperty.call(data, "ok");
 }
 
 interface TimeoutMarker extends Error {

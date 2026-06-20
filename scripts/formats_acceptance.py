@@ -38,7 +38,8 @@ def main() -> int:
         "successful": result.wasSuccessful(),
         "covered_routes": [
             "language_detection_ch_en",
-            "pdf_text_layer_or_mineru_auto_or_ocr",
+            "pdf_text_layer_or_mineru_ocr",
+            "mineru_auto_diagnosis_strategy",
             "image_to_pdf_then_mineru_ocr",
             "legacy_office_to_pdf_route",
             "media_to_transcript",
