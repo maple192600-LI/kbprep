@@ -159,9 +159,32 @@ describe("kbprep worker pipeline - batch and long documents part 2", () => {
       expect(garbledDiag.data.needs_ocr).toBe(true);
       expect(garbledDiag.data.conversion_strategy).toBe("mineru_ocr");
       expect(JSON.stringify(garbledDiag.data.warnings)).toContain("W_PDF_TEXT_LAYER_UNTRUSTED");
+
+      expect(textDiag.data.pdf_route_diagnostics.schema).toBe("kbprep.pdf_route_diagnostics.v1");
+      expect(textDiag.data.pdf_route_diagnostics.text_layer.trusted).toBe(true);
+      expect(textDiag.data.pdf_route_diagnostics.layout_complexity.level).toBe("simple");
+      expect(textDiag.data.pdf_route_diagnostics.image_coverage.ratio).toBe(0);
+      expect(textDiag.data.pdf_route_diagnostics.recommended_tier).toBe("tier_1");
+      expect(textDiag.data.pdf_route_diagnostics.recommended_route).toBe("pymupdf4llm");
+
+      expect(imageDiag.data.pdf_route_diagnostics.text_layer.trusted).toBe(false);
+      expect(imageDiag.data.pdf_route_diagnostics.image_coverage.level).toBe("high");
+      expect(imageDiag.data.pdf_route_diagnostics.ocr_triggers).toContain("high_image_coverage");
+      expect(imageDiag.data.pdf_route_diagnostics.recommended_tier).toBe("tier_3");
+      expect(imageDiag.data.pdf_route_diagnostics.recommended_route).toBe("mineru_ocr");
+
+      expect(slideTextDiag.data.pdf_route_diagnostics.text_layer.trusted).toBe(true);
+      expect(slideTextDiag.data.pdf_route_diagnostics.layout_complexity.level).toBe("complex");
+      expect(slideTextDiag.data.pdf_route_diagnostics.structure_signals.slide_like).toBe(true);
+      expect(slideTextDiag.data.pdf_route_diagnostics.recommended_tier).toBe("tier_2");
+      expect(slideTextDiag.data.pdf_route_diagnostics.recommended_route).toBe("mineru_auto");
+
+      expect(garbledDiag.data.pdf_route_diagnostics.text_layer.trusted).toBe(false);
+      expect(garbledDiag.data.pdf_route_diagnostics.text_risk.cid_or_tounicode_risk).toBe(true);
+      expect(garbledDiag.data.pdf_route_diagnostics.ocr_triggers).toContain("untrusted_text_layer");
+      expect(garbledDiag.data.pdf_route_diagnostics.recommended_tier).toBe("tier_3");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 });
-

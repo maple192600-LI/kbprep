@@ -6,6 +6,7 @@ from typing import Any
 
 from ..detect import detect_language_from_text
 from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
+from .pdf_route_diagnostics import build_pdf_route_diagnostics
 from .text_quality import analyze_text_quality, detect_text_profile
 
 
@@ -21,6 +22,7 @@ def analyze_pdf(input_path: str) -> dict:
         # Try basic analysis with mineru's content extraction
         result["text_layer_health"] = "unavailable"
         result["warnings"] = warnings
+        result["pdf_route_diagnostics"] = build_pdf_route_diagnostics(result)
         return result
 
     analysis_errors = _fitz_analysis_errors(fitz)
@@ -57,6 +59,7 @@ def analyze_pdf(input_path: str) -> dict:
             _close_pdf_doc(doc, warnings)
 
     result["warnings"] = warnings
+    result["pdf_route_diagnostics"] = build_pdf_route_diagnostics(result)
     return result
 
 

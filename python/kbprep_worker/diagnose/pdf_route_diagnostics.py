@@ -84,14 +84,20 @@ def _text_risk_signals(diagnosis: dict[str, Any]) -> dict[str, bool]:
     quality = diagnosis.get("text_quality")
     text_quality = quality if isinstance(quality, dict) else {}
     unreadable = _float_value(text_quality.get("unreadable_text_ratio"))
+    garbled = _float_value(text_quality.get("garbled_ratio"))
     mojibake = _float_value(text_quality.get("mojibake_ratio"))
     replacement = _float_value(text_quality.get("replacement_char_ratio"))
     control = _float_value(text_quality.get("control_ratio"))
+    non_common = _float_value(text_quality.get("non_common_unicode_ratio"))
     untrusted = str(diagnosis.get("text_layer_health") or "") in {"bad", "degraded", "untrusted"}
+    garbled_subtype = diagnosis.get("pdf_subtype") == "garbled_text_layer"
     return {
-        "cid_or_tounicode_risk": untrusted and (unreadable > 0 or mojibake > 0),
+        "cid_or_tounicode_risk": untrusted and (
+            garbled_subtype or unreadable > 0 or garbled > 0 or mojibake > 0 or non_common > 0
+        ),
         "replacement_character_risk": replacement > 0,
         "control_character_risk": control > 0,
+        "private_use_or_control_risk": non_common > 0 or control > 0,
     }
 
 
