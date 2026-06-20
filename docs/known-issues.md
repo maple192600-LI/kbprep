@@ -9,7 +9,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 - CleaningPolicySnapshot is documented, but full reproducibility coverage still needs implementation.
 - CleaningPatch and Clean View are target contracts; current cleanup artifacts are not fully migrated.
 - Optional media and YouTube routes require dependency checks, sample evidence, and capability promotion before they are current CLI promises.
-- PDF routing target is now the protected three-tier design: Tier 1 `pymupdf4llm`, Tier 2 `mineru_txt` or `mineru_auto`, Tier 3 `mineru_ocr`. Current implementation records B1 diagnostic tier evidence, but remains `partial` until B2-B5 route behavior and fixture evidence are complete.
+- PDF routing now executes the protected three-tier design, but capability promotion remains blocked until real Vault smoke evidence covers the missing Phase B acceptance classes: `simple_single_column`, `english_simple_text`.
 - Batch manifests now report evidence-backed rerun scope, but executable selective rerun remains limited by available run metadata and current worker contracts.
 
 ## Closed Workflow Risks

@@ -25,7 +25,7 @@ Status values:
 | subtitle_transcript_direct | Subtitle/transcript files | direct_text | verified | utterance order, timestamps when present, speaker-like lines | `src/test/scenarios/worker-direct-content-part1.test.ts::normalizes local subtitle files into readable transcript markdown` | subtitle noise still needs transcript-specific cleanup |
 | office_xml | Modern Office XML | office_xml | partial | document text, slide order, sheet/table text, embedded images when extractable | `src/test/scenarios/worker-local-formats.test.ts::converts modern Office files through the local XML fallback when MinerU is unnecessary` | layout fidelity, charts, and complex workbook semantics are not fully proven |
 | epub_xhtml | EPUB | epub_xhtml | partial | spine order, chapter headings, links, images when referenced | `src/test/scenarios/worker-local-formats.test.ts::converts EPUB ebooks through local XHTML extraction instead of MinerU` | footnotes, complex tables, and custom XHTML need more fixtures |
-| pdf_diagnosis_selected | PDF | pdf_diagnosis_selected | partial | page order, text layer where trusted, layout evidence, OCR text when routed to MinerU, image evidence | `python/tests/test_pdf_route_diagnostics.py`; `src/test/scenarios/worker-batch-long-docs-part2.test.ts::diagnoses text-layer, image-only, and PPT-like PDFs differently`; `src/test/scenarios/worker-local-formats.test.ts::converts trusted text-layer PDFs without invoking MinerU`; `src/test/scenarios/worker-pdf-routing.test.ts::falls back to MinerU when a trusted PDF text-layer conversion produces unreadable Markdown`; `src/test/scenarios/worker-pdf-routing.test.ts::routes image-only scanned PDFs through MinerU OCR and records the actual route` | current implementation records structured B1 tier evidence in `pdf_route_diagnostics`, but remains partial until Tier 1 `pymupdf4llm`, Tier 2 mode split, Tier 3 trigger consolidation, and the six acceptance fixtures are complete |
+| pdf_diagnosis_selected | PDF | pdf_diagnosis_selected | partial | page order, trusted text-layer structure, layout evidence, OCR text when routed to MinerU, image evidence | `src/test/scenarios/worker-local-formats.test.ts::converts trusted simple PDFs through Tier 1 PyMuPDF4LLM`; `src/test/scenarios/worker-batch-long-docs-part2.test.ts::diagnoses text-layer, image-only, and PPT-like PDFs differently`; `src/test/scenarios/worker-pdf-routing-part2.test.ts::classifies the six Phase B public PDF acceptance shapes`; `src/test/scenarios/worker-pdf-routing-part2.test.ts::routes trusted multi-column PDFs through MinerU txt mode`; `src/test/scenarios/worker-pdf-routing-part2.test.ts::falls back to MinerU when a trusted Tier 1 PDF conversion produces unreadable Markdown`; `src/test/scenarios/worker-pdf-routing.test.ts::routes image-only scanned PDFs through MinerU OCR and records the actual route` | Phase B route behavior exists, but promotion remains blocked because `npm run vault:pdf-phase-b` reported missing real sample classes: `simple_single_column`, `english_simple_text`. |
 | image_ocr | Image files | image_to_pdf_then_mineru_ocr | experimental | image text through MinerU OCR, conversion report evidence | `src/test/scenarios/worker-core-runtime-part2.test.ts::diagnoses local external-converter formats and keeps MOBI explicitly unsupported` | OCR quality depends on local MinerU and image quality; current tests mock the external OCR step |
 | legacy_office_pdf_bridge | Legacy Office | legacy_office_to_pdf_route | experimental | LibreOffice-generated PDF evidence, downstream PDF route quality checks | `src/test/scenarios/worker-core-runtime-part2.test.ts::diagnoses local external-converter formats and keeps MOBI explicitly unsupported` | LibreOffice conversion can lose layout or embedded objects; KBPrep records the generated PDF route for audit |
 | media_local_transcript | Audio/video binaries | media_to_transcript | experimental | transcript text, ASR command evidence, Whisper model metadata | `src/test/scenarios/worker-core-runtime-part2.test.ts::declares converter capabilities and exposes the chosen capability through diagnosis` | ASR quality and runtime depend on local Whisper model and media quality; batch processing still excludes media by default |
@@ -47,11 +47,11 @@ preserved structures, test evidence, risk, and reason.
 
 Every successful conversion also writes `conversion_report.json.route_decision`.
 That record compares the declared capability route with the actual converter
-used for this run, including the diagnosed strategy, actual route,
-`fallback_applied`, `fallback_from`, and `fallback_to`. For example, a PDF can
-be declared as `pdf_diagnosis_selected`, diagnosed as `pdf_text_layer`, then
-record an actual route of `mineru_ocr` if the text layer was rejected after
-conversion.
+used for this run, including the selected PDF tier, diagnosed strategy, actual
+route, `fallback_applied`, `fallback_from`, and `fallback_to`. For example, a
+PDF can be declared as `pdf_diagnosis_selected`, selected as Tier 1
+`pymupdf4llm`, then record an actual route of `mineru_ocr` if the converted
+Markdown was rejected as unreadable.
 
 `python/kbprep_worker/converter_capabilities.py` also exposes
 `capability_gap_report()`. That machine-readable report lists every non-verified
@@ -60,6 +60,6 @@ blocker. Package checks validate that every non-verified capability appears in
 this gap report, so new file routes cannot silently imply full support before
 fixtures prove them.
 
-1. Add golden fixtures for every `partial` route before promoting it to `verified`, including PDF Tier 1 simple single-column and English text fixtures, Tier 2 multi-column and table-heavy fixtures, and Tier 3 scanned plus CID or ToUnicode-damaged fixtures.
+1. Add real Vault evidence for the missing PDF classes `simple_single_column` and `english_simple_text` before promoting `pdf_diagnosis_selected` to `verified`.
 2. Add real image OCR, legacy Office, and media ASR fixtures before promoting experimental routes.
 3. Keep MOBI explicitly unsupported unless the project owner later reopens that scope.

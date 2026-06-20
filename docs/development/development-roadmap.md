@@ -34,7 +34,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
-| pdf_three_tier_routing | partial | B1 diagnostic evidence now records recommended tier, route, reason, structure signals, image coverage, and large-PDF sampling; code still ships `pdf_text_layer` + `mineru_auto`/`mineru_ocr`; Tier 1 and the six fixtures are not implemented yet. |
+| pdf_three_tier_routing | partial | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; promotion remains blocked by missing real Vault classes `simple_single_column` and `english_simple_text`. |
 | media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
 | youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
 
@@ -82,25 +82,27 @@ governance catches a planted missing-coverage case.
 ### Phase B — PDF Three-Tier Routing
 
 Contract: protected design §5 and `docs/development/03-deterministic-conversion-routing.md`.
-The three-tier design is already defined at the design source (landed this cycle). This phase is implementation and fixtures only: replace the flat `pdf_text_layer` default with the three tiers and strengthen the current partial PDF capability evidence.
+The three-tier design is already defined at the design source (landed this cycle). This phase implements those tiers and keeps the PDF capability partial until real sample evidence supports promotion.
 
 Slices:
 
 - **B1** Landed: diagnostic evidence now records multi-column, table,
   image/text interleaving, CID/ToUnicode risk, image coverage ratio,
   large-PDF sampling, recommended PDF tier, recommended route, and reason.
-- **B2** Tier 1 `pymupdf4llm` for trusted text layer + simple layout.
-- **B3** Tier 2 `mineru_txt` / `mineru_auto` for trusted text layer + complex
+- **B2** Landed: Tier 1 `pymupdf4llm` handles trusted text layer + simple
   layout.
-- **B4** Tier 3 `mineru_ocr` for untrusted text layer (consolidate existing
-  path with new trigger evidence).
-- **B5** The six acceptance fixtures defined in stage 03: simple single-column,
-  English simple text, multi-column paper, table-heavy, scanned,
-  CID/ToUnicode-damaged.
+- **B3** Landed: Tier 2 selects `mineru_txt` or `mineru_auto` for trusted text
+  layer + complex layout.
+- **B4** Landed: Tier 3 `mineru_ocr` is selected from untrusted text-layer
+  evidence and one-upgrade fallback records its reason.
+- **B5** Open: the six public acceptance shapes pass, but real Vault smoke is
+  missing `simple_single_column` and `english_simple_text` before capability
+  promotion.
 
-Acceptance: `conversion_report.json.route_decision` records selected tier, actual route, and
-reason for every PDF; the six fixtures pass; `pdf_diagnosis_selected` moves
-toward verified in `capability-matrix.md`.
+Acceptance: `conversion_report.json.route_decision` records selected tier,
+actual route, fallback or upgrade, and reason for every PDF; public route-shape
+tests pass; `pdf_diagnosis_selected` stays `partial` until real Vault smoke
+covers the missing classes.
 
 ### Phase C — Canonical IR Typed Nodes And Source Spans
 

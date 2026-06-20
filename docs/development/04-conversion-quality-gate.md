@@ -21,7 +21,7 @@ This stage owns `conversion_quality_gate` in the flowchart contract.
 ## Acceptance
 
 - Hard failures stop before classification and cleanup.
-- PDF upgrade happens at most once.
+- PDF upgrade happens at most once and records `fallback_from`, `fallback_to`, `fallback_reason`, and the rejected Markdown path in `conversion_report.json`.
 - Failure reports explain what the user can change or install.
 - Passing the gate does not mean final output is accepted; it only allows cleanup to begin.
 

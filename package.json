@@ -39,7 +39,8 @@
     "acceptance:formats": "node scripts/python-venv.mjs scripts/formats_acceptance.py",
     "test": "vitest run --pool=forks --maxWorkers=1 --testTimeout=30000",
     "test:coverage": "vitest run --pool=forks --maxWorkers=1 --testTimeout=30000 --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json-summary --coverage.include=src/**/*.ts --coverage.exclude=src/test/** --coverage.exclude=src/adapters/standalone/bin/** --coverage.thresholds.lines=85 --coverage.thresholds.branches=70 --coverage.thresholds.functions=80 --coverage.thresholds.statements=80 && node scripts/checks/ts-coverage-floor.mjs --summary coverage/coverage-summary.json --total-lines 85 --file src/runtime/pythonRuntime.ts --file-lines 80",
-    "vault:smoke": "node scripts/check-vault-smoke.mjs"
+    "vault:smoke": "node scripts/check-vault-smoke.mjs",
+    "vault:pdf-phase-b": "node scripts/check-vault-pdf-phase-b.mjs"
   },
   "files": [
     "dist",

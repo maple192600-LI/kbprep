@@ -22,6 +22,10 @@ from ..supported_formats import IMAGE_EXTENSIONS
 from .pipeline_state import PipelineError
 
 EXISTING_RUN_SCAN_LIMIT = 20
+PDF_FALLBACK_CONVERTERS = {
+    "mineru_after_pdf_text_layer_fallback",
+    "mineru_after_pymupdf4llm_fallback",
+}
 
 
 def _write_blocks(blocks_path: Path, blocks: list[dict[str, Any]]) -> None:
@@ -338,7 +342,7 @@ def _conversion_route_decision(
 
     actual_route = _actual_route_for_converter(converter, diagnosis, mineru_artifacts)
     fallback_from = mineru_artifacts.get("fallback_from") or None
-    fallback_applied = bool(fallback_from) or converter == "mineru_after_pdf_text_layer_fallback"
+    fallback_applied = bool(fallback_from) or converter in PDF_FALLBACK_CONVERTERS
     fallback_to = actual_route if fallback_applied else None
 
     decision = {
@@ -366,6 +370,7 @@ def _conversion_route_decision(
 
 def _selected_route_for_decision(route: ConversionRoute) -> str:
     if route.kind.value == "mineru_ocr" and route.conversion_strategy in {
+        "mineru_txt",
         "mineru_ocr",
         "mineru_auto",
         "mineru_mixed_text_image",
@@ -375,11 +380,18 @@ def _selected_route_for_decision(route: ConversionRoute) -> str:
 
 
 def _actual_route_for_converter(converter: str, diagnosis: dict, mineru_artifacts: dict | None = None) -> str:
-    if converter == "mineru_after_pdf_text_layer_fallback":
+    if converter in PDF_FALLBACK_CONVERTERS:
         return "mineru_ocr"
     if converter == "mineru":
         strategy = str(diagnosis.get("conversion_strategy") or "")
-        if strategy in {"mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}:
+        pdf_route = diagnosis.get("pdf_route_diagnostics")
+        if isinstance(pdf_route, dict) and pdf_route.get("recommended_route") in {
+            "mineru_txt",
+            "mineru_auto",
+            "mineru_ocr",
+        }:
+            return str(pdf_route["recommended_route"])
+        if strategy in {"mineru_txt", "mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}:
             return strategy
         return "mineru"
     if converter == "image_to_pdf_ocr":

@@ -65,10 +65,12 @@ def _run_selected_conversion(
         _convert_epub_route(state, converted_path, run_dir)
     elif route.kind in _EXTERNAL_CONVERSION_ROUTE_KINDS:
         _convert_external_route_kind(state, converted_path, run_dir, route.kind)
+    elif route.kind == ConversionRouteKind.PDF_PYMUPDF4LLM:
+        _convert_pymupdf4llm_route(state, converted_path, run_dir)
     elif route.kind == ConversionRouteKind.PDF_TEXT_LAYER:
         _convert_pdf_text_layer_route(state, converted_path, run_dir)
     elif route.kind == ConversionRouteKind.MINERU_OCR:
-        _convert_mineru_ocr_route(state, converted_path, run_dir)
+        _convert_mineru_ocr_route(state, converted_path, run_dir, route)
 
 
 def _raise_unsupported_conversion_route(route: Any, ext: str) -> None:
@@ -125,18 +127,40 @@ def _convert_external_route_kind(
     _stderr_log("info", "convert", external_route_message(route_kind))
 
 
+def _convert_pymupdf4llm_route(state: PipelineState, converted_path: Path, run_dir: Path) -> None:
+    from ..pymupdf4llm_adapter import convert_pymupdf4llm_pdf
+
+    result = convert_pymupdf4llm_pdf(state.input_p, converted_path, run_dir)
+    state.mineru_artifacts = result
+    state.warnings.extend(result.get("warnings", []))
+    _stderr_log("info", "convert", "PDF converted with PyMuPDF4LLM")
+    fallback = _maybe_fallback_pdf_markdown_to_mineru(
+        input_p=state.input_p,
+        converted_path=converted_path,
+        run_dir=run_dir,
+        language=state.language,
+        source_route="pymupdf4llm",
+        source_artifacts=result,
+    )
+    if fallback:
+        state.mineru_artifacts = fallback
+        state.warnings.extend(fallback.get("warnings", []))
+        _stderr_log("warn", "convert", "PyMuPDF4LLM output was unreadable; fell back to MinerU OCR")
+
+
 def _convert_pdf_text_layer_route(state: PipelineState, converted_path: Path, run_dir: Path) -> None:
     from .. import pdf_text
     result = pdf_text.convert_text_layer_pdf(state.input_p, converted_path, run_dir)
     state.mineru_artifacts = result
     state.warnings.extend(result.get("warnings", []))
     _stderr_log("info", "convert", "PDF text layer converted directly")
-    fallback = _maybe_fallback_pdf_text_layer_to_mineru(
+    fallback = _maybe_fallback_pdf_markdown_to_mineru(
         input_p=state.input_p,
         converted_path=converted_path,
         run_dir=run_dir,
         language=state.language,
-        text_layer_artifacts=result,
+        source_route="pdf_text_layer",
+        source_artifacts=result,
     )
     if fallback:
         state.mineru_artifacts = fallback
@@ -144,11 +168,28 @@ def _convert_pdf_text_layer_route(state: PipelineState, converted_path: Path, ru
         _stderr_log("warn", "convert", "PDF text layer was unreadable; fell back to MinerU OCR")
 
 
-def _convert_mineru_ocr_route(state: PipelineState, converted_path: Path, run_dir: Path) -> None:
-    result = _run_mineru_conversion(state.input_p, converted_path, run_dir, state.language, "auto")
+def _convert_mineru_ocr_route(
+    state: PipelineState,
+    converted_path: Path,
+    run_dir: Path,
+    route: Any | None = None,
+) -> None:
+    strategy = route.conversion_strategy if route else state.diagnosis.get("conversion_strategy")
+    mode = _mineru_mode_for_strategy(strategy)
+    result = _run_mineru_conversion(state.input_p, converted_path, run_dir, state.language, mode)
+    result["mineru_mode"] = mode
     state.mineru_artifacts = result
     state.warnings.extend(result.get("warnings", []))
-    _stderr_log("info", "convert", "MinerU conversion complete")
+    _stderr_log("info", "convert", f"MinerU conversion complete in {mode} mode")
+
+
+def _mineru_mode_for_strategy(strategy: object) -> str:
+    value = str(strategy or "")
+    if value == "mineru_txt":
+        return "txt"
+    if value == "mineru_ocr":
+        return "ocr"
+    return "auto"
 
 
 def _ensure_converted_output(converted_path: Path) -> None:
@@ -194,6 +235,8 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return str(artifacts.get("converter") or "legacy_office_to_pdf")
     if artifacts.get("fallback_from") == "pdf_text_layer":
         return "mineru_after_pdf_text_layer_fallback"
+    if artifacts.get("fallback_from") == "pymupdf4llm":
+        return "mineru_after_pymupdf4llm_fallback"
     if route == ConversionRouteKind.DIRECT_TEXT:
         return "direct_text"
     if route == ConversionRouteKind.OFFICE_XML:
@@ -204,6 +247,8 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return "image_to_pdf_ocr"
     if route == ConversionRouteKind.MEDIA_TRANSCRIPT:
         return "media_transcript"
+    if route == ConversionRouteKind.PDF_PYMUPDF4LLM:
+        return "pymupdf4llm"
     if route == ConversionRouteKind.PDF_TEXT_LAYER:
         return "pdf_text_layer"
     if route == ConversionRouteKind.MINERU_OCR:
@@ -218,14 +263,32 @@ def _maybe_fallback_pdf_text_layer_to_mineru(
     language: str,
     text_layer_artifacts: dict,
 ) -> dict | None:
+    return _maybe_fallback_pdf_markdown_to_mineru(
+        input_p=input_p,
+        converted_path=converted_path,
+        run_dir=run_dir,
+        language=language,
+        source_route="pdf_text_layer",
+        source_artifacts=text_layer_artifacts,
+    )
+
+
+def _maybe_fallback_pdf_markdown_to_mineru(
+    input_p: Path,
+    converted_path: Path,
+    run_dir: Path,
+    language: str,
+    source_route: str,
+    source_artifacts: dict,
+) -> dict | None:
     text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
     rejected_quality = _converted_text_quality(text)
-    text_layer_artifacts["post_convert_text_quality"] = rejected_quality
+    source_artifacts["post_convert_text_quality"] = rejected_quality
 
     if not _pdf_text_layer_output_needs_ocr(rejected_quality):
         return None
 
-    rejected_path = run_dir / "converted.pdf_text_layer.rejected.md"
+    rejected_path = run_dir / f"converted.{source_route}.rejected.md"
     if converted_path.exists():
         shutil.copy2(str(converted_path), str(rejected_path))
 
@@ -236,11 +299,24 @@ def _maybe_fallback_pdf_text_layer_to_mineru(
         language=language,
         mode="ocr",
     )
-    fallback["fallback_from"] = "pdf_text_layer"
+    fallback["fallback_from"] = source_route
     fallback["fallback_reason"] = "post_convert_text_unreadable"
     fallback["rejected_text_layer_md"] = str(rejected_path)
+    fallback["rejected_markdown_path"] = str(rejected_path)
     fallback["rejected_text_layer_quality"] = rejected_quality
     ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
     fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
-    fallback["warnings"] = [*fallback.get("warnings", []), _pdf_text_layer_fallback_warning(rejected_quality)]
+    fallback["warnings"] = [*fallback.get("warnings", []), _pdf_fallback_warning(source_route, rejected_quality)]
     return fallback
+
+
+def _pdf_fallback_warning(source_route: str, rejected_quality: dict) -> str:
+    if source_route == "pdf_text_layer":
+        return _pdf_text_layer_fallback_warning(rejected_quality)
+    unreadable = rejected_quality.get("unreadable_text_ratio", 0)
+    garbled = rejected_quality.get("garbled_ratio", 0)
+    return (
+        "W_PDF_MARKDOWN_FALLBACK_TO_OCR: "
+        f"{source_route} produced unreadable Markdown "
+        f"(unreadable={unreadable:.2%}, garbled={garbled:.2%}); reran MinerU in OCR mode."
+    )

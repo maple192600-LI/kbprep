@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { ManagedProcessTimeoutError, runManagedProcess } from "./subprocess.js";
 
 const RUNTIME_MARKER_SCHEMA = "kbprep.local_venv.v1";
-const PYTHON_WORKER_DEPENDENCY_SPEC = "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;beautifulsoup4==4.14.3;lxml==6.0.2";
+const PYTHON_WORKER_DEPENDENCY_SPEC = "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2";
 
 export type RuntimeConfig = {
   device_override?: "cuda" | "cpu";

@@ -24,7 +24,7 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 - CleaningPatch and rejected patch reports are not yet the universal cleanup path.
 - Clean View is not yet the required render source for all profiles.
 - Optional media and YouTube routes require capability evidence before promotion.
-- PDF routing has the target three-tier design and now records B1 diagnostic tier evidence in `pdf_route_diagnostics`, but current implementation is still `partial` until B2-B5 route behavior and fixture evidence are complete.
+- PDF routing now executes the target three-tier design and records route evidence in `pdf_route_diagnostics` and `conversion_report.json.route_decision`; the capability remains `partial` because real Vault smoke is missing `simple_single_column` and `english_simple_text`.
 
 ## Acceptance
 

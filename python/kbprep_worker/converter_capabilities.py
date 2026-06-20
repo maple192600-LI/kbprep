@@ -175,21 +175,37 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "source_type": "pdf_like",
         "extensions": sorted(PDF_EXTENSIONS),
         "route": "pdf_diagnosis_selected",
-        "dependencies": ["PyMuPDF for diagnosis/text layer", "MinerU/OCR runtime when needed"],
-        "fallback": "mineru_ocr when text layer is missing, image-heavy, or rejected",
+        "dependencies": [
+            "PyMuPDF for diagnosis",
+            "pymupdf4llm for trusted simple text-layer PDFs",
+            "MinerU/OCR runtime when needed",
+        ],
+        "fallback": "mineru_ocr when text layer is missing, untrusted, image-heavy, or rejected after conversion",
         "status": "partial",
         "test_evidence": [
-            "src/test/scenarios/worker-local-formats.test.ts::converts trusted text-layer PDFs without invoking MinerU",
-            "src/test/scenarios/worker-pdf-routing.test.ts::falls back to MinerU when a trusted PDF text-layer conversion produces unreadable Markdown",  # noqa: E501
+            "src/test/scenarios/worker-local-formats.test.ts::converts trusted simple PDFs through Tier 1 PyMuPDF4LLM",  # noqa: E501
+            "src/test/scenarios/worker-batch-long-docs-part2.test.ts::diagnoses text-layer, image-only, and PPT-like PDFs differently",  # noqa: E501
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::classifies the six Phase B public PDF acceptance shapes",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::routes trusted multi-column PDFs through MinerU txt mode",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::falls back to MinerU when a trusted Tier 1 PDF conversion produces unreadable Markdown",  # noqa: E501
             "src/test/scenarios/worker-pdf-routing.test.ts::routes image-only scanned PDFs through MinerU OCR and records the actual route",
         ],
         "required_evidence": [
-            "golden PDFs covering trusted text layer, scanned/image-only, mixed text-image, PPT exports, tables, images, and OCR fallback",
-            "source/converted comparison for chapters, tables, images, page order, and OCR text retention",
+            "real Vault smoke evidence for simple_single_column",
+            "real Vault smoke evidence for english_simple_text",
         ],
-        "promotion_blocker": "Needs a broader PDF golden fixture set across text-layer, scanned, mixed, and layout-heavy PDFs.",
-        "preserves": ["page order", "text layer where trusted", "OCR text when routed to MinerU", "image evidence"],
-        "risk": "bad embedded text layers and complex layouts require strict quality checks",
+        "promotion_blocker": (
+            "Golden/public Phase B route tests pass, but real Vault smoke is missing "
+            "simple_single_column and english_simple_text before verified promotion."
+        ),
+        "preserves": [
+            "page order",
+            "trusted text-layer structure",
+            "layout evidence",
+            "OCR text when routed to MinerU",
+            "image evidence",
+        ],
+        "risk": "capability promotion is blocked until real Vault evidence covers the missing Phase B classes",
     },
     {
         "id": "image_ocr",

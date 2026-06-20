@@ -35,7 +35,7 @@ def _source_text_layer_status(diagnosis: dict, conversion_report: dict) -> dict:
 def _conversion_supersedes_source_text_layer(diagnosis: dict, conversion_report: dict) -> bool:
     converter = str(conversion_report.get("converter") or "")
     converted_bytes = int(conversion_report.get("converted_bytes") or 0)
-    if converter not in {"mineru", "mineru_after_pdf_text_layer_fallback"}:
+    if converter not in {"mineru", "mineru_after_pdf_text_layer_fallback", "mineru_after_pymupdf4llm_fallback"}:
         return False
     if converted_bytes <= 0:
         return False

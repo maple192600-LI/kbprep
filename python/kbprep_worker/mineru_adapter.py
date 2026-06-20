@@ -15,6 +15,7 @@ from .setup_env import detect_device
 
 logger = logging.getLogger(__name__)
 DEFAULT_MINERU_TIMEOUT_SECONDS = 1140
+DEFAULT_MINERU_BACKEND = "pipeline"
 LOCAL_PROXY_BYPASS_HOSTS = ("localhost", "127.0.0.1")
 
 
@@ -127,7 +128,7 @@ def _mineru_command(mineru: str, input_p: Path, assets_dir: Path, mode: str, lan
         mineru,
         "-p", str(input_p),
         "-o", str(assets_dir),
-        "-b", "pipeline",
+        "-b", DEFAULT_MINERU_BACKEND,
         "-m", mode,
         "-l", mineru_language,
     ]
@@ -321,6 +322,7 @@ def _mineru_result_payload(
         "warnings": warnings,
         "mineru_timeout_seconds": timeout_seconds,
         "mineru_command": _command_for_report(cmd),
+        "mineru_backend": DEFAULT_MINERU_BACKEND,
     }
 
 

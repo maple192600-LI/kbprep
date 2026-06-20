@@ -40,7 +40,7 @@ class PDFRouteDiagnosticsTests(unittest.TestCase):
             "image_count": 0,
             "text_layer_health": "good",
             "needs_ocr": False,
-            "layout_complexity": "complex",
+            "layout_complexity": "simple",
             "layout_profile": "slide_deck_or_ppt_export",
             "pdf_subtype": "ppt_exported_text_layer",
             "multi_column_pages": 1,
@@ -59,6 +59,56 @@ class PDFRouteDiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostics["layout_complexity"]["level"], "complex")
         self.assertTrue(diagnostics["structure_signals"]["multi_column"])
         self.assertTrue(diagnostics["structure_signals"]["slide_like"])
+        self.assertEqual(diagnostics["recommended_tier"], "tier_2")
+        self.assertEqual(diagnostics["recommended_route"], "mineru_auto")
+
+    def test_multi_column_text_prefers_mineru_txt(self):
+        diagnostics = build_pdf_route_diagnostics({
+            "page_count": 12,
+            "text_pages": 12,
+            "image_pages": 0,
+            "text_layer_health": "good",
+            "needs_ocr": False,
+            "layout_complexity": "simple",
+            "layout_profile": "document_pages",
+            "multi_column_pages": 4,
+            "table_pages": 0,
+            "image_text_interleaved_pages": 0,
+            "pdf_subtype": "text_layer",
+            "text_quality": {
+                "garbled_ratio": 0.0,
+                "unreadable_text_ratio": 0.0,
+                "replacement_char_ratio": 0.0,
+                "mojibake_ratio": 0.0,
+                "control_ratio": 0.0,
+            },
+        })
+
+        self.assertEqual(diagnostics["recommended_tier"], "tier_2")
+        self.assertEqual(diagnostics["recommended_route"], "mineru_txt")
+
+    def test_table_or_image_interleaving_prefers_mineru_auto(self):
+        diagnostics = build_pdf_route_diagnostics({
+            "page_count": 12,
+            "text_pages": 12,
+            "image_pages": 3,
+            "text_layer_health": "good",
+            "needs_ocr": False,
+            "layout_complexity": "complex",
+            "layout_profile": "document_pages",
+            "multi_column_pages": 0,
+            "table_pages": 2,
+            "image_text_interleaved_pages": 1,
+            "pdf_subtype": "mixed_text_image",
+            "text_quality": {
+                "garbled_ratio": 0.0,
+                "unreadable_text_ratio": 0.0,
+                "replacement_char_ratio": 0.0,
+                "mojibake_ratio": 0.0,
+                "control_ratio": 0.0,
+            },
+        })
+
         self.assertEqual(diagnostics["recommended_tier"], "tier_2")
         self.assertEqual(diagnostics["recommended_route"], "mineru_auto")
 

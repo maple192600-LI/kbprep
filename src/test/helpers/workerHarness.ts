@@ -208,6 +208,78 @@ export function makeTextLayerPdf(pdfPath: string) {
   );
 }
 
+export function makeChineseTextLayerPdf(pdfPath: string) {
+  runPython(
+    [
+      "import fitz, sys",
+      "pdf_path = sys.argv[1]",
+      "doc = fitz.open()",
+      "page = doc.new_page(width=595, height=842)",
+      "page.insert_text((72, 72), '步骤 1：打开设置并保留 threshold=0.8。')",
+      "page.insert_text((72, 96), '步骤 2：记录失败原因和 retry_count=3。')",
+      "doc.save(pdf_path)",
+    ].join("\n"),
+    [pdfPath],
+    true,
+  );
+}
+
+export function makeMultiColumnTextPdf(pdfPath: string) {
+  runPython(
+    [
+      "import fitz, sys",
+      "pdf_path = sys.argv[1]",
+      "doc = fitz.open()",
+      "page = doc.new_page(width=595, height=842)",
+      "left_lines = [",
+      "    'Column A step 1: open settings and keep threshold=0.8.',",
+      "    'Column A step 2: record retry_count=3 before export.',",
+      "]",
+      "right_lines = [",
+      "    'Column B step 3: verify failure_reason=timeout.',",
+      "    'Column B step 4: keep the exact audit evidence.',",
+      "]",
+      "for index, text in enumerate(left_lines):",
+      "    page.insert_textbox(fitz.Rect(72, 72 + index * 90, 250, 145 + index * 90), text)",
+      "for index, text in enumerate(right_lines):",
+      "    page.insert_textbox(fitz.Rect(340, 72 + index * 90, 520, 145 + index * 90), text)",
+      "doc.save(pdf_path)",
+    ].join("\n"),
+    [pdfPath],
+    true,
+  );
+}
+
+export function makeTableHeavyPdf(pdfPath: string) {
+  runPython(
+    [
+      "import fitz, sys",
+      "pdf_path = sys.argv[1]",
+      "doc = fitz.open()",
+      "page = doc.new_page(width=595, height=842)",
+      "x0, y0, cell_w, cell_h = 72, 72, 130, 36",
+      "for row in range(5):",
+      "    y = y0 + row * cell_h",
+      "    page.draw_line((x0, y), (x0 + cell_w * 3, y), color=(0, 0, 0), width=0.8)",
+      "for col in range(4):",
+      "    x = x0 + col * cell_w",
+      "    page.draw_line((x, y0), (x, y0 + cell_h * 4), color=(0, 0, 0), width=0.8)",
+      "rows = [",
+      "    ('Metric', 'Value', 'Reason'),",
+      "    ('threshold', '0.8', 'kept for setup'),",
+      "    ('retry_count', '3', 'kept for replay'),",
+      "    ('failure_reason', 'timeout', 'kept for audit'),",
+      "]",
+      "for row_index, row in enumerate(rows):",
+      "    for col_index, text in enumerate(row):",
+      "        page.insert_text((x0 + col_index * cell_w + 8, y0 + row_index * cell_h + 22), text)",
+      "doc.save(pdf_path)",
+    ].join("\n"),
+    [pdfPath],
+    true,
+  );
+}
+
 export function makeImageOnlyPdf(pdfPath: string, imagePath: string) {
   const png1x1 = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
@@ -354,5 +426,3 @@ export function makeEpubFixture(epubPath: string) {
 export function normalizeMarkdownText(text: string) {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
 }
-
-

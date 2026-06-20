@@ -6,6 +6,7 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "mineru[all]>=3.2.1,<4",
     "PyMuPDF>=1.27,<2",
+    "pymupdf4llm>=0.0.27,<1",
     "beautifulsoup4==4.14.3",
     "lxml==6.0.2"
 ]

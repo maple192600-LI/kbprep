@@ -379,6 +379,8 @@ def _pdf_layout_complexity(result: dict) -> str:
         return "complex"
     if result.get("pdf_subtype") in complex_subtypes:
         return "complex"
+    if any(_positive_count(result.get(key)) for key in ("multi_column_pages", "table_pages", "image_text_interleaved_pages")):
+        return "complex"
     return "simple"
 
 
@@ -393,8 +395,9 @@ def _apply_pdf_processing_strategy(result: dict) -> None:
         hints.append("Run OCR because the text layer is missing, image-heavy, or untrusted.")
     elif result.get("layout_complexity") == "complex":
         result["recommended_pipeline"] = "mineru_pipeline"
-        result["conversion_strategy"] = "mineru_auto"
-        hints.append("Use MinerU auto mode because the trusted text layer has complex visual layout.")
+        result["conversion_strategy"] = _complex_pdf_conversion_strategy(result)
+        mode = result["conversion_strategy"].removeprefix("mineru_")
+        hints.append(f"Use MinerU {mode} mode because the trusted text layer has complex visual layout.")
     else:
         result["recommended_pipeline"] = "pdf_text_layer"
         result["conversion_strategy"] = "pdf_text_layer"
@@ -413,3 +416,17 @@ def _apply_pdf_processing_strategy(result: dict) -> None:
         hints.append("Slides and report pages often contain sparse but important details; avoid over-aggressive cleanup.")
 
     result["processing_hints"] = hints
+
+
+def _complex_pdf_conversion_strategy(result: dict) -> str:
+    if (
+        _positive_count(result.get("table_pages"))
+        or _positive_count(result.get("image_text_interleaved_pages"))
+        or result.get("layout_profile") in {"slide_deck_or_ppt_export", "landscape_report", "image_heavy_document"}
+    ):
+        return "mineru_auto"
+    return "mineru_txt"
+
+
+def _positive_count(value: object) -> bool:
+    return isinstance(value, int) and value > 0

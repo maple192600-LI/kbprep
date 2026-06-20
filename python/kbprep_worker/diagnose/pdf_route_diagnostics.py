@@ -25,7 +25,7 @@ def build_pdf_route_diagnostics(diagnosis: dict[str, Any]) -> dict[str, Any]:
         "large_pdf_sampling": _large_pdf_sampling(diagnosis),
         "ocr_triggers": ocr_triggers,
         "recommended_tier": recommended_tier,
-        "recommended_route": _recommended_route(recommended_tier),
+        "recommended_route": _recommended_route(recommended_tier, structure, image_coverage),
         "reason": _reason(recommended_tier, text_layer, layout, image_coverage, ocr_triggers),
     }
 
@@ -122,7 +122,7 @@ def _ocr_triggers(
 
 def _layout_complexity_summary(diagnosis: dict[str, Any], structure: dict[str, bool]) -> dict[str, Any]:
     level = str(diagnosis.get("layout_complexity") or "unknown")
-    if level == "unknown" and any(structure.values()):
+    if level in {"simple", "unknown"} and any(structure.values()):
         level = "complex"
     return {
         "level": level,
@@ -144,13 +144,24 @@ def _recommended_tier(
     return "tier_1"
 
 
-def _recommended_route(tier: str) -> str:
-    routes = {
-        "tier_1": "pymupdf4llm",
-        "tier_2": "mineru_auto",
-        "tier_3": "mineru_ocr",
-    }
-    return routes[tier]
+def _recommended_route(
+    tier: str,
+    structure: dict[str, bool] | None = None,
+    image_coverage: dict[str, Any] | None = None,
+) -> str:
+    if tier == "tier_1":
+        return "pymupdf4llm"
+    if tier == "tier_3":
+        return "mineru_ocr"
+    structure = structure or {}
+    image_coverage = image_coverage or {}
+    complex_visual = (
+        structure.get("table_heavy")
+        or structure.get("image_text_interleaving")
+        or structure.get("slide_like")
+        or image_coverage.get("level") == "high"
+    )
+    return "mineru_auto" if complex_visual else "mineru_txt"
 
 
 def _reason(
@@ -164,7 +175,8 @@ def _reason(
         trigger_text = ", ".join(ocr_triggers) if ocr_triggers else "high image coverage"
         return f"Tier 3 because OCR evidence is present: {trigger_text}."
     if tier == "tier_2":
-        return f"Tier 2 because text is trusted but layout is {layout['level']}."
+        signals = ", ".join(layout["signals"]) or "reading-order risk"
+        return f"Tier 2 because text is trusted but layout is {layout['level']} ({signals})."
     return f"Tier 1 because text is trusted and layout is {layout['level']} with image coverage {image_coverage['ratio']}."  # noqa: E501
 
 
