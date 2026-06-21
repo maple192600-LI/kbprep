@@ -9,7 +9,6 @@ This file tracks known product and engineering gaps that are not hidden defects.
 - CleaningPolicySnapshot is documented, but full reproducibility coverage still needs implementation.
 - CleaningPatch and Clean View are target contracts; current cleanup artifacts are not fully migrated.
 - Optional media and YouTube routes require dependency checks, sample evidence, and capability promotion before they are current CLI promises.
-- PDF routing now executes the protected three-tier design, but capability promotion remains blocked until real Vault smoke evidence covers the missing Phase B acceptance classes: `simple_single_column`, `english_simple_text`.
 - Batch manifests now report evidence-backed rerun scope, but executable selective rerun remains limited by available run metadata and current worker contracts.
 
 ## Closed Workflow Risks

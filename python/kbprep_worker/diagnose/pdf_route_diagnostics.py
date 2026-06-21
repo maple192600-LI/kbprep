@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
+
 PDF_ROUTE_DIAGNOSTICS_SCHEMA = "kbprep.pdf_route_diagnostics.v1"
 
 
@@ -95,9 +97,12 @@ def _text_risk_signals(diagnosis: dict[str, Any]) -> dict[str, bool]:
         "cid_or_tounicode_risk": untrusted and (
             garbled_subtype or unreadable > 0 or garbled > 0 or mojibake > 0 or non_common > 0
         ),
-        "replacement_character_risk": replacement > 0,
-        "control_character_risk": control > 0,
-        "private_use_or_control_risk": non_common > 0 or control > 0,
+        "replacement_character_risk": replacement >= DIAGNOSIS_THRESHOLDS["pdf_text_risk_replacement_ratio"],
+        "control_character_risk": control >= DIAGNOSIS_THRESHOLDS["pdf_text_risk_control_ratio"],
+        "private_use_or_control_risk": (
+            non_common >= DIAGNOSIS_THRESHOLDS["pdf_text_risk_non_common_ratio"]
+            or control >= DIAGNOSIS_THRESHOLDS["pdf_text_risk_control_ratio"]
+        ),
     }
 
 
@@ -122,13 +127,32 @@ def _ocr_triggers(
 
 def _layout_complexity_summary(diagnosis: dict[str, Any], structure: dict[str, bool]) -> dict[str, Any]:
     level = str(diagnosis.get("layout_complexity") or "unknown")
-    if level in {"simple", "unknown"} and any(structure.values()):
+    structure_ratio = _structure_signal_ratio(diagnosis)
+    if (
+        level in {"simple", "unknown"}
+        and structure_ratio >= DIAGNOSIS_THRESHOLDS["pdf_structure_signal_ratio_complex"]
+    ):
         level = "complex"
     return {
         "level": level,
         "profile": diagnosis.get("layout_profile") or "unknown",
         "signals": [key for key, enabled in structure.items() if enabled],
+        "structure_signal_ratio": structure_ratio,
     }
+
+
+def _structure_signal_ratio(diagnosis: dict[str, Any]) -> float:
+    sampled_page_count = _int_value(diagnosis.get("sampled_page_count"))
+    page_count = _int_value(diagnosis.get("page_count"))
+    denominator = sampled_page_count if sampled_page_count > 0 else page_count
+    if denominator <= 0:
+        return 0.0
+    counts = (
+        _int_value(diagnosis.get("multi_column_pages")),
+        _int_value(diagnosis.get("table_pages")),
+        _int_value(diagnosis.get("image_text_interleaved_pages")),
+    )
+    return round(max(counts) / denominator, 4)
 
 
 def _recommended_tier(

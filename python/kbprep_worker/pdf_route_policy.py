@@ -17,7 +17,11 @@ LEGACY_PDF_STRATEGIES = {
 
 
 def selected_pdf_strategy(diagnosis: dict[str, Any]) -> str:
-    """Return the executable PDF conversion strategy for a diagnosis result."""
+    """Return the executable PDF conversion strategy for a diagnosis result.
+
+    If no auditable PDF diagnostics or legacy strategy exists, choose OCR as the
+    conservative fallback so unknown PDF evidence does not bypass safer handling.
+    """
     diagnostics = diagnosis.get("pdf_route_diagnostics")
     if isinstance(diagnostics, dict) and diagnostics.get("schema") == PDF_ROUTE_DIAGNOSTICS_SCHEMA:
         route = str(diagnostics.get("recommended_route") or "")

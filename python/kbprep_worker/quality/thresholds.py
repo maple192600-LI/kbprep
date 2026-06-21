@@ -18,6 +18,10 @@ DIAGNOSIS_THRESHOLDS = {
     "pdf_slide_image_score": 0.25,
     "pdf_slide_text_score": 0.2,
     "pdf_slide_like_score": 0.65,
+    "pdf_structure_signal_ratio_complex": 0.20,
+    "pdf_text_risk_control_ratio": 0.02,
+    "pdf_text_risk_non_common_ratio": 0.02,
+    "pdf_text_risk_replacement_ratio": 0.02,
     "markdown_garbled_warn": 0.05,
 }
 

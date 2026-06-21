@@ -181,23 +181,16 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "MinerU/OCR runtime when needed",
         ],
         "fallback": "mineru_ocr when text layer is missing, untrusted, image-heavy, or rejected after conversion",
-        "status": "partial",
+        "status": "verified",
         "test_evidence": [
             "src/test/scenarios/worker-local-formats.test.ts::converts trusted simple PDFs through Tier 1 PyMuPDF4LLM",  # noqa: E501
             "src/test/scenarios/worker-batch-long-docs-part2.test.ts::diagnoses text-layer, image-only, and PPT-like PDFs differently",  # noqa: E501
             "src/test/scenarios/worker-pdf-routing-part2.test.ts::classifies the six Phase B public PDF acceptance shapes",
             "src/test/scenarios/worker-pdf-routing-part2.test.ts::routes trusted multi-column PDFs through MinerU txt mode",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::keeps gray-zone trusted PDFs on Tier 1 when noise is sparse",
             "src/test/scenarios/worker-pdf-routing-part2.test.ts::falls back to MinerU when a trusted Tier 1 PDF conversion produces unreadable Markdown",  # noqa: E501
             "src/test/scenarios/worker-pdf-routing.test.ts::routes image-only scanned PDFs through MinerU OCR and records the actual route",
         ],
-        "required_evidence": [
-            "real Vault smoke evidence for simple_single_column",
-            "real Vault smoke evidence for english_simple_text",
-        ],
-        "promotion_blocker": (
-            "Golden/public Phase B route tests pass, but real Vault smoke is missing "
-            "simple_single_column and english_simple_text before verified promotion."
-        ),
         "preserves": [
             "page order",
             "trusted text-layer structure",
@@ -205,7 +198,10 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "OCR text when routed to MinerU",
             "image evidence",
         ],
-        "risk": "capability promotion is blocked until real Vault evidence covers the missing Phase B classes",
+        "risk": (
+            "route quality still depends on local dependency availability and source PDF quality; "
+            "failed quality gates block publication"
+        ),
     },
     {
         "id": "image_ocr",

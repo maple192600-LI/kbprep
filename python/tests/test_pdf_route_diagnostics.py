@@ -4,6 +4,45 @@ from kbprep_worker.diagnose.pdf_route_diagnostics import build_pdf_route_diagnos
 
 
 class PDFRouteDiagnosticsTests(unittest.TestCase):
+    def _trusted_pdf_diagnosis(
+        self,
+        *,
+        page_count: int = 20,
+        sampled_page_count: int | None = None,
+        layout_complexity: str = "simple",
+        multi_column_pages: int = 0,
+        table_pages: int = 0,
+        image_text_interleaved_pages: int = 0,
+        control_ratio: float = 0.0,
+        non_common_unicode_ratio: float = 0.0,
+        replacement_char_ratio: float = 0.0,
+    ) -> dict:
+        diagnosis = {
+            "page_count": page_count,
+            "text_pages": sampled_page_count or page_count,
+            "image_pages": 0,
+            "image_count": 0,
+            "text_layer_health": "good",
+            "needs_ocr": False,
+            "layout_complexity": layout_complexity,
+            "layout_profile": "document_pages",
+            "pdf_subtype": "text_layer",
+            "multi_column_pages": multi_column_pages,
+            "table_pages": table_pages,
+            "image_text_interleaved_pages": image_text_interleaved_pages,
+            "text_quality": {
+                "garbled_ratio": 0.0,
+                "unreadable_text_ratio": 0.0,
+                "replacement_char_ratio": replacement_char_ratio,
+                "mojibake_ratio": 0.0,
+                "control_ratio": control_ratio,
+                "non_common_unicode_ratio": non_common_unicode_ratio,
+            },
+        }
+        if sampled_page_count is not None:
+            diagnosis["sampled_page_count"] = sampled_page_count
+        return diagnosis
+
     def test_simple_trusted_text_layer_recommends_tier_1(self):
         diagnostics = build_pdf_route_diagnostics({
             "page_count": 2,
@@ -86,6 +125,62 @@ class PDFRouteDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(diagnostics["recommended_tier"], "tier_2")
         self.assertEqual(diagnostics["recommended_route"], "mineru_txt")
+
+    def test_sparse_structure_signals_stay_tier_1(self):
+        diagnostics = build_pdf_route_diagnostics(self._trusted_pdf_diagnosis(
+            page_count=126,
+            sampled_page_count=22,
+            multi_column_pages=1,
+            table_pages=1,
+        ))
+
+        self.assertEqual(diagnostics["layout_complexity"]["level"], "simple")
+        self.assertEqual(diagnostics["recommended_tier"], "tier_1")
+        self.assertEqual(diagnostics["recommended_route"], "pymupdf4llm")
+
+    def test_systemic_structure_signals_route_tier_2(self):
+        diagnostics = build_pdf_route_diagnostics(self._trusted_pdf_diagnosis(
+            page_count=20,
+            sampled_page_count=20,
+            layout_complexity="complex",
+            multi_column_pages=8,
+            table_pages=1,
+        ))
+
+        self.assertEqual(diagnostics["layout_complexity"]["level"], "complex")
+        self.assertEqual(diagnostics["recommended_tier"], "tier_2")
+
+    def test_tiny_control_noise_stays_tier_1(self):
+        diagnostics = build_pdf_route_diagnostics(self._trusted_pdf_diagnosis(
+            page_count=337,
+            sampled_page_count=43,
+            control_ratio=0.0015,
+        ))
+
+        self.assertFalse(diagnostics["text_risk"]["control_character_risk"])
+        self.assertFalse(diagnostics["text_risk"]["private_use_or_control_risk"])
+        self.assertEqual(diagnostics["ocr_triggers"], [])
+        self.assertEqual(diagnostics["recommended_tier"], "tier_1")
+
+    def test_high_control_ratio_routes_tier_3(self):
+        diagnostics = build_pdf_route_diagnostics(self._trusted_pdf_diagnosis(control_ratio=0.03))
+
+        self.assertTrue(diagnostics["text_risk"]["control_character_risk"])
+        self.assertIn("control_character_risk", diagnostics["ocr_triggers"])
+        self.assertEqual(diagnostics["recommended_tier"], "tier_3")
+
+    def test_small_private_use_noise_keeps_complex_pdf_in_tier_2(self):
+        diagnostics = build_pdf_route_diagnostics(self._trusted_pdf_diagnosis(
+            page_count=23,
+            sampled_page_count=23,
+            layout_complexity="complex",
+            multi_column_pages=6,
+            table_pages=7,
+            non_common_unicode_ratio=0.0195,
+        ))
+
+        self.assertFalse(diagnostics["text_risk"]["private_use_or_control_risk"])
+        self.assertEqual(diagnostics["recommended_tier"], "tier_2")
 
     def test_table_or_image_interleaving_prefers_mineru_auto(self):
         diagnostics = build_pdf_route_diagnostics({

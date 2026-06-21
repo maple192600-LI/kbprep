@@ -34,7 +34,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
-| pdf_three_tier_routing | partial | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; promotion remains blocked by missing real Vault classes `simple_single_column` and `english_simple_text`. |
+| pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
 | youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
 
@@ -95,14 +95,16 @@ Slices:
   layer + complex layout.
 - **B4** Landed: Tier 3 `mineru_ocr` is selected from untrusted text-layer
   evidence and one-upgrade fallback records its reason.
-- **B5** Open: the six public acceptance shapes pass, but real Vault smoke is
-  missing `simple_single_column` and `english_simple_text` before capability
-  promotion.
+- **B5** Landed: the six public acceptance shapes pass, real Vault smoke covers
+  `simple_single_column`, `english_simple_text`, `multi_column_paper`,
+  `table_heavy`, `scanned`, and `cid_or_tounicode_damaged`, and the smoke check
+  now reports tier/route distribution so zero-hit Tier 1 regressions fail as
+  diagnosis problems instead of being mislabeled as missing samples.
 
 Acceptance: `conversion_report.json.route_decision` records selected tier,
 actual route, fallback or upgrade, and reason for every PDF; public route-shape
-tests pass; `pdf_diagnosis_selected` stays `partial` until real Vault smoke
-covers the missing classes.
+tests pass; `pdf_diagnosis_selected` is verified by named tests and real Vault
+smoke distribution evidence.
 
 ### Phase C — Canonical IR Typed Nodes And Source Spans
 

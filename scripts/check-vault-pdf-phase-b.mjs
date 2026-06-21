@@ -18,6 +18,7 @@ const ignoredDirs = new Set([
   "kbprep-output",
   "node_modules",
 ]);
+const minTier1Hits = Number(process.env.KBPREP_VAULT_PDF_MIN_TIER_1 || "3");
 
 if (!existsSync(vaultRoot)) fail(`Vault root does not exist: ${vaultRoot}`);
 
@@ -34,14 +35,29 @@ const selected = selectSix(diagnoses);
 const missing = Object.entries(selected)
   .filter(([, value]) => !value)
   .map(([name]) => name);
+const tierCounts = countBy(diagnoses, tier);
+const routeCounts = countBy(diagnoses, route);
+
+if ((tierCounts.tier_1 || 0) < minTier1Hits) {
+  failWithEvidence(
+    `PDF diagnosis distribution is suspicious: tier_1 hit count ${tierCounts.tier_1 || 0} is below ${minTier1Hits}. This usually means thresholds or route diagnostics are over-gating simple PDFs.`,
+    { pdfCount: pdfs.length, diagnosedCount: diagnoses.length, tierCounts, routeCounts, missing },
+  );
+}
 
 if (missing.length) {
-  fail(`Missing required real PDF acceptance class(es): ${missing.join(", ")}`);
+  failWithEvidence(
+    `Missing required real PDF acceptance class(es): ${missing.join(", ")}`,
+    { pdfCount: pdfs.length, diagnosedCount: diagnoses.length, tierCounts, routeCounts, missing },
+  );
 }
 
 process.stdout.write(JSON.stringify({
   ok: true,
   pdfCount: pdfs.length,
+  diagnosedCount: diagnoses.length,
+  tierCounts,
+  routeCounts,
   selected: Object.fromEntries(
     Object.entries(selected).map(([name, item]) => [name, publicEvidence(item)]),
   ),
@@ -109,6 +125,19 @@ function language(item) {
   return String(item.data.detected_language || "");
 }
 
+function route(item) {
+  return item.data.pdf_route_diagnostics?.recommended_route || "";
+}
+
+function countBy(items, mapper) {
+  const counts = {};
+  for (const item of items) {
+    const key = mapper(item) || "unknown";
+    counts[key] = (counts[key] || 0) + 1;
+  }
+  return counts;
+}
+
 function collectFiles(root) {
   const collected = [];
   walk(root, collected);
@@ -140,4 +169,11 @@ function fail(message) {
   process.stderr.write(`${message}\n`);
   process.stderr.write(`Isolated work root: ${workRoot}\n`);
   process.exit(1);
+}
+
+function failWithEvidence(message, evidence) {
+  process.stderr.write(`${message}\n`);
+  process.stderr.write(JSON.stringify({ ok: false, ...evidence }, null, 2));
+  process.stderr.write("\n");
+  fail("Vault Phase B PDF smoke failed.");
 }

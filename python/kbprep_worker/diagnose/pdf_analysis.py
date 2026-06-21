@@ -379,9 +379,21 @@ def _pdf_layout_complexity(result: dict) -> str:
         return "complex"
     if result.get("pdf_subtype") in complex_subtypes:
         return "complex"
-    if any(_positive_count(result.get(key)) for key in ("multi_column_pages", "table_pages", "image_text_interleaved_pages")):
+    if _structure_signal_ratio(result) >= DIAGNOSIS_THRESHOLDS["pdf_structure_signal_ratio_complex"]:
         return "complex"
     return "simple"
+
+
+def _structure_signal_ratio(result: dict) -> float:
+    denominator = _page_ratio_denominator(result)
+    if denominator <= 0:
+        return 0.0
+    signals = (
+        _positive_count(result.get("multi_column_pages")),
+        _positive_count(result.get("table_pages")),
+        _positive_count(result.get("image_text_interleaved_pages")),
+    )
+    return max(signals) / denominator
 
 
 def _apply_pdf_processing_strategy(result: dict) -> None:
