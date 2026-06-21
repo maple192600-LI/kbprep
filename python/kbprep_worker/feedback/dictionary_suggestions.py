@@ -23,39 +23,27 @@ from .support import (
     _target_rules_dir,
 )
 
+SCOPE_MIN_FEEDBACK_COUNTS = {
+    "user": 2,
+    "project": 2,
+    "source_pattern": 2,
+    "document_type": 3,
+    "global": 5,
+    "public": 5,
+}
+
 
 def _suggest_dictionary_updates(data: dict) -> None:
     rules_dir = _rules_dir(data)
-    accepted = _read_jsonl(rules_dir / "accepted_rules.jsonl")
-    rejected = _read_jsonl(rules_dir / "rejected_rules.jsonl")
-    min_count = _positive_int(data.get("min_feedback_count"), 2)
-
-    rejected_keys: set[tuple[str, str, str, str]] = set()
-    for item in rejected:
-        rejected_key = _feedback_cluster_key(item)
-        if rejected_key:
-            rejected_keys.add(rejected_key)
-    groups: dict[str, list[dict]] = {}
-    for item in accepted:
-        key = _feedback_cluster_key(item)
-        if not key or key in rejected_keys:
-            continue
-        document_type = key[0]
-        if item.get("action") != "discard":
-            continue
-        groups.setdefault(document_type, []).append(item)
-
-    suggestions = []
-    for document_type, items in sorted(groups.items()):
-        deduped = _dedupe_feedback_items(items)
-        if len(deduped) < min_count:
-            continue
-        suggestions.append(_dictionary_suggestion_for_document_type(document_type, deduped, rejected_keys))
+    requested_min_count = data.get("min_feedback_count")
+    groups, rejected_keys = _dictionary_feedback_groups(rules_dir)
+    suggestions = _dictionary_suggestions_for_groups(groups, rejected_keys, requested_min_count)
 
     report = {
         "schema": "kbprep.dictionary_suggestions.v1",
         "rules_dir": str(rules_dir),
-        "min_feedback_count": min_count,
+        "requested_min_feedback_count": _positive_int(requested_min_count, 0) if requested_min_count else None,
+        "min_feedback_count_by_scope": dict(SCOPE_MIN_FEEDBACK_COUNTS),
         "suggestion_count": len(suggestions),
         "suggestions": suggestions,
     }
@@ -70,6 +58,52 @@ def _suggest_dictionary_updates(data: dict) -> None:
         "suggestions_path": str(suggestions_path),
         "next_step": "Review dictionary_suggestions.jsonl before copying any proposal into rules/document_types/.",
     })
+
+
+def _dictionary_feedback_groups(rules_dir: Path) -> tuple[dict[str, list[dict]], set[tuple[str, str, str, str]]]:
+    accepted_path = rules_dir / "accepted_rules.jsonl"
+    rejected_path = rules_dir / "rejected_rules.jsonl"
+    accepted = _read_jsonl(accepted_path) if accepted_path.exists() else []
+    rejected = _read_jsonl(rejected_path) if rejected_path.exists() else []
+    rejected_keys = _rejected_feedback_keys(rejected)
+    groups: dict[str, list[dict]] = {}
+    for item in accepted:
+        key = _feedback_cluster_key(item)
+        if not key or key in rejected_keys or item.get("action") != "discard":
+            continue
+        groups.setdefault(key[0], []).append(item)
+    return groups, rejected_keys
+
+
+def _rejected_feedback_keys(items: list[dict]) -> set[tuple[str, str, str, str]]:
+    rejected_keys: set[tuple[str, str, str, str]] = set()
+    for item in items:
+        rejected_key = _feedback_cluster_key(item)
+        if rejected_key:
+            rejected_keys.add(rejected_key)
+    return rejected_keys
+
+
+def _dictionary_suggestions_for_groups(
+    groups: dict[str, list[dict]],
+    rejected_keys: set[tuple[str, str, str, str]],
+    requested_min_count: int | float | str | None,
+) -> list[dict]:
+    suggestions = []
+    for document_type, items in sorted(groups.items()):
+        deduped = _dedupe_feedback_items(items)
+        feedback_scope = _feedback_scope_for_items(deduped)
+        min_count = _min_feedback_count_for_scope(feedback_scope, requested_min_count)
+        if len(deduped) >= min_count:
+            suggestions.append(_dictionary_suggestion_for_document_type(
+                document_type,
+                deduped,
+                rejected_keys,
+                feedback_scope=feedback_scope,
+                min_feedback_count=min_count,
+            ))
+    return suggestions
+
 
 def _promote_dictionary_suggestion(data: dict) -> None:
     if not _has_dictionary_update_confirmation(data):
@@ -218,7 +252,11 @@ def _dictionary_promotion_history_risk(data: dict, target_rules_dir: Path, docum
             recoverable=True,
             suggested_action="Review promotion_history.jsonl and failed regression samples, or rerun with allow_failed_promotion_history=true if the user explicitly accepts the risk.",  # noqa: E501
         )
-    return {**history_risk, "status": "override_used"}
+    return {
+        **history_risk,
+        "status": "override_used",
+        "override_warning": "Failed promotion history was bypassed by explicit override; review failed_samples before relying on this dictionary.",  # noqa: E501
+    }
 
 
 def _require_public_write_confirmation(data: dict, target_rules_dir: Path) -> None:
@@ -435,6 +473,9 @@ def _dictionary_suggestion_for_document_type(
     document_type: str,
     items: list[dict],
     rejected_keys: set[tuple[str, str, str, str]],
+    *,
+    feedback_scope: str,
+    min_feedback_count: int,
 ) -> dict:
     proposed_rules = []
     for item in items:
@@ -459,8 +500,32 @@ def _dictionary_suggestion_for_document_type(
         "target": f"rules/document_types/{document_type}.json",
         "required_confirmation": True,
         "feedback_count": len(proposed_rules),
+        "feedback_scope": feedback_scope,
+        "min_feedback_count": min_feedback_count,
         "proposed_rules": proposed_rules,
         "blocked_by_rejected_feedback": False,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "review_note": "Copy into a document-type dictionary only after checking examples, counterexamples, and current source outputs.",
     }
+
+
+def _min_feedback_count_for_scope(scope: str, requested: int | float | str | None) -> int:
+    default = SCOPE_MIN_FEEDBACK_COUNTS.get(scope, SCOPE_MIN_FEEDBACK_COUNTS["user"])
+    requested_count = _positive_int(requested, default)
+    return max(default, requested_count)
+
+
+def _feedback_scope_for_items(items: list[dict]) -> str:
+    rank = {
+        "user": 0,
+        "project": 0,
+        "source_pattern": 0,
+        "document_type": 1,
+        "global": 2,
+        "public": 2,
+    }
+    scopes = [
+        _optional_string(item.get("scope")) or "user"
+        for item in items
+    ]
+    return max(scopes or ["user"], key=lambda value: rank.get(value, 0))

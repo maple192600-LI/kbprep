@@ -84,6 +84,25 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
           accepted_rule_id: "user-feedback-report-noise",
           artifact_context: { document_type: "report", source_name: "report-a.md" },
         },
+        {
+          schema: "kbprep.rule_proposal.v1",
+          id: "proposal-course-community",
+          status: "accepted",
+          action: "discard",
+          scope: "document_type",
+          document_type: "course",
+          match: "literal",
+          pattern: "加入课程社群",
+          reason: "course wrapper pollution",
+          risk_note: "test fixture risk reviewed",
+          created_from_run: "run-course-4",
+          owner_confirmation_status: "confirmed",
+          requires_confirmation: true,
+          examples: ["加入课程社群"],
+          counterexamples: ["课程正文"],
+          accepted_rule_id: "user-feedback-course-community",
+          artifact_context: { document_type: "course", source_name: "course-d.md" },
+        },
       ];
       const rejectedRules = [
         {
@@ -121,13 +140,17 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
       expect(suggestion.target).toBe("rules/document_types/course.json");
       expect(suggestion.document_type).toBe("course");
       expect(suggestion.required_confirmation).toBe(true);
+      expect(suggestion.feedback_scope).toBe("document_type");
+      expect(suggestion.min_feedback_count).toBe(3);
       expect(suggestion.proposed_rules.map((rule: { pattern: string }) => rule.pattern)).toEqual([
         "加入训练营领取资料",
         "私信老师领取课件",
+        "加入课程社群",
       ]);
       expect(suggestion.proposed_rules.map((rule: { created_from_run: string }) => rule.created_from_run)).toEqual([
         "run-course-1",
         "run-course-2",
+        "run-course-4",
       ]);
       expect(JSON.stringify(suggestion)).not.toContain("扫码失败排查步骤");
       expect(envelope.data.suggestions_path).toContain("dictionary_suggestions.jsonl");

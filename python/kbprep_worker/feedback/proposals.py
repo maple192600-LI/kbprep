@@ -207,13 +207,56 @@ def _counterexamples(data: dict, pattern: str, match: str, action: str, artifact
     fallback_sources = ("cleaned", "review_needed", "discarded")
     if action != "discard":
         return _counterexample_fallbacks(artifacts, pattern, match, fallback_sources)
-    result = []
-    for line in _matching_snippets(artifacts["texts"].get("cleaned", ""), pattern, match, limit=12):
-        if _looks_like_body_counterexample(line, pattern):
-            result.append(line)
+    result = _discard_body_counterexamples(artifacts, pattern, match)
     if result:
         return _dedupe_strings(result)[:5]
     return _counterexample_fallbacks(artifacts, pattern, match, fallback_sources)
+
+
+def _discard_body_counterexamples(artifacts: dict, pattern: str, match: str) -> list[str]:
+    result: list[str] = []
+    texts = artifacts.get("texts")
+    texts = texts if isinstance(texts, dict) else {}
+    for source in ("cleaned", "review_needed"):
+        for line in _matching_snippets(str(texts.get(source, "")), pattern, match, limit=12):
+            if _looks_like_body_counterexample(line, pattern):
+                result.append(line)
+    result.extend(_quality_issue_counterexamples(artifacts, pattern, match))
+    return result
+
+
+def _quality_issue_counterexamples(artifacts: dict, pattern: str, match: str) -> list[str]:
+    quality = artifacts.get("quality")
+    quality = quality if isinstance(quality, dict) else {}
+    issues = quality.get("quality_issues")
+    if not isinstance(issues, list):
+        return []
+    result = []
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        for value in issue.values():
+            result.extend(_quality_value_counterexamples(value, pattern, match))
+    return result[:5]
+
+
+def _quality_value_counterexamples(value: object, pattern: str, match: str) -> list[str]:
+    if isinstance(value, str):
+        return [
+            line for line in _matching_snippets(value, pattern, match, limit=5)
+            if _looks_like_body_counterexample(line, pattern)
+        ]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            result.extend(_quality_value_counterexamples(item, pattern, match))
+        return result
+    if isinstance(value, dict):
+        nested_result: list[str] = []
+        for item in value.values():
+            nested_result.extend(_quality_value_counterexamples(item, pattern, match))
+        return nested_result
+    return []
 
 
 def _counterexample_fallbacks(artifacts: dict, pattern: str, match: str, sources: tuple[str, ...]) -> list[str]:

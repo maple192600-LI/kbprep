@@ -186,7 +186,8 @@ def load_cleaning_rules(
     templates: tuple[str, ...] = (),
     source_identity: str = "",
 ) -> LoadedCleaningRules:
-    base = _load_base_cleaning_rules(profile, document_type, templates)
+    root = rules_root()
+    base = _load_base_cleaning_rules(str(root), profile, document_type, templates)
     accepted_rules: list[CleaningRule] = []
     accepted_sources: list[str] = []
     for path in _accepted_rule_paths():
@@ -203,12 +204,14 @@ def load_cleaning_rules(
 
 @lru_cache(maxsize=64)
 def _load_base_cleaning_rules(
+    root_key: str,
     profile: str = "standard",
     document_type: str = "",
     templates: tuple[str, ...] = (),
 ) -> LoadedCleaningRules:
-    selected = select_base_cleaning_routes(rules_root(), profile=profile, document_type=document_type, templates=templates)
-    rule_sets = _load_rule_sets(selected)
+    root = Path(root_key)
+    selected = select_base_cleaning_routes(root, profile=profile, document_type=document_type, templates=templates)
+    rule_sets = _load_rule_sets(selected, root)
     return LoadedCleaningRules(
         cleaning=_cleaning_rule_group(rule_sets),
         image=_image_rule_group(rule_sets),
@@ -218,10 +221,10 @@ def _load_base_cleaning_rules(
     )
 
 
-def _load_rule_sets(selected: tuple[CleaningRuleRoute, ...]) -> list[CleaningRuleSet]:
+def _load_rule_sets(selected: tuple[CleaningRuleRoute, ...], root: Path) -> list[CleaningRuleSet]:
     rule_sets: list[CleaningRuleSet] = []
     for route in selected:
-        path = _resolve_rule_route_path(route)
+        path = _resolve_rule_route_path(route, root)
         if not path.exists():
             continue
         with path.open("r", encoding="utf-8") as fh:
@@ -229,9 +232,9 @@ def _load_rule_sets(selected: tuple[CleaningRuleRoute, ...]) -> list[CleaningRul
     return rule_sets
 
 
-def _resolve_rule_route_path(route: CleaningRuleRoute) -> Path:
+def _resolve_rule_route_path(route: CleaningRuleRoute, root: Path) -> Path:
     if route.path.parent.name == "templates" and route.path.suffix == ".json":
-        for path in template_candidates(route.path.stem, rules_root() / "templates"):
+        for path in template_candidates(route.path.stem, root / "templates"):
             if path.exists():
                 return path
     return route.path

@@ -124,6 +124,31 @@ class FeedbackProposalNarrowingTests(unittest.TestCase):
         self.assertEqual(envelope["error"]["code"], "E_RULE_VALIDATION_FAILED")
         self.assertEqual(envelope["error"]["details"]["missing_counterexamples"], proposal["counterexamples"])
 
+    def test_discard_counterexamples_include_review_needed_and_quality_issue_body_matches(self) -> None:
+        artifacts = {
+            "texts": {
+                "cleaned": "",
+                "review_needed": "案例：字段值为关注公众号时表示渠道来源，应作为样本值保留。",
+                "discarded": "关注公众号领取资料。",
+            },
+            "quality": {
+                "quality_issues": [
+                    {"message": "案例：表格字段关注公众号是渠道取值，不是营销 CTA。"},
+                ],
+            },
+        }
+
+        counterexamples = proposals._counterexamples(
+            {},
+            "关注公众号",
+            "literal",
+            "discard",
+            artifacts,
+        )
+
+        self.assertIn("案例：字段值为关注公众号时表示渠道来源，应作为样本值保留。", counterexamples)
+        self.assertIn("案例：表格字段关注公众号是渠道取值，不是营销 CTA。", counterexamples)
+
 
 if __name__ == "__main__":
     unittest.main()

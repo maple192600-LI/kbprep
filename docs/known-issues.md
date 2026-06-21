@@ -19,6 +19,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 - CLI path safety distinguishes read and write boundaries.
 - Provider-specific AI review clients are not maintained in this repository.
 - Public rules must stay generic or sanitized; private rules belong under `.kbprep/rules/`.
+- New external AI review integrations should run in shadow mode before apply mode.
 
 ## Review Closure Guards
 

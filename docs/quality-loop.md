@@ -83,4 +83,4 @@ Final output is blocked when strict quality errors remain. A run may still emit 
 
 ## Feedback Loop
 
-Feedback does not mutate long-term cleanup behavior directly. KBPrep creates a rule proposal, validates examples and counterexamples, requires a risk note and owner confirmation status, accepts only with `confirm_rule_acceptance=true`, and reruns representative sources when run metadata allows it.
+Feedback does not mutate long-term cleanup behavior directly. KBPrep creates a rule proposal, validates examples and counterexamples, requires a risk note and owner confirmation status, accepts only with `confirm_rule_acceptance=true`, and reruns representative sources when run metadata allows it. Promotion into dictionaries uses scope-based evidence thresholds and stops on failed promotion history unless an explicit override records the risk and failed samples.

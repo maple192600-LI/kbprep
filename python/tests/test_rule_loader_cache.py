@@ -8,6 +8,22 @@ from unittest.mock import patch
 from kbprep_worker.rule_loader import load_cleaning_rules
 
 
+def _write_minimal_base_rules(path: Path, marker: str) -> None:
+    base = path / "base"
+    base.mkdir(parents=True)
+    (base / "obvious_noise.json").write_text(
+        json.dumps(
+            {
+                "schema": "kbprep.cleaning_rules.v1",
+                "keyword_sets": {"cta_keywords": [marker]},
+                "rules": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 class RuleLoaderCacheTests(unittest.TestCase):
     def setUp(self):
         load_cleaning_rules.cache_clear()
@@ -57,6 +73,22 @@ class RuleLoaderCacheTests(unittest.TestCase):
                     os.environ.pop("KBPREP_USER_RULES_DIR", None)
                 else:
                     os.environ["KBPREP_USER_RULES_DIR"] = old_env
+
+    def test_base_rule_cache_tracks_rules_root_override(self):
+        marker = "temporary-root-only-cta"
+        default_rules = load_cleaning_rules()
+        with tempfile.TemporaryDirectory() as tmp:
+            override_root = Path(tmp)
+            _write_minimal_base_rules(override_root, marker)
+
+            with patch.dict(os.environ, {"KBPREP_RULES_ROOT": str(override_root)}):
+                override_rules = load_cleaning_rules()
+
+            restored_rules = load_cleaning_rules()
+
+        self.assertIn(marker, override_rules.cta_keywords)
+        self.assertNotIn(marker, default_rules.cta_keywords)
+        self.assertEqual(default_rules.cta_keywords, restored_rules.cta_keywords)
 
 
 if __name__ == "__main__":

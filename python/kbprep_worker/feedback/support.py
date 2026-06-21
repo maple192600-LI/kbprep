@@ -296,7 +296,7 @@ def _run_artifacts(run_dir: Path) -> dict:
             if (run_dir / name).exists()
         ],
     }
-    return {"context": context, "texts": texts}
+    return {"context": context, "texts": texts, "quality": quality}
 
 
 def _metadata_source_identity(metadata: dict, input_path: str) -> dict:

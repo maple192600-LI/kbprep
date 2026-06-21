@@ -27,6 +27,76 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
 
 
 class FeedbackPromotionRound2CoverageTests(unittest.TestCase):
+    def test_dictionary_suggestions_use_scope_based_feedback_thresholds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "rules"
+
+            def accepted(rule_id: str, scope: str, pattern: str, document_type: str = "course") -> dict:
+                return {
+                    "schema": "kbprep.rule_proposal.v1",
+                    "id": rule_id,
+                    "status": "accepted",
+                    "action": "discard",
+                    "scope": scope,
+                    "match": "literal",
+                    "pattern": pattern,
+                    "reason": "confirmed feedback",
+                    "risk_note": "review before promotion",
+                    "created_from_run": "run",
+                    "requires_confirmation": True,
+                    "owner_confirmation_status": "confirmed",
+                    "examples": [pattern],
+                    "counterexamples": ["正文案例：这是需要保留的方法内容。"],
+                    "document_type": document_type,
+                }
+
+            _write_jsonl(rules_dir / "accepted_rules.jsonl", [
+                accepted("user-1", "user", "用户污染1", "user_doc"),
+                accepted("user-2", "user", "用户污染2", "user_doc"),
+                accepted("doc-1", "document_type", "课程污染1", "doc_type"),
+                accepted("doc-2", "document_type", "课程污染2", "doc_type"),
+                accepted("global-1", "global", "全局污染1", "global_doc"),
+                accepted("global-2", "global", "全局污染2", "global_doc"),
+                accepted("global-3", "global", "全局污染3", "global_doc"),
+                accepted("global-4", "global", "全局污染4", "global_doc"),
+            ])
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._suggest_dictionary_updates,
+                {"rules_dir": str(rules_dir), "min_feedback_count": 1},
+            )
+
+            self.assertEqual(code, 0)
+            suggestions = envelope["data"]["suggestions"]["suggestions"]
+            self.assertEqual([item["document_type"] for item in suggestions], ["user_doc"])
+            self.assertEqual(suggestions[0]["feedback_scope"], "user")
+            self.assertEqual(suggestions[0]["min_feedback_count"], 2)
+            self.assertEqual(envelope["data"]["suggestions"]["min_feedback_count_by_scope"]["global"], 5)
+
+            _write_jsonl(rules_dir / "accepted_rules.jsonl", [
+                accepted("doc-1", "document_type", "课程污染1", "doc_type"),
+                accepted("doc-2", "document_type", "课程污染2", "doc_type"),
+                accepted("doc-3", "document_type", "课程污染3", "doc_type"),
+                accepted("global-1", "global", "全局污染1", "global_doc"),
+                accepted("global-2", "global", "全局污染2", "global_doc"),
+                accepted("global-3", "global", "全局污染3", "global_doc"),
+                accepted("global-4", "global", "全局污染4", "global_doc"),
+                accepted("global-5", "global", "全局污染5", "global_doc"),
+            ])
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._suggest_dictionary_updates,
+                {"rules_dir": str(rules_dir), "min_feedback_count": 1},
+            )
+
+            self.assertEqual(code, 0)
+            suggestions = envelope["data"]["suggestions"]["suggestions"]
+            self.assertEqual(
+                [(item["document_type"], item["feedback_scope"], item["min_feedback_count"]) for item in suggestions],
+                [("doc_type", "document_type", 3), ("global_doc", "global", 5)],
+            )
+
     def test_promote_dictionary_suggestion_writes_rule_file_and_history(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -93,6 +163,78 @@ class FeedbackPromotionRound2CoverageTests(unittest.TestCase):
             self.assertEqual(envelope["data"]["promoted"]["promoted_count"], 0)
             self.assertEqual(envelope["data"]["promoted"]["skipped_duplicates"], 2)
             self.assertTrue(Path(envelope["data"]["promoted"]["backup_path"]).exists())
+
+    def test_promotion_history_override_reports_failed_sample_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "rules"
+            target_rules_dir = root / "target"
+            suggestions_path = rules_dir / "dictionary_suggestions.jsonl"
+            _write_jsonl(suggestions_path, [
+                {
+                    "schema": "kbprep.dictionary_suggestion.v1",
+                    "document_type": "course",
+                    "target": "rules/document_types/course.json",
+                    "required_confirmation": True,
+                    "proposed_rules": [
+                        {
+                            "action": "discard",
+                            "match": "literal",
+                            "pattern": "课程污染",
+                            "reason": "confirmed CTA",
+                        },
+                    ],
+                },
+            ])
+            _write_jsonl(target_rules_dir / "promotion_history.jsonl", [
+                {
+                    "schema": "kbprep.dictionary_promotion_history.v1",
+                    "created_at": "2026-06-02T00:00:00Z",
+                    "document_type": "course",
+                    "regression_verification": {
+                        "status": "failed",
+                        "samples": [
+                            {
+                                "ok": False,
+                                "run_dir": str(root / "runs" / "failed-course"),
+                                "reason": "discard_pattern_still_in_cleaned",
+                                "worker_error": {"code": "E_QA_FAILED"},
+                            },
+                        ],
+                    },
+                },
+            ])
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._promote_dictionary_suggestion,
+                {
+                    "confirm_dictionary_update": True,
+                    "document_type": "course",
+                    "rules_dir": str(rules_dir),
+                    "target_rules_dir": str(target_rules_dir),
+                    "suggestions_file": str(suggestions_path),
+                },
+            )
+            self.assertEqual(code, 1)
+            self.assertEqual(envelope["error"]["details"]["failed_samples"][0]["reason"], "discard_pattern_still_in_cleaned")
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._promote_dictionary_suggestion,
+                {
+                    "confirm_dictionary_update": True,
+                    "document_type": "course",
+                    "rules_dir": str(rules_dir),
+                    "target_rules_dir": str(target_rules_dir),
+                    "suggestions_file": str(suggestions_path),
+                    "allow_failed_promotion_history": True,
+                },
+            )
+
+            self.assertEqual(code, 0)
+            history_risk = envelope["data"]["promoted"]["history_risk"]
+            self.assertEqual(history_risk["status"], "override_used")
+            self.assertIn("explicit override", history_risk["override_warning"])
+            self.assertEqual(history_risk["failed_samples"][0]["worker_error_code"], "E_QA_FAILED")
 
     def test_dictionary_promotion_defaults_to_project_private_rules(self):
         with tempfile.TemporaryDirectory() as tmp:

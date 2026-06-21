@@ -102,8 +102,12 @@ Implemented behavior includes:
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
 - dictionary suggestions require explicit confirmation before promotion
+- dictionary suggestion thresholds are scope-based: user/project/source-pattern evidence can start lower, document-type promotion needs more evidence, and global/public-style promotion needs the highest evidence count
 - dictionary promotion defaults to private project rules and requires a second explicit confirmation before writing packaged public rules
-- promotion history records pass, fail, or unverified outcomes
+- promotion history records pass, fail, or unverified outcomes; failed history blocks new promotion by default
+- overriding failed promotion history requires an explicit flag and reports the failed sample evidence in the response
+
+AI review should start in `shadow` mode for any new external model. Shadow suggestions do not mutate final Markdown; apply mode still routes through worker `apply_review` and the quality gates.
 
 ## Acceptance
 

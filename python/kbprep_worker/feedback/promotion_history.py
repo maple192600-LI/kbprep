@@ -41,6 +41,7 @@ def _promotion_history_risk(*, target_rules_dir: Path, document_type: str) -> di
             "status": "blocked",
             "history_path": str(history_path),
             "summary": summary,
+            "failed_samples": _failed_sample_references(entries),
             "reason": "Failed promotion history exists for this document type.",
         }
     if counts["unverified"] > 0:
@@ -306,6 +307,33 @@ def _promotion_failure_reasons(verification: dict) -> list[str]:
                     if isinstance(effect, dict) and effect.get("ok") is False and _optional_string(effect.get("effect")):
                         reasons.append(str(effect.get("effect")))
     return reasons
+
+
+def _failed_sample_references(entries: list[dict]) -> list[dict]:
+    result: list[dict] = []
+    for entry in entries:
+        verification = entry.get("regression_verification")
+        verification = verification if isinstance(verification, dict) else {}
+        if verification.get("status") != "failed":
+            continue
+        samples = verification.get("samples")
+        if not isinstance(samples, list):
+            continue
+        for sample in samples:
+            if isinstance(sample, dict) and sample.get("ok") is False:
+                result.append(_failed_sample_reference(sample))
+    return result[:10]
+
+
+def _failed_sample_reference(sample: dict) -> dict:
+    worker_error = sample.get("worker_error")
+    worker_error = worker_error if isinstance(worker_error, dict) else {}
+    return {
+        "run_dir": _optional_string(sample.get("run_dir")) or "",
+        "source_path": _optional_string(sample.get("source_path")) or "",
+        "reason": _optional_string(sample.get("reason")) or _optional_string(sample.get("error")) or "",
+        "worker_error_code": _optional_string(worker_error.get("code")) or "",
+    }
 
 def _promotion_history_counts(entries: list[dict]) -> dict:
     failed = 0
