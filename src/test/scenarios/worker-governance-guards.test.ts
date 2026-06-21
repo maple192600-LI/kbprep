@@ -311,8 +311,9 @@ describe("kbprep worker governance guards", () => {
             statusCapability("document_type_classification", "partial", [
               "docs/development/05-document-type-classification.md",
             ]),
-            statusCapability("cleaning_policy_snapshot", "design_only", [
+            statusCapability("cleaning_policy_snapshot", "partial", [
               "docs/development/06-cleaning-policy-library.md",
+              "python/tests/test_cleaning_policy_snapshot.py",
             ]),
             statusCapability("patch_clean_view", "design_only", [
               "docs/development/07-cleaning-unit-patch-clean-view.md",

@@ -18,6 +18,7 @@ from typing import Any
 
 from .. import __version__
 from ..atomic_io import atomic_write_json, atomic_write_text
+from ..cleaning_policy_snapshot import write_cleaning_policy_snapshot
 from ..envelope import fail, ok
 from ..fs_safety import is_safe_input_path, is_safe_output_root
 from ..prepare_artifacts import (
@@ -54,6 +55,7 @@ from ..prepare_runtime import (
 from ..prepare_runtime import (
     runtime_snapshot as _runtime_snapshot,
 )
+from .cache_probe import discard_cache_probe_run
 from .pipeline_helpers import (  # noqa: F401
     _actual_route_for_converter,
     _conversion_route_decision,
@@ -105,14 +107,16 @@ def run(data: dict) -> None:
 
     try:
         _stage_env_check(state)
-        if _stage_initialize_run_or_skip_cache(state) == "skipped_existing_run":
-            return
+        _stage_initialize_run(state)
         _stage_diagnose(state)
         _stage_convert(state)
         _stage_pre_clean_conversion_gate(state)
         _stage_normalize(state)
         _stage_blockify(state)
         _stage_classify_blocks(state)
+        _stage_cleaning_policy_snapshot(state)
+        if not state.force and _publish_cached_run_if_available(state):
+            return
         _stage_apply_cleaning_rules(state)
         _stage_classify_images(state)
         _stage_apply_obsidian_policy(state)
@@ -142,7 +146,7 @@ def _stage_env_check(state: PipelineState) -> None:
     state.warnings.extend(_check_env(state.profile))
 
 
-def _stage_initialize_run_or_skip_cache(state: PipelineState) -> str:
+def _stage_initialize_run(state: PipelineState) -> None:
     _stderr_log("info", "original_preserve", "Computing file hash")
     _capture_input_fingerprint(state)
     _capture_runtime_snapshot(state)
@@ -150,13 +154,9 @@ def _stage_initialize_run_or_skip_cache(state: PipelineState) -> str:
     _compute_run_identity(state)
     _assign_run_paths(state)
 
-    if not state.force and _publish_cached_run_if_available(state):
-        return "skipped_existing_run"
-
     _create_run_workspace(state)
     _write_initial_run_metadata(state)
     _preserve_original_input(state)
-    return "continue"
 
 
 def _capture_input_fingerprint(state: PipelineState) -> None:
@@ -192,7 +192,8 @@ def _compute_run_identity(state: PipelineState) -> None:
     state.config_hash = hashlib.sha256(config_str.encode()).hexdigest()[:16]
     run_hash_input = f"{state.file_hash}:{state.config_hash}:{state.plugin_version}:{state.runtime_cache_key}"
     run_hash = hashlib.sha256(run_hash_input.encode()).hexdigest()
-    state.run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{run_hash[:12]}"
+    unique_suffix = time.time_ns()
+    state.run_id = f"{time.strftime('%Y%m%d_%H%M%S')}_{run_hash[:12]}_{unique_suffix:x}"
 
 
 def _assign_run_paths(state: PipelineState) -> None:
@@ -207,13 +208,22 @@ def _assign_run_paths(state: PipelineState) -> None:
 
 
 def _publish_cached_run_if_available(state: PipelineState) -> bool:
+    if not state.cleaning_policy_snapshot_hash:
+        return False
     existing = _find_existing_run(
-        state.root_p, state.file_hash, state.config_hash, state.plugin_version, state.runtime_cache_key,
+        state.root_p,
+        state.file_hash,
+        state.config_hash,
+        state.plugin_version,
+        state.runtime_cache_key,
+        policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
     )
     if not existing:
         return False
     _stderr_log("info", "original_preserve", f"Skipping: matching run {existing['run_id']}")
-    latest_outputs = _publish_latest_outputs(Path(existing["run_dir"]), state.root_p, state.input_p, state.profile)
+    existing_run_dir = Path(existing["run_dir"])
+    discard_cache_probe_run(state.run_dir, state.runs_dir, existing_run_dir)
+    latest_outputs = _publish_latest_outputs(existing_run_dir, state.root_p, state.input_p, state.profile)
     ok(data={
         "run_id": existing["run_id"],
         "run_dir": existing["run_dir"],
@@ -405,6 +415,31 @@ def _stage_classify_blocks(state: PipelineState) -> None:
     _stderr_log("info", "classify_blocks", "Classification complete")
 
 
+def _stage_cleaning_policy_snapshot(state: PipelineState) -> None:
+    state.require_stage_fields("cleaning_policy_snapshot", "run_dir")
+    run_dir = state.require_path("cleaning_policy_snapshot", "run_dir")
+    source_quality = str(state.diagnosis.get("text_layer_health") or "")
+    result = write_cleaning_policy_snapshot(
+        run_dir,
+        profile=state.profile,
+        document_type=state.document_type,
+        source_identity=state.source_identity,
+        source_quality=source_quality,
+    )
+    if result.path is None:
+        raise PipelineError("E_INTERNAL", "cleaning policy snapshot path was not written")
+    state.cleaning_policy_snapshot_hash = result.snapshot_hash
+    state.cleaning_policy_snapshot_path = result.path
+    _update_run_metadata(run_dir, {
+        "cleaning_policy_snapshot_hash": result.snapshot_hash,
+        "cleaning_policy_snapshot": {
+            "path": str(result.path),
+            "snapshot_hash": result.snapshot_hash,
+        },
+    })
+    _stderr_log("info", "cleaning_policy_snapshot", f"Policy snapshot: {result.snapshot_hash[:12]}")
+
+
 def _stage_apply_cleaning_rules(state: PipelineState) -> None:
     state.require_stage_fields("clean_rules", "blocks_path")
     blocks_path = state.require_path("clean_rules", "blocks_path")
@@ -526,6 +561,11 @@ def _stage_quality_check(state: PipelineState) -> None:
         "runtime_cache_key": state.runtime_cache_key,
         "runtime": state.runtime,
         "document_type_detection": state.document_type_detection,
+        "cleaning_policy_snapshot_hash": state.cleaning_policy_snapshot_hash,
+        "cleaning_policy_snapshot": {
+            "path": str(state.cleaning_policy_snapshot_path) if state.cleaning_policy_snapshot_path else "",
+            "snapshot_hash": state.cleaning_policy_snapshot_hash,
+        },
     })
     atomic_write_json(
         run_dir / "quality_report.json",
@@ -681,6 +721,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
     run_dir = state.require_path("run_outputs", "run_dir")
     chunks_dir = run_dir / "chunks"
     obsidian_complete = _obsidian_complete_path(run_dir / "obsidian")
+    policy_snapshot_path = run_dir / "cleaning_policy_snapshot.json"
     return {
         "converted_md": str(run_dir / "converted.md"),
         "normalized_md": str(run_dir / "normalized.md"),
@@ -691,6 +732,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "review_needed_md": str(run_dir / "review_needed.md"),
         "audit_md": str(run_dir / "audit.md"),
         "quality_report": str(run_dir / "quality_report.json"),
+        "cleaning_policy_snapshot": str(policy_snapshot_path) if policy_snapshot_path.exists() else None,
         "publish_report": str(run_dir / "publish_report.json") if (run_dir / "publish_report.json").exists() else None,
         "conversion_quality_report": str(run_dir / "conversion_quality_report.json"),
         "document_classification": str(run_dir / "document_classification.json"),

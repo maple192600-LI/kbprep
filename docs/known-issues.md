@@ -6,7 +6,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 
 - Canonical IR is documented as the target fact layer, but the worker has not fully moved every route to that contract.
 - SourceSpan coverage is not yet complete across every source kind.
-- CleaningPolicySnapshot is documented, but full reproducibility coverage still needs implementation.
+- CleaningPolicySnapshot now records the first policy input/hash artifact, but full reproducibility coverage still needs implementation.
 - CleaningPatch and Clean View are target contracts; current cleanup artifacts are not fully migrated.
 - Optional media and YouTube routes require dependency checks, sample evidence, and capability promotion before they are current CLI promises.
 - Batch manifests now report evidence-backed rerun scope, but executable selective rerun remains limited by available run metadata and current worker contracts.

@@ -96,6 +96,7 @@ class PipelineState:
     latest_outputs: dict[str, Any] = field(default_factory=dict)
     document_type: str = "unknown"
     document_type_detection: dict[str, Any] = field(default_factory=dict)
+    cleaning_policy_snapshot_hash: str = ""
     file_hash: str = ""
     file_size: int = 0
     plugin_version: str = "unknown"
@@ -117,6 +118,7 @@ class PipelineState:
     converted_path: Path | None = None
     normalized_path: Path | None = None
     blocks_path: Path | None = None
+    cleaning_policy_snapshot_path: Path | None = None
     input_config: PipelineInputConfig = field(init=False)
     run_facts: PipelineRunFacts = field(default_factory=PipelineRunFacts)
     runtime_facts: PipelineRuntimeFacts = field(default_factory=PipelineRuntimeFacts)

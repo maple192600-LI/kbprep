@@ -336,6 +336,12 @@ def _accepted_rule_paths() -> list[Path]:
     return [route.path for route in select_accepted_rule_routes(rules_root(), cwd=Path.cwd(), user_rule_dirs=_user_rule_dirs_from_env())]
 
 
+def load_active_accepted_rules(path: Path, document_type: str, source_identity: str) -> tuple[CleaningRule, ...]:
+    if not path.exists():
+        return ()
+    return tuple(_load_accepted_rule_proposals(path, document_type, source_identity))
+
+
 def _user_rule_dirs_from_env() -> tuple[Path, ...]:
     return accepted_rule_dirs_from_env()
 

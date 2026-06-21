@@ -160,6 +160,46 @@ class PipelineHelperRound2CoverageTests(unittest.TestCase):
             existing = pipeline_core._find_existing_run(root, "hash", "cfg", "v", "rt")
             self.assertEqual(existing["run_id"], "24")
             self.assertIsNone(pipeline_core._find_existing_run(root, "missing", "cfg", "v", "rt"))
+            self.assertIsNone(
+                pipeline_core._find_existing_run(
+                    root,
+                    "hash",
+                    "cfg",
+                    "v",
+                    "rt",
+                    policy_snapshot_hash="policy-v2",
+                ),
+            )
+            (runs / "24" / "quality_report.json").write_text(
+                json.dumps({
+                    "source_sha256": "hash",
+                    "config_hash": "cfg",
+                    "plugin_version": "v",
+                    "runtime_cache_key": "rt",
+                    "cleaning_policy_snapshot_hash": "policy-v1",
+                    "strict_errors": [],
+                }),
+                encoding="utf-8",
+            )
+            matched = pipeline_core._find_existing_run(
+                root,
+                "hash",
+                "cfg",
+                "v",
+                "rt",
+                policy_snapshot_hash="policy-v1",
+            )
+            self.assertEqual(matched["run_id"], "24")
+            self.assertIsNone(
+                pipeline_core._find_existing_run(
+                    root,
+                    "hash",
+                    "cfg",
+                    "v",
+                    "rt",
+                    policy_snapshot_hash="policy-v2",
+                ),
+            )
 
             issue = pipeline_core._primary_quality_issue({"quality_issues": [{"code": "E_IMAGE_FILE_MISSING", "gate": "image"}]})
             self.assertEqual(issue["code"], "E_IMAGE_FILE_MISSING")

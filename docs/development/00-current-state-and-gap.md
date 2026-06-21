@@ -20,7 +20,7 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 
 - Canonical IR is not yet the complete internal fact layer.
 - SourceSpan variants are not yet a full contract across all source kinds.
-- CleaningPolicySnapshot is not yet the full reproducibility boundary.
+- CleaningPolicySnapshot records the first policy input/hash artifact, but is not yet the full reproducibility boundary.
 - CleaningPatch and rejected patch reports are not yet the universal cleanup path.
 - Clean View is not yet the required render source for all profiles.
 - Optional media and YouTube routes require capability evidence before promotion.

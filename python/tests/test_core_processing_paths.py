@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 import zipfile
@@ -21,6 +22,16 @@ from kbprep_worker.render_outputs import render
 from kbprep_worker.rule_loader import load_cleaning_rules
 from kbprep_worker.split import split_into_chunks
 from kbprep_worker.stages import pipeline_core
+
+
+def _base_rules(marker: str = "v1") -> dict:
+    return {
+        "schema": "kbprep.cleaning_rules.v1",
+        "keyword_sets": {
+            "cta_keywords": [f"cta-{marker}"],
+        },
+        "rules": [],
+    }
 
 
 def _capture_envelope(fn, payload):
@@ -77,6 +88,163 @@ class CoreProcessingPathTests(unittest.TestCase):
             quality_report = json.loads(Path(data["latest_outputs"]["quality_report"]).read_text(encoding="utf-8"))
             self.assertIn("quality_issues", quality_report)
             self.assertIn("conversion_quality_gate", quality_report)
+            snapshot_path = Path(data["outputs"]["cleaning_policy_snapshot"])
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            metadata = json.loads((Path(data["run_dir"]) / "run_metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(quality_report["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
+            self.assertEqual(metadata["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
+            self.assertEqual(
+                quality_report["cleaning_policy_snapshot"]["path"],
+                str(snapshot_path),
+            )
+
+    def test_prepare_cache_reuse_requires_matching_policy_snapshot_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertTrue(second_envelope["data"]["skipped"])
+            self.assertEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertEqual(len([path for path in (output_root / "runs").iterdir() if path.is_dir()]), 1)
+
+    def test_prepare_cache_hit_does_not_rewrite_existing_run_artifacts_in_same_second(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            with patch("kbprep_worker.stages.pipeline_core.time.time", return_value=1000.0):
+                first_code, first_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+                )
+                first_run_dir = Path(first_envelope["data"]["run_dir"])
+                tracked_files = {
+                    name: (first_run_dir / name).read_bytes()
+                    for name in (
+                        "run_metadata.json",
+                        "diagnosis_report.json",
+                        "converted.md",
+                        "normalized.md",
+                        "blocks.jsonl",
+                        "document_classification.json",
+                        "cleaning_policy_snapshot.json",
+                    )
+                }
+                second_code, second_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+                )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertTrue(second_envelope["data"]["skipped"])
+            self.assertEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertEqual(
+                tracked_files,
+                {name: (first_run_dir / name).read_bytes() for name in tracked_files},
+            )
+            self.assertEqual(len([path for path in (output_root / "runs").iterdir() if path.is_dir()]), 1)
+
+    def test_prepare_cache_hit_discards_distinct_probe_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertTrue(second_envelope["data"]["skipped"])
+            self.assertEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertEqual(
+                [path.name for path in (output_root / "runs").iterdir() if path.is_dir()],
+                [first_envelope["data"]["run_id"]],
+            )
+
+    def test_prepare_does_not_reuse_legacy_run_without_policy_snapshot_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            quality_path = Path(first_envelope["data"]["run_dir"]) / "quality_report.json"
+            quality_report = json.loads(quality_path.read_text(encoding="utf-8"))
+            quality_report.pop("cleaning_policy_snapshot_hash")
+            quality_path.write_text(json.dumps(quality_report, ensure_ascii=False), encoding="utf-8")
+
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            refreshed_quality = json.loads(Path(second_envelope["data"]["latest_outputs"]["quality_report"]).read_text(encoding="utf-8"))
+            self.assertIn("cleaning_policy_snapshot_hash", refreshed_quality)
+
+    def test_prepare_reruns_when_rule_file_changes_policy_snapshot_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_root = root / "rules"
+            base_rules_path = rules_root / "base" / "obvious_noise.json"
+            base_rules_path.parent.mkdir(parents=True)
+            base_rules_path.write_text(json.dumps(_base_rules("v1"), ensure_ascii=False), encoding="utf-8")
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            with patch.dict(os.environ, {"KBPREP_RULES_ROOT": str(rules_root)}):
+                load_cleaning_rules.cache_clear()
+                first_code, first_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+                )
+                first_quality = json.loads(Path(first_envelope["data"]["latest_outputs"]["quality_report"]).read_text(encoding="utf-8"))
+                base_rules_path.write_text(json.dumps(_base_rules("v2"), ensure_ascii=False), encoding="utf-8")
+                load_cleaning_rules.cache_clear()
+                second_code, second_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+                )
+                second_quality = json.loads(Path(second_envelope["data"]["latest_outputs"]["quality_report"]).read_text(encoding="utf-8"))
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(
+                first_quality["cleaning_policy_snapshot_hash"],
+                second_quality["cleaning_policy_snapshot_hash"],
+            )
 
     def test_prepare_stops_before_cleanup_when_pre_clean_conversion_gate_fails(self):
         with tempfile.TemporaryDirectory() as tmp:

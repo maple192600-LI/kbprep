@@ -1,6 +1,6 @@
 {
   "schema": "kbprep.implementation_status.v1",
-  "updated": "2026-06-20",
+  "updated": "2026-06-21",
   "capabilities": [
     {
       "id": "design_source_alignment",
@@ -77,10 +77,15 @@
     {
       "id": "cleaning_policy_snapshot",
       "label": "CleaningPolicySnapshot",
-      "status": "design_only",
-      "scope": "The reproducibility boundary is defined, but full snapshot compilation is not yet the shipped cleanup contract.",
+      "status": "partial",
+      "scope": "The worker writes a partial cleaning_policy_snapshot.json with selected policy input routes, active file paths and SHA-256 hashes, filtered accepted-rule fingerprints, threshold summary, and quality/run metadata references. Cache matching uses the policy hash after the document type is known. The full reproducible cleanup contract is not yet shipped.",
       "evidence": [
-        "docs/development/06-cleaning-policy-library.md"
+        "docs/development/06-cleaning-policy-library.md",
+        "python/kbprep_worker/cleaning_policy_snapshot.py",
+        "python/kbprep_worker/rule_loader.py",
+        "python/kbprep_worker/stages/pipeline_core.py",
+        "python/tests/test_cleaning_policy_snapshot.py",
+        "python/tests/test_core_processing_paths.py"
       ],
       "prohibitedClaims": [
         "CleaningPolicySnapshot fully reproduces every shipped cleanup run"

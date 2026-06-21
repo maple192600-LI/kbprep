@@ -30,7 +30,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | conversion_quality_gate | partial | Gate exists; must read Canonical IR evidence across every route. |
 | canonical_ir_contract | partial | Only a minimal manifest; `typed_nodes_available` and `source_spans_available` hardcoded `False`. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
-| cleaning_policy_snapshot | design_only | Reproducibility boundary defined; not the shipped cleanup contract. |
+| cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
@@ -137,7 +137,12 @@ Clean View.
 Slices:
 
 - **D1** `CleaningPolicySnapshot` schema and compiler (rule set hash, dictionary
-  hash, conflict resolutions, compiler version).
+  hash, conflict resolutions, compiler version). Partially landed: current runs
+  record selected policy input files, resolved active paths, file SHA-256 hashes,
+  filtered accepted-rule fingerprints, threshold summary, and a snapshot hash.
+  Cache matching uses the snapshot hash after document type detection. Remaining
+  D1 work still needs complete rule ids, dictionary ids, disabled rules,
+  conflict resolutions, and full preference semantics.
 - **D2** `CleaningPatch` generation replacing direct cleanup writes.
 - **D3** Patch gate (protected design §12 checks: node exists, rule in
   snapshot, protection hit, table/code/formula/link/image integrity, no
@@ -147,9 +152,10 @@ Slices:
   accepted patches in original order.
 - **D6** `DocumentCleaningGate` over the assembled Clean View.
 
-Acceptance: `cleaning_policy_snapshot` and `patch_clean_view` move from
-design_only to implemented; same Canonical IR + snapshot produces the same
-Clean View; unsafe patches preserve original text with a warning.
+Acceptance: `cleaning_policy_snapshot` moves from partial to implemented and
+`patch_clean_view` moves from design_only to implemented; same Canonical IR +
+snapshot produces the same Clean View; unsafe patches preserve original text
+with a warning.
 
 ### Phase E — Generalized completed_with_warnings
 
@@ -215,7 +221,7 @@ Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
 | --- | --- | --- |
 | M1 Design Source Aligned | Phase A (ongoing) | implemented, kept aligned |
 | M2 Canonical IR Contract | Phase C | in progress (partial) |
-| M3 Policy Snapshot And Patch Cleanup | Phase D | not started (design_only) |
+| M3 Policy Snapshot And Patch Cleanup | Phase D | in progress (`cleaning_policy_snapshot` partial; `patch_clean_view` design_only) |
 | M4 Source-Side Publication | — | implemented |
 | M5 Feedback And Selective Rerun | Phase A + D (rerun from Canonical IR) | partial |
 | M6 Optional Source Expansion | Phase F | not started (design_only) |

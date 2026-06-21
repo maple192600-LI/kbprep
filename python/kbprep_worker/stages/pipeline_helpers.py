@@ -571,7 +571,14 @@ def _quality_gate_name_from_error(error: str) -> str:
     return "export_readiness"
 
 
-def _find_existing_run(root_p: Path, file_hash: str, config_hash: str, plugin_version: str, runtime_cache_key: str) -> dict | None:
+def _find_existing_run(
+    root_p: Path,
+    file_hash: str,
+    config_hash: str,
+    plugin_version: str,
+    runtime_cache_key: str,
+    policy_snapshot_hash: str | None = None,
+) -> dict | None:
     runs_dir = root_p / "runs"
     if not runs_dir.exists():
         return None
@@ -590,11 +597,18 @@ def _find_existing_run(root_p: Path, file_hash: str, config_hash: str, plugin_ve
                     report.get("config_hash") == config_hash and
                     report.get("plugin_version") == plugin_version and
                     report.get("runtime_cache_key") == runtime_cache_key and
+                    _policy_snapshot_matches(report, policy_snapshot_hash) and
                     not report.get("strict_errors")):
                     return {"run_id": run_dir.name, "run_dir": str(run_dir)}
             except Exception:
                 continue
     return None
+
+
+def _policy_snapshot_matches(report: dict, policy_snapshot_hash: str | None) -> bool:
+    if policy_snapshot_hash is None:
+        return True
+    return report.get("cleaning_policy_snapshot_hash") == policy_snapshot_hash
 
 
 def _prepare_metadata_payload(
