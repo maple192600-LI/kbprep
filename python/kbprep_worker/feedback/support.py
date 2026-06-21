@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import re
@@ -23,27 +24,35 @@ class _JsonlFileLock:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("a+b")
         handle = self.handle
-        if os.name == "nt":
-            import msvcrt
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)  # type: ignore[attr-defined]
+        _lock_file(handle)
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         if not self.handle:
             return
         handle = self.handle
-        if os.name == "nt":
-            import msvcrt
-            handle.seek(0)
-            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)  # type: ignore[attr-defined]
+        _unlock_file(handle)
         handle.close()
+
+
+def _lock_file(handle: Any) -> None:
+    if os.name == "nt":
+        handle.seek(0)
+        msvcrt = cast(Any, importlib.import_module("msvcrt"))
+        msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        return
+    fcntl = cast(Any, importlib.import_module("fcntl"))
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+
+
+def _unlock_file(handle: Any) -> None:
+    if os.name == "nt":
+        handle.seek(0)
+        msvcrt = cast(Any, importlib.import_module("msvcrt"))
+        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+    fcntl = cast(Any, importlib.import_module("fcntl"))
+    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _append_jsonl_locked(path: Path, payload: dict) -> None:
