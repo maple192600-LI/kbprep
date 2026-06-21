@@ -72,14 +72,17 @@ for (const relative of checkedFiles) {
       }
     }
     for (const literal of pythonStringLiterals(file)) {
+      const literalValues = pythonStringLiteralValues(literal.value);
       for (const term of forbiddenTerms) {
-        if (literal.value.includes(term)) {
+        if (literalValues.some((value) => value.includes(term))) {
           violations.push({ file: fileRelative, line: literal.line, term, source: "decoded_string" });
         }
       }
-      for (const term of sensitiveRuleTerms(literal.value)) {
-        if (!rulesText.includes(term)) {
-          violations.push({ file: fileRelative, line: literal.line, term, source: "string_not_in_rules" });
+      for (const value of literalValues) {
+        for (const term of sensitiveRuleTerms(value)) {
+          if (!rulesText.includes(term)) {
+            violations.push({ file: fileRelative, line: literal.line, term, source: "string_not_in_rules" });
+          }
         }
       }
     }
@@ -135,6 +138,22 @@ function rulesCorpus(root) {
     .filter((file) => file.endsWith(".json") || file.endsWith(".jsonl"))
     .map((file) => readFileSync(file, "utf8"))
     .join("\n");
+}
+
+function pythonStringLiteralValues(value) {
+  const values = new Set([value]);
+  const decoded = decodeUnicodeEscapes(value);
+  if (decoded !== value) {
+    values.add(decoded);
+  }
+  return [...values];
+}
+
+function decodeUnicodeEscapes(value) {
+  return value.replaceAll(/\\U([0-9a-fA-F]{8})|\\u([0-9a-fA-F]{4})/g, (_match, longHex, shortHex) => {
+    const codePoint = Number.parseInt(longHex ?? shortHex, 16);
+    return String.fromCodePoint(codePoint);
+  });
 }
 
 function collectFiles(target) {

@@ -1,10 +1,14 @@
+import tempfile
 import unittest
+from pathlib import Path
 
 from kbprep_worker.quality.thresholds import (
     CLASSIFICATION_CONFIDENCE,
     DIAGNOSIS_THRESHOLDS,
     OBSIDIAN_CONFIDENCE,
+    review_pack_low_confidence_threshold,
 )
+from kbprep_worker.stages.pipeline_helpers import _generate_review_pack
 
 
 class ThresholdContractTests(unittest.TestCase):
@@ -19,6 +23,54 @@ class ThresholdContractTests(unittest.TestCase):
     def test_obsidian_confidence_names_curation_decisions(self):
         self.assertEqual(OBSIDIAN_CONFIDENCE["drop_internal_page_marker"], 0.99)
         self.assertEqual(OBSIDIAN_CONFIDENCE["author_intro_review"], 0.60)
+
+    def test_review_pack_low_confidence_threshold_defaults_to_existing_policy(self):
+        self.assertEqual(review_pack_low_confidence_threshold(), 0.76)
+        self.assertEqual(
+            review_pack_low_confidence_threshold(source_quality="high", document_type="report"),
+            0.76,
+        )
+        self.assertEqual(
+            review_pack_low_confidence_threshold(source_quality="high", document_type="course"),
+            0.76,
+        )
+
+    def test_low_quality_transcript_review_pack_uses_more_conservative_threshold(self):
+        default = review_pack_low_confidence_threshold()
+        transcript = review_pack_low_confidence_threshold(source_quality="low", document_type="transcript")
+        unavailable = review_pack_low_confidence_threshold(source_quality="unavailable", document_type="transcript")
+        self.assertGreaterEqual(transcript, default)
+        self.assertGreater(transcript, default)
+        self.assertGreaterEqual(unavailable, default)
+        self.assertGreater(unavailable, default)
+
+    def test_review_pack_uses_source_quality_and_document_type_threshold(self):
+        blocks = [{
+            "block_id": "low_conf_transcript",
+            "type": "paragraph",
+            "status": "keep",
+            "risk_tags": [],
+            "reason": "",
+            "confidence": 0.78,
+            "protected": False,
+            "heading_path": [],
+            "page_start": 1,
+            "page_end": 1,
+            "text": "字幕转写段落，置信度略高于默认阈值但仍需人工复核。",
+        }]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            _generate_review_pack(
+                blocks,
+                run_dir,
+                "subtitle_transcript",
+                source_quality="unavailable",
+                document_type="transcript",
+            )
+            pack = (run_dir / "review_pack.json").read_text(encoding="utf-8")
+
+        self.assertIn("low_conf_transcript", pack)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,28 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Interview-specific cleanup and protection vocabulary for Q&A and speaker-attributed content.",
+  "rules": [],
+  "keyword_sets": {
+    "tutorial_indicators": [
+      "访谈",
+      "采访",
+      "问答",
+      "对话"
+    ],
+    "knowledge_terms": [
+      "主持人",
+      "嘉宾",
+      "提问",
+      "回答",
+      "追问",
+      "观点",
+      "案例"
+    ],
+    "protected_patterns": [
+      {
+        "label": "interview_exchange",
+        "pattern": "^\\s*(?:Q|A|问|答|主持人|嘉宾)[：:]"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Webpage-specific cleanup and protection vocabulary for navigation wrappers and article bodies.",
+  "rules": [],
+  "keyword_sets": {
+    "knowledge_terms": [
+      "正文",
+      "文章来源",
+      "网页案例",
+      "产品文档",
+      "更新日志"
+    ],
+    "footer_patterns": [
+      "^\\s*(?:上一篇|下一篇|相关阅读|相关文章)\\s*$",
+      "^\\s*(?:privacy policy|terms of use|cookie settings)\\s*$"
+    ],
+    "marketing_wrapper_heading_terms": [
+      "导航菜单",
+      "页脚导航",
+      "Cookie 横幅"
+    ]
+  }
+}

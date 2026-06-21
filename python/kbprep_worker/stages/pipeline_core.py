@@ -456,7 +456,13 @@ def _stage_review_pack(state: PipelineState) -> None:
     run_dir = state.require_path("review_pack", "run_dir")
     if state.mode == "rules_plus_review_pack":
         _stderr_log("info", "review_pack", "Generating review pack")
-        _generate_review_pack(state.blocks, run_dir, state.source_type)
+        _generate_review_pack(
+            state.blocks,
+            run_dir,
+            state.source_type,
+            source_quality=str(state.diagnosis.get("text_layer_health") or ""),
+            document_type=state.document_type,
+        )
 
 
 def _stage_render_outputs(state: PipelineState) -> None:

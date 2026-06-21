@@ -221,14 +221,14 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
     expect(summary.checkedFiles).toBeGreaterThan(0);
   });
 
-  it("detects escaped Chinese cleanup terms in Python string literals", () => {
+  it("detects escaped Chinese cleanup terms in raw Python string literals", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-hardcode-"));
     try {
       const workerDir = path.join(root, "python", "kbprep_worker");
       const rulesDir = path.join(root, "rules", "base");
       mkdirSync(workerDir, { recursive: true });
       mkdirSync(rulesDir, { recursive: true });
-      writeFileSync(path.join(workerDir, "bad.py"), 'TITLE = "\\u516c\\u4f17\\u53f7"\n', "utf8");
+      writeFileSync(path.join(workerDir, "bad.py"), 'TITLE = r"\\u516c\\u4f17\\u53f7"\n', "utf8");
       writeFileSync(path.join(rulesDir, "obvious_noise.json"), JSON.stringify({ keyword_sets: {} }), "utf8");
 
       const result = spawnSync(process.execPath, [

@@ -59,7 +59,35 @@ OBSIDIAN_CONFIDENCE = {
 
 REVIEW_THRESHOLDS = {
     "review_pack_low_confidence": 0.76,
+    "review_pack_low_confidence_low_quality_transcript": 0.82,
 }
+
+LOW_QUALITY_SOURCE_QUALITIES = frozenset({
+    "bad",
+    "degraded",
+    "low",
+    "media_to_transcript",
+    "media_transcript",
+    "needs_conversion",
+    "poor",
+    "unreadable",
+    "unavailable",
+    "untrusted",
+})
+
+
+def review_pack_low_confidence_threshold(*, source_quality: str = "", document_type: str = "") -> float:
+    default = REVIEW_THRESHOLDS["review_pack_low_confidence"]
+    if (
+        _policy_key(document_type) == "transcript"
+        and _policy_key(source_quality) in LOW_QUALITY_SOURCE_QUALITIES
+    ):
+        return max(default, REVIEW_THRESHOLDS["review_pack_low_confidence_low_quality_transcript"])
+    return default
+
+
+def _policy_key(value: str) -> str:
+    return str(value or "").strip().lower().replace("-", "_")
 
 CONVERSION_THRESHOLDS = {
     "garbage_ratio_warn": 0.03,

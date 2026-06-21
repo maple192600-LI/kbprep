@@ -226,7 +226,9 @@ def _is_standalone_direct_cta(text: str, rules: LoadedCleaningRules) -> bool:
     compact_lower = compact.lower()
     if not any(term.replace(" ", "").lower() in compact_lower for term in rules.cta_keywords):
         return False
-    return not any(term in compact for term in rules.knowledge_terms)
+    if any(term in compact for term in rules.tutorial_indicators):
+        return False
+    return not _has_contextual_knowledge_signal(compact, rules)
 
 
 def _has_method_knowledge_signal(text: str, heading_text: str, rules: LoadedCleaningRules) -> bool:
@@ -234,13 +236,16 @@ def _has_method_knowledge_signal(text: str, heading_text: str, rules: LoadedClea
     searchable = f"{heading_text}\n{text}"
     if _protected_type(text, rules) == "operation_step":
         return True
-    if any(term in searchable for term in rules.business_method_context_terms + rules.knowledge_terms):
+    if any(term in searchable for term in rules.business_method_context_terms):
         return True
-    return bool(re.search(
-        r"(\u5982\u4f55|\u600e\u4e48|\u65b9\u6cd5|\u6b65\u9aa4|\u7b56\u7565|\u6848\u4f8b|\u590d\u76d8|\u5b9e\u64cd|\u5e95\u5c42\u903b\u8f91).{0,80}"
-        r"(\u5f15\u6d41|\u79c1\u57df|\u8d26\u53f7|\u8fd0\u8425|\u5de5\u5177|\u6d41\u91cf|\u8f6c\u5316|\u5ba2\u7fa4|\u8fed\u4ee3)",
+    if _has_contextual_knowledge_signal(searchable, rules):
+        return True
+    return _has_nearby_rule_terms(
         searchable,
-    ))
+        rules.tutorial_indicators,
+        rules.business_method_context_terms,
+        max_gap=80,
+    )
 
 
 def _is_garbled(text: str) -> bool:
@@ -259,21 +264,48 @@ def _is_contextual_cta_knowledge(text: str, block: dict | None = None, rules: Lo
     if not _has_cta_signal(text, rules):
         return False
 
-    knowledge_terms = rules.knowledge_terms + rules.tutorial_indicators
-    if any(term in text for term in knowledge_terms):
+    if any(term in text for term in rules.tutorial_indicators):
+        return True
+    if _has_contextual_knowledge_signal(text, rules):
         return True
 
     block = block or {}
     heading_text = " ".join(str(item) for item in (block.get("heading_path", []) or []))
-    if any(term in heading_text for term in rules.business_method_context_terms + rules.knowledge_terms):
+    if any(term in heading_text for term in rules.business_method_context_terms):
+        return True
+    if _has_contextual_knowledge_signal(heading_text, rules):
         return True
 
-    return bool(re.search(
-        r"(\u5982\u679c|\u5f53|\u51fa\u73b0).{0,40}"
-        r"(\u626b\u7801|\u5165\u7fa4|\u52a0\u7fa4|\u793e\u7fa4|\u4f53\u9a8c\u5361).{0,60}"
-        r"(\u4fdd\u7559|\u6807\u8bb0|\u8bb0\u5f55|\u5224\u65ad|\u5224\u5b9a|\u5220\u9664)",
-        text,
-    ))
+    return False
+
+
+def _has_contextual_knowledge_signal(text: str, rules: LoadedCleaningRules) -> bool:
+    matches = {term for term in rules.knowledge_terms if term in text}
+    if any(_is_contextual_knowledge_term(term) for term in matches):
+        return True
+    return len(matches) >= 2
+
+
+def _is_contextual_knowledge_term(term: str) -> bool:
+    normalized = term.strip()
+    return len(normalized) >= 3 or normalized.isascii()
+
+
+def _has_nearby_rule_terms(
+    text: str,
+    first_terms: tuple[str, ...],
+    second_terms: tuple[str, ...],
+    *,
+    max_gap: int,
+) -> bool:
+    for first in first_terms:
+        start = text.find(first)
+        while start >= 0:
+            window = text[start:start + len(first) + max_gap]
+            if any(second in window for second in second_terms):
+                return True
+            start = text.find(first, start + 1)
+    return False
 
 
 def _has_cta_signal(text: str, rules: LoadedCleaningRules) -> bool:

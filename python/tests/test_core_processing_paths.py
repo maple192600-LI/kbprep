@@ -18,6 +18,7 @@ from kbprep_worker.images import classify_images
 from kbprep_worker.notebook import analyze_notebook, notebook_to_markdown
 from kbprep_worker.pdf_text import _normalize_page_text
 from kbprep_worker.render_outputs import render
+from kbprep_worker.rule_loader import load_cleaning_rules
 from kbprep_worker.split import split_into_chunks
 from kbprep_worker.stages import pipeline_core
 
@@ -189,6 +190,90 @@ class CoreProcessingPathTests(unittest.TestCase):
             self.assertGreaterEqual(split_result["chunk_count"], 1)
             self.assertIn("threshold = 0.8", (run_dir / "cleaned.md").read_text(encoding="utf-8"))
             self.assertIn("扫码进群", (run_dir / "discarded.md").read_text(encoding="utf-8"))
+
+    def test_document_type_rule_dictionaries_protect_cta_examples(self):
+        for document_type in ("course", "transcript", "webpage", "interview"):
+            rules = load_cleaning_rules(document_type=document_type)
+            self.assertIn(f"rules/document_types/{document_type}.json", rules.sources)
+
+        blocks = [
+            {
+                "block_id": "course_goal",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "学习目标：解释扫码海报在课程中作为反例的使用。",
+                "heading_path": ["课程导入"],
+            },
+            {
+                "block_id": "platform_rule",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "平台规则：不得诱导关注公众号，这类文案要作为违规案例记录。",
+                "heading_path": ["平台规则"],
+            },
+            {
+                "block_id": "case_review",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "案例复盘：文末引导写扫码加群会导致审核失败。",
+                "heading_path": ["案例复盘"],
+            },
+            {
+                "block_id": "pure_cta",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "扫码加入社群领取体验卡。",
+                "heading_path": [],
+            },
+            {
+                "block_id": "conditional_ad_cta",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "如果想领取体验卡，扫码进群即可。",
+                "heading_path": [],
+            },
+            {
+                "block_id": "conditional_policy_example",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "如果文案出现扫码入群，应该记录为违规案例和判断标准。",
+                "heading_path": ["平台规则"],
+            },
+        ]
+
+        classified = {block["block_id"]: block for block in classify_blocks(blocks, document_type="course")}
+
+        self.assertEqual(classified["course_goal"]["status"], "keep")
+        self.assertEqual(classified["platform_rule"]["status"], "keep")
+        self.assertEqual(classified["case_review"]["status"], "keep")
+        self.assertEqual(classified["pure_cta"]["status"], "discard")
+        self.assertEqual(classified["pure_cta"]["type"], "marketing_cta")
+        self.assertEqual(classified["conditional_ad_cta"]["status"], "discard")
+        self.assertEqual(classified["conditional_ad_cta"]["type"], "marketing_cta")
+        self.assertEqual(classified["conditional_policy_example"]["status"], "keep")
+
+    def test_webpage_login_and_registration_steps_are_kept_as_body_content(self):
+        blocks = [
+            {
+                "block_id": "login_step",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "输入邮箱和密码完成登录。",
+                "heading_path": ["登录"],
+            },
+            {
+                "block_id": "registration_step",
+                "type": "paragraph",
+                "status": "unclassified",
+                "text": "填写邮箱并提交验证码完成注册。",
+                "heading_path": ["注册"],
+            },
+        ]
+
+        classified = {block["block_id"]: block for block in classify_blocks(blocks, document_type="webpage")}
+
+        self.assertEqual(classified["login_step"]["status"], "keep")
+        self.assertEqual(classified["registration_step"]["status"], "keep")
 
     def test_large_render_outputs_write_parts_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:

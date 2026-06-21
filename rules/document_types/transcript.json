@@ -1,0 +1,25 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Transcript-specific cleanup and protection vocabulary for subtitles, timestamps, and talk records.",
+  "rules": [],
+  "keyword_sets": {
+    "tutorial_indicators": [
+      "逐字稿",
+      "字幕",
+      "时间戳",
+      "访谈要点"
+    ],
+    "knowledge_terms": [
+      "关键片段",
+      "主持人提问",
+      "嘉宾回答",
+      "问答",
+      "口述案例",
+      "转写说明"
+    ],
+    "transcript_filler_patterns": [
+      "^\\s*(?:嗯|啊|呃|这个|那个)[\\s，,。.!！?？]*$",
+      "^\\s*(?:好的|是的|没错)[\\s，,。.!！?？]*$"
+    ]
+  }
+}

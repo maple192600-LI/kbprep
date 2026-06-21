@@ -1,0 +1,29 @@
+{
+  "schema": "kbprep.cleaning_rules.v1",
+  "description": "Course-specific cleanup and protection vocabulary for lessons, exercises, and learning artifacts.",
+  "rules": [],
+  "keyword_sets": {
+    "tutorial_indicators": [
+      "学习目标",
+      "课程",
+      "课时",
+      "练习",
+      "作业",
+      "讲义",
+      "课后"
+    ],
+    "knowledge_terms": [
+      "知识点",
+      "反例",
+      "课程案例",
+      "实操练习",
+      "学习路径",
+      "检查清单"
+    ],
+    "business_method_context_terms": [
+      "课程方法",
+      "课程案例",
+      "练习步骤"
+    ]
+  }
+}
