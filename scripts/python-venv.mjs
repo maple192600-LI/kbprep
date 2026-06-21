@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEV_MARKER_SCHEMA = "kbprep.dev_venv.v1";
-const DEV_DEPENDENCY_SPEC = "editable-no-deps;PyMuPDF>=1.27,<2;beautifulsoup4==4.14.3;lxml==6.0.2;coverage[toml]>=7.6,<8;mypy>=1.17,<2;ruff>=0.8,<1";
+const DEV_DEPENDENCY_SPEC = "editable-no-deps;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2;coverage[toml]>=7.6,<8;mypy>=1.17,<2;ruff>=0.8,<1";
 
 export function kbprepVenvPythonPathForTest(rootDir) {
   return kbprepVenvPythonPath(rootDir);
@@ -98,6 +98,7 @@ function ensureDevRuntime(rootDir) {
       "pip",
       "install",
       "PyMuPDF>=1.27,<2",
+      "pymupdf4llm>=0.0.27,<1",
       "beautifulsoup4==4.14.3",
       "lxml==6.0.2",
       "coverage[toml]>=7.6,<8",

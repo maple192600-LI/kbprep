@@ -83,6 +83,32 @@ class ConverterRegistryTests(unittest.TestCase):
         self.assertEqual(route.matched_converter, "mineru")
         self.assertIn("pdf_header", route.match_evidence)
 
+    def test_pdf_route_policy_selects_pymupdf4llm_registration(self):
+        route = select_conversion_route(".pdf", {
+            "conversion_strategy": "pdf_text_layer",
+            "pdf_route_diagnostics": {
+                "schema": "kbprep.pdf_route_diagnostics.v1",
+                "recommended_route": "pymupdf4llm",
+            },
+        })
+
+        self.assertEqual(route.kind, ConversionRouteKind.PDF_PYMUPDF4LLM)
+        self.assertEqual(route.converter, "pymupdf4llm")
+        self.assertEqual(route.conversion_strategy, "pymupdf4llm")
+
+    def test_pdf_route_policy_selects_mineru_txt_registration(self):
+        route = select_conversion_route(".pdf", {
+            "conversion_strategy": "mineru_auto",
+            "pdf_route_diagnostics": {
+                "schema": "kbprep.pdf_route_diagnostics.v1",
+                "recommended_route": "mineru_txt",
+            },
+        })
+
+        self.assertEqual(route.kind, ConversionRouteKind.MINERU_OCR)
+        self.assertEqual(route.converter, "mineru")
+        self.assertEqual(route.conversion_strategy, "mineru_txt")
+
     def test_fake_pdf_extension_is_rejected_when_content_is_not_pdf(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp, "fake.pdf")

@@ -60,7 +60,7 @@ describe("python runtime setup ergonomics", () => {
       python_executable: kbprepVenvPythonPath(),
       requested_device_override: "cpu",
       python_project: {
-        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;beautifulsoup4==4.14.3;lxml==6.0.2",
+        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2",
       },
       setup_env: {
         ok: true,
@@ -88,7 +88,7 @@ describe("python runtime setup ergonomics", () => {
       python_executable: kbprepVenvPythonPath(),
       device_override: "cuda",
       python_project: {
-        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;beautifulsoup4==4.14.3;lxml==6.0.2",
+        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2",
       },
       setup_env: {
         ok: true,
@@ -224,6 +224,7 @@ describe("python runtime setup ergonomics", () => {
     const wrapper = readFileSync(path.join(repoRoot, "scripts", "python-venv.mjs"), "utf8");
     expect(wrapper).toContain("\"--no-deps\", \"-e\"");
     expect(wrapper).toContain("\"PyMuPDF>=1.27,<2\"");
+    expect(wrapper).toContain("\"pymupdf4llm>=0.0.27,<1\"");
     expect(wrapper).toContain("\"beautifulsoup4==4.14.3\"");
     expect(wrapper).toContain("\"lxml==6.0.2\"");
     expect(wrapper).toContain("\"setuptools<82\"");

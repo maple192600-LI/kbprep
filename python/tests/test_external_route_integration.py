@@ -139,10 +139,10 @@ class ExternalRouteIntegrationTests(unittest.TestCase):
                 output.write_text("���" * 80, encoding="utf-8")
                 return {"source_md_path": str(output), "converter": "pdf_text_layer", "warnings": ["fake bad text layer"]}
 
-            def fake_mineru(_input: Path, output: Path, _run_dir: Path, _language: str, mode: str) -> dict:
+            def fake_mineru(input_p: Path, converted_path: Path, run_dir: Path, language: str, mode: str) -> dict:
                 self.assertEqual(mode, "ocr")
-                output.write_text("OCR text with threshold=0.8", encoding="utf-8")
-                return {"source_md_path": str(output), "converter": "mineru", "warnings": []}
+                converted_path.write_text("OCR text with threshold=0.8", encoding="utf-8")
+                return {"source_md_path": str(converted_path), "converter": "mineru", "warnings": []}
 
             with patch("kbprep_worker.converters.external_tools.convert_legacy_office_to_pdf", return_value=external), \
                 patch("kbprep_worker.diagnose.pdf_analysis.analyze_pdf", return_value={
@@ -151,7 +151,7 @@ class ExternalRouteIntegrationTests(unittest.TestCase):
                     "text_layer_health": "good",
                 }), \
                 patch("kbprep_worker.pdf_text.convert_text_layer_pdf", side_effect=bad_pdf_text), \
-                patch("kbprep_worker.stages.external_conversion._run_mineru_conversion", side_effect=fake_mineru):
+                patch("kbprep_worker.stages.pipeline_helpers._run_mineru_conversion", side_effect=fake_mineru):
                 pipeline_core._stage_convert(state)
 
             report = json.loads((run_dir / "conversion_report.json").read_text(encoding="utf-8"))

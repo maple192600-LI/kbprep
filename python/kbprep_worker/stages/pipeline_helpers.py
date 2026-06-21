@@ -22,6 +22,10 @@ from ..supported_formats import IMAGE_EXTENSIONS
 from .pipeline_state import PipelineError
 
 EXISTING_RUN_SCAN_LIMIT = 20
+PDF_FALLBACK_CONVERTERS = {
+    "mineru_after_pdf_text_layer_fallback",
+    "mineru_after_pymupdf4llm_fallback",
+}
 
 
 def _write_blocks(blocks_path: Path, blocks: list[dict[str, Any]]) -> None:
@@ -274,7 +278,62 @@ def _pdf_text_layer_fallback_warning(rejected_quality: dict) -> str:
     )
 
 
+def _mineru_mode_for_strategy(strategy: object) -> str:
+    value = str(strategy or "")
+    if value == "mineru_txt":
+        return "txt"
+    if value == "mineru_ocr":
+        return "ocr"
+    return "auto"
 
+
+def _maybe_fallback_pdf_markdown_to_mineru(
+    input_p: Path,
+    converted_path: Path,
+    run_dir: Path,
+    language: str,
+    source_route: str,
+    source_artifacts: dict,
+) -> dict | None:
+    text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
+    rejected_quality = _converted_text_quality(text)
+    source_artifacts["post_convert_text_quality"] = rejected_quality
+
+    if not _pdf_text_layer_output_needs_ocr(rejected_quality):
+        return None
+
+    rejected_path = run_dir / f"converted.{source_route}.rejected.md"
+    if converted_path.exists():
+        shutil.copy2(str(converted_path), str(rejected_path))
+
+    fallback = _run_mineru_conversion(
+        input_p=input_p,
+        converted_path=converted_path,
+        run_dir=run_dir,
+        language=language,
+        mode="ocr",
+    )
+    fallback["fallback_from"] = source_route
+    fallback["fallback_reason"] = "post_convert_text_unreadable"
+    fallback["rejected_text_layer_md"] = str(rejected_path)
+    fallback["rejected_markdown_path"] = str(rejected_path)
+    fallback["rejected_text_layer_quality"] = rejected_quality
+    ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
+    fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
+    fallback["warnings"] = [*fallback.get("warnings", []), _pdf_fallback_warning(source_route, rejected_quality)]
+    return fallback
+
+
+def _pdf_fallback_warning(source_route: str, rejected_quality: dict) -> str:
+    if source_route == "pdf_text_layer":
+        return _pdf_text_layer_fallback_warning(rejected_quality)
+    unreadable = rejected_quality.get("unreadable_text_ratio", 0)
+    garbled = rejected_quality.get("garbled_ratio", 0)
+    return (
+        "W_PDF_MARKDOWN_FALLBACK_TO_OCR: "
+        f"{source_route} produced unreadable Markdown "
+        f"(unreadable={unreadable:.2%}, garbled={garbled:.2%}); reran MinerU in OCR mode."
+    )
 
 
 def _write_conversion_report(
@@ -310,6 +369,7 @@ def _write_conversion_report(
         "text_layer_health": diagnosis.get("text_layer_health"),
         "pdf_subtype": diagnosis.get("pdf_subtype"),
         "layout_profile": diagnosis.get("layout_profile"),
+        "pdf_route_diagnostics": diagnosis.get("pdf_route_diagnostics"),
         "converted_md": str(output_path),
         "converted_bytes": output_path.stat().st_size if output_path.exists() else 0,
         "mineru_artifacts": mineru_artifacts,
@@ -337,10 +397,10 @@ def _conversion_route_decision(
 
     actual_route = _actual_route_for_converter(converter, diagnosis, mineru_artifacts)
     fallback_from = mineru_artifacts.get("fallback_from") or None
-    fallback_applied = bool(fallback_from) or converter == "mineru_after_pdf_text_layer_fallback"
+    fallback_applied = bool(fallback_from) or converter in PDF_FALLBACK_CONVERTERS
     fallback_to = actual_route if fallback_applied else None
 
-    return {
+    decision = {
         "declared_capability_id": capability.get("id", ""),
         "declared_route": capability.get("route", ""),
         "declared_status": capability.get("status", ""),
@@ -355,10 +415,17 @@ def _conversion_route_decision(
         "fallback_from": fallback_from,
         "fallback_to": fallback_to,
     }
+    pdf_route = diagnosis.get("pdf_route_diagnostics")
+    if isinstance(pdf_route, dict):
+        decision["selected_pdf_tier"] = pdf_route.get("recommended_tier")
+        decision["pdf_route_reason"] = pdf_route.get("reason", "")
+        decision["pdf_route_diagnostics_schema"] = pdf_route.get("schema")
+    return decision
 
 
 def _selected_route_for_decision(route: ConversionRoute) -> str:
     if route.kind.value == "mineru_ocr" and route.conversion_strategy in {
+        "mineru_txt",
         "mineru_ocr",
         "mineru_auto",
         "mineru_mixed_text_image",
@@ -368,11 +435,18 @@ def _selected_route_for_decision(route: ConversionRoute) -> str:
 
 
 def _actual_route_for_converter(converter: str, diagnosis: dict, mineru_artifacts: dict | None = None) -> str:
-    if converter == "mineru_after_pdf_text_layer_fallback":
+    if converter in PDF_FALLBACK_CONVERTERS:
         return "mineru_ocr"
     if converter == "mineru":
         strategy = str(diagnosis.get("conversion_strategy") or "")
-        if strategy in {"mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}:
+        pdf_route = diagnosis.get("pdf_route_diagnostics")
+        if isinstance(pdf_route, dict) and pdf_route.get("recommended_route") in {
+            "mineru_txt",
+            "mineru_auto",
+            "mineru_ocr",
+        }:
+            return str(pdf_route["recommended_route"])
+        if strategy in {"mineru_txt", "mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}:
             return strategy
         return "mineru"
     if converter == "image_to_pdf_ocr":

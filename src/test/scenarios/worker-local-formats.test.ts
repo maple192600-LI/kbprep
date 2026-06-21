@@ -176,7 +176,7 @@ describe("kbprep worker pipeline - local formats", () => {
     }
   }, 30_000);
 
-  it("converts trusted text-layer PDFs without invoking MinerU", () => {
+  it("converts trusted simple PDFs through Tier 1 PyMuPDF4LLM", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-pdf-text-"));
     try {
       const inputPath = path.join(root, "tutorial.pdf");
@@ -198,15 +198,16 @@ describe("kbprep worker pipeline - local formats", () => {
       expect(converted).toContain("retry_count values");
 
       const conversionReport = JSON.parse(readFileSync(path.join(outputRoot, "conversion_report.json"), "utf8"));
-      expect(conversionReport.converter).toBe("pdf_text_layer");
+      expect(conversionReport.converter).toBe("pymupdf4llm");
       expect(conversionReport.diagnosed_strategy).toBe("pdf_text_layer");
       expect(conversionReport.route_decision.declared_route).toBe("pdf_diagnosis_selected");
       expect(conversionReport.route_decision.diagnosed_strategy).toBe("pdf_text_layer");
-      expect(conversionReport.route_decision.actual_converter).toBe("pdf_text_layer");
-      expect(conversionReport.route_decision.actual_route).toBe("pdf_text_layer");
+      expect(conversionReport.route_decision.selected_pdf_tier).toBe("tier_1");
+      expect(conversionReport.route_decision.actual_converter).toBe("pymupdf4llm");
+      expect(conversionReport.route_decision.actual_route).toBe("pymupdf4llm");
       expect(conversionReport.route_decision.fallback_applied).toBe(false);
       expect(conversionReport.mineru_artifacts.source_md_path).toContain("converted.md");
-      expect(conversionReport.mineru_artifacts.content_list_path).toContain("pdf_text_content_list.json");
+      expect(conversionReport.mineru_artifacts.content_list_path).toContain("pymupdf4llm_content_list.json");
 
       const blocks = readFileSync(path.join(outputRoot, "blocks.jsonl"), "utf8")
         .trim()

@@ -24,7 +24,7 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 - CleaningPatch and rejected patch reports are not yet the universal cleanup path.
 - Clean View is not yet the required render source for all profiles.
 - Optional media and YouTube routes require capability evidence before promotion.
-- PDF routing has the target three-tier design, but current implementation is still `partial` until Tier 1 `pymupdf4llm`, Tier 2 `mineru_txt` or `mineru_auto`, Tier 3 `mineru_ocr`, and the required fixtures are all implemented and evidenced.
+- PDF routing now executes the target three-tier design and records route evidence in `pdf_route_diagnostics` and `conversion_report.json.route_decision`; the capability is verified by public route-shape tests, gray-zone threshold regression tests, generated-PDF route tests, and real Vault smoke distribution evidence.
 
 ## Acceptance
 

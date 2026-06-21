@@ -175,21 +175,33 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "source_type": "pdf_like",
         "extensions": sorted(PDF_EXTENSIONS),
         "route": "pdf_diagnosis_selected",
-        "dependencies": ["PyMuPDF for diagnosis/text layer", "MinerU/OCR runtime when needed"],
-        "fallback": "mineru_ocr when text layer is missing, image-heavy, or rejected",
-        "status": "partial",
+        "dependencies": [
+            "PyMuPDF for diagnosis",
+            "pymupdf4llm for trusted simple text-layer PDFs",
+            "MinerU/OCR runtime when needed",
+        ],
+        "fallback": "mineru_ocr when text layer is missing, untrusted, image-heavy, or rejected after conversion",
+        "status": "verified",
         "test_evidence": [
-            "src/test/scenarios/worker-local-formats.test.ts::converts trusted text-layer PDFs without invoking MinerU",
-            "src/test/scenarios/worker-pdf-routing.test.ts::falls back to MinerU when a trusted PDF text-layer conversion produces unreadable Markdown",  # noqa: E501
+            "src/test/scenarios/worker-local-formats.test.ts::converts trusted simple PDFs through Tier 1 PyMuPDF4LLM",  # noqa: E501
+            "src/test/scenarios/worker-batch-long-docs-part2.test.ts::diagnoses text-layer, image-only, and PPT-like PDFs differently",  # noqa: E501
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::classifies the six Phase B public PDF acceptance shapes",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::routes trusted multi-column PDFs through MinerU txt mode",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::keeps gray-zone trusted PDFs on Tier 1 when noise is sparse",
+            "src/test/scenarios/worker-pdf-routing-part2.test.ts::falls back to MinerU when a trusted Tier 1 PDF conversion produces unreadable Markdown",  # noqa: E501
             "src/test/scenarios/worker-pdf-routing.test.ts::routes image-only scanned PDFs through MinerU OCR and records the actual route",
         ],
-        "required_evidence": [
-            "golden PDFs covering trusted text layer, scanned/image-only, mixed text-image, PPT exports, tables, images, and OCR fallback",
-            "source/converted comparison for chapters, tables, images, page order, and OCR text retention",
+        "preserves": [
+            "page order",
+            "trusted text-layer structure",
+            "layout evidence",
+            "OCR text when routed to MinerU",
+            "image evidence",
         ],
-        "promotion_blocker": "Needs a broader PDF golden fixture set across text-layer, scanned, mixed, and layout-heavy PDFs.",
-        "preserves": ["page order", "text layer where trusted", "OCR text when routed to MinerU", "image evidence"],
-        "risk": "bad embedded text layers and complex layouts require strict quality checks",
+        "risk": (
+            "route quality still depends on local dependency availability and source PDF quality; "
+            "failed quality gates block publication"
+        ),
     },
     {
         "id": "image_ocr",

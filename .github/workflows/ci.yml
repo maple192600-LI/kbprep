@@ -63,8 +63,15 @@ jobs:
 
       - name: Python worker smoke
         run: |
+          mkdir -p .kbprep
           node scripts/python-venv.mjs -m kbprep_worker.cli --help
-          printf '{"workspace_path":".kbprep/python-ci-smoke","profile":"lite"}' | node scripts/python-venv.mjs -m kbprep_worker.cli preflight --json-stdin
+          if printf '{"workspace_path":".kbprep/python-ci-smoke","profile":"lite"}' | node scripts/python-venv.mjs -m kbprep_worker.cli preflight --json-stdin > .kbprep/python-ci-preflight.json; then
+            echo "preflight should report missing MinerU in the lightweight CI worker"
+            cat .kbprep/python-ci-preflight.json
+            exit 1
+          fi
+          grep -q '"code": "KBPREP_WORKER_NOT_READY"' .kbprep/python-ci-preflight.json
+          grep -q 'MinerU not found' .kbprep/python-ci-preflight.json
 
   python-worker:
     name: Python worker unit tests on ${{ matrix.python-version }}

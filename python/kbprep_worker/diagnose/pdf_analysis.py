@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 from typing import Any
 
 from ..detect import detect_language_from_text
 from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
+from .pdf_route_diagnostics import build_pdf_route_diagnostics
 from .text_quality import analyze_text_quality, detect_text_profile
 
 
@@ -20,8 +23,7 @@ def analyze_pdf(input_path: str) -> dict:
         warnings.append("PyMuPDF not installed. PDF analysis limited. Install: pip install pymupdf")
         # Try basic analysis with mineru's content extraction
         result["text_layer_health"] = "unavailable"
-        result["warnings"] = warnings
-        return result
+        return _finalize_pdf_result(result, warnings)
 
     analysis_errors = _fitz_analysis_errors(fitz)
     doc: Any | None = None
@@ -56,7 +58,12 @@ def analyze_pdf(input_path: str) -> dict:
         if doc is not None:
             _close_pdf_doc(doc, warnings)
 
+    return _finalize_pdf_result(result, warnings)
+
+
+def _finalize_pdf_result(result: dict, warnings: list[str]) -> dict:
     result["warnings"] = warnings
+    result["pdf_route_diagnostics"] = build_pdf_route_diagnostics(result)
     return result
 
 
@@ -92,44 +99,144 @@ def _initial_pdf_result() -> dict:
     }
 
 
-def _collect_pdf_page_stats(doc) -> dict:
-    image_pages = 0
-    text_pages = 0
-    empty_pages = 0
-    total_text = ""
-    image_count = 0
-    landscape_pages = 0
-    max_image_count_on_page = 0
+def diagnostic_page_indexes(page_count: int) -> tuple[tuple[int, ...], bool]:
+    if page_count <= int(DIAGNOSIS_THRESHOLDS["pdf_large_page_count"]):
+        return tuple(range(page_count)), False
 
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        if page.rect.width > page.rect.height:
-            landscape_pages += 1
-        text = page.get_text("text").strip()
-        images = page.get_images(full=True)
-        image_count += len(images)
-        max_image_count_on_page = max(max_image_count_on_page, len(images))
+    head = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_head_pages"])
+    tail = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_tail_pages"])
+    stride = int(DIAGNOSIS_THRESHOLDS["pdf_large_sample_stride"])
+    pages = set(range(min(head, page_count)))
+    pages.update(range(max(page_count - tail, 0), page_count))
+    pages.update(range(0, page_count, stride))
+    return tuple(sorted(pages)), True
 
-        if not text and images:
-            image_pages += 1
-        elif text:
-            text_pages += 1
-            total_text += text + "\n"
-        else:
-            empty_pages += 1
 
+def _collect_pdf_page_stats(doc: Any) -> dict:
+    page_indexes, sampling_applied = diagnostic_page_indexes(len(doc))
+    stats = _initial_page_stats()
+    for page_num in page_indexes:
+        _update_page_stats(doc[page_num], stats)
+    return _page_stats_payload(len(doc), page_indexes, sampling_applied, stats)
+
+
+def _initial_page_stats() -> dict[str, Any]:
     return {
-        "page_count": len(doc),
-        "image_pages": image_pages,
+        "image_pages": 0,
+        "text_pages": 0,
+        "empty_pages": 0,
+        "total_text": "",
+        "image_count": 0,
+        "landscape_pages": 0,
+        "max_image_count_on_page": 0,
+        "multi_column_pages": 0,
+        "table_pages": 0,
+        "image_text_interleaved_pages": 0,
+    }
+
+
+def _update_page_stats(page: Any, stats: dict[str, Any]) -> None:
+    if page.rect.width > page.rect.height:
+        stats["landscape_pages"] += 1
+    text = page.get_text("text").strip()
+    images = page.get_images(full=True)
+    stats["image_count"] += len(images)
+    stats["max_image_count_on_page"] = max(stats["max_image_count_on_page"], len(images))
+
+    if _page_has_multi_column_text(page):
+        stats["multi_column_pages"] += 1
+    if _page_has_tables(page, text):
+        stats["table_pages"] += 1
+    if text and images:
+        stats["image_text_interleaved_pages"] += 1
+
+    _update_text_image_page_counts(stats, text, bool(images))
+
+
+def _update_text_image_page_counts(stats: dict[str, Any], text: str, has_images: bool) -> None:
+    if not text and has_images:
+        stats["image_pages"] += 1
+    elif text:
+        stats["text_pages"] += 1
+        stats["total_text"] += text + "\n"
+    else:
+        stats["empty_pages"] += 1
+
+
+def _page_stats_payload(
+    page_count: int,
+    page_indexes: tuple[int, ...],
+    sampling_applied: bool,
+    stats: dict[str, Any],
+) -> dict:
+    total_text = stats["total_text"]
+    text_pages = stats["text_pages"]
+    return {
+        "page_count": page_count,
+        "sampled_page_count": len(page_indexes),
+        "large_pdf_sampling_applied": sampling_applied,
+        "large_pdf_sampled_pages": len(page_indexes),
+        "large_pdf_sample_strategy": "first_5_last_5_stride_10" if sampling_applied else "full_scan",
+        "image_pages": stats["image_pages"],
         "text_pages": text_pages,
-        "empty_pages": empty_pages,
+        "empty_pages": stats["empty_pages"],
         "total_text": total_text,
         "total_text_length": len(total_text),
-        "image_count": image_count,
-        "landscape_pages": landscape_pages,
-        "max_image_count_on_page": max_image_count_on_page,
+        "image_count": stats["image_count"],
+        "landscape_pages": stats["landscape_pages"],
+        "max_image_count_on_page": stats["max_image_count_on_page"],
+        "multi_column_pages": stats["multi_column_pages"],
+        "table_pages": stats["table_pages"],
+        "image_text_interleaved_pages": stats["image_text_interleaved_pages"],
         "average_text_chars_per_text_page": round(len(total_text) / text_pages, 1) if text_pages else 0,
     }
+
+
+def _page_has_multi_column_text(page: Any) -> bool:
+    try:
+        page_dict = page.get_text("dict")
+    except (RuntimeError, ValueError, TypeError):
+        return False
+    if not isinstance(page_dict, dict):
+        return False
+    blocks = page_dict.get("blocks", [])
+    text_boxes = [
+        block["bbox"]
+        for block in blocks
+        if block.get("type") == 0 and _block_text(block).strip()
+    ]
+    if len(text_boxes) < DIAGNOSIS_THRESHOLDS["pdf_multi_column_min_blocks"]:
+        return False
+    width = float(page.rect.width)
+    has_left = any(float(box[0]) < width * 0.45 for box in text_boxes)
+    has_right = any(float(box[0]) > width * 0.45 for box in text_boxes)
+    return has_left and has_right
+
+
+def _block_text(block: dict) -> str:
+    lines = block.get("lines")
+    if not isinstance(lines, list):
+        return ""
+    spans: list[str] = []
+    for line in lines:
+        if not isinstance(line, dict):
+            continue
+        for span in line.get("spans", []):
+            if isinstance(span, dict):
+                spans.append(str(span.get("text") or ""))
+    return "".join(spans)
+
+
+def _page_has_tables(page: Any, text: str) -> bool:
+    finder = getattr(page, "find_tables", None)
+    if callable(finder):
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                tables = finder()
+            return bool(getattr(tables, "tables", []))
+        except (RuntimeError, ValueError, TypeError):
+            pass
+    return "\t" in text
 
 
 def _apply_bad_text_layer(result: dict, warnings: list[str], message: str, *, degraded: bool = False) -> None:
@@ -189,7 +296,10 @@ def _readable_signal_ratio(quality: dict) -> float:
 def _apply_image_ratio_assessment(result: dict, image_pages: int, text_pages: int, warnings: list[str]) -> None:
     if result["page_count"] <= 0:
         return
-    image_page_ratio = image_pages / result["page_count"]
+    page_denominator = _page_ratio_denominator(result)
+    if page_denominator <= 0:
+        return
+    image_page_ratio = image_pages / page_denominator
     result["image_page_ratio"] = round(image_page_ratio, 4)
     if image_page_ratio > DIAGNOSIS_THRESHOLDS["pdf_image_page_ratio"]:
         result["needs_ocr"] = True
@@ -213,19 +323,20 @@ def _apply_pdf_layout_profile(
 ) -> None:
     if result["page_count"] > 0 and image_pages > 0 and text_pages > 0 and "pdf_subtype" not in result:
         result["pdf_subtype"] = "mixed_text_image"
-    landscape_ratio = landscape_pages / result["page_count"] if result["page_count"] else 0
+    page_denominator = _page_ratio_denominator(result)
+    landscape_ratio = landscape_pages / page_denominator if page_denominator else 0
     result["landscape_ratio"] = round(landscape_ratio, 4)
 
     avg_chars = result["average_text_chars_per_text_page"]
     slide_like_score = 0.0
-    if result["page_count"] >= 3:
+    if page_denominator >= 3:
         if landscape_ratio >= DIAGNOSIS_THRESHOLDS["pdf_landscape_ratio"]:
             slide_like_score += 0.45
         if avg_chars and avg_chars < 900:
             slide_like_score += DIAGNOSIS_THRESHOLDS["pdf_slide_image_score"]
-        if image_count >= result["page_count"]:
+        if image_count >= page_denominator:
             slide_like_score += DIAGNOSIS_THRESHOLDS["pdf_slide_text_score"]
-        if text_pages <= max(1, result["page_count"] * DIAGNOSIS_THRESHOLDS["pdf_slide_image_score"]):
+        if text_pages <= max(1, page_denominator * DIAGNOSIS_THRESHOLDS["pdf_slide_image_score"]):
             slide_like_score += 0.1
     result["slide_like_score"] = round(min(slide_like_score, 1.0), 4)
 
@@ -233,14 +344,14 @@ def _apply_pdf_layout_profile(
         result["layout_profile"] = "slide_deck_or_ppt_export"
     elif landscape_ratio >= DIAGNOSIS_THRESHOLDS["pdf_landscape_ratio"]:
         result["layout_profile"] = "landscape_report"
-    elif image_pages / result["page_count"] > DIAGNOSIS_THRESHOLDS["pdf_image_page_ratio"] if result["page_count"] else False:
+    elif image_pages / page_denominator > DIAGNOSIS_THRESHOLDS["pdf_image_page_ratio"] if page_denominator else False:
         result["layout_profile"] = "image_heavy_document"
     else:
         result["layout_profile"] = "document_pages"
 
     if (
-        image_count >= result["page_count"]
-        and text_pages <= max(1, result["page_count"] * DIAGNOSIS_THRESHOLDS["pdf_slide_text_score"])
+        image_count >= page_denominator
+        and text_pages <= max(1, page_denominator * DIAGNOSIS_THRESHOLDS["pdf_slide_text_score"])
         and landscape_ratio > DIAGNOSIS_THRESHOLDS["pdf_image_page_ratio"]
     ):
         result["pdf_subtype"] = "ppt_exported_or_scanned"
@@ -252,6 +363,15 @@ def _apply_pdf_layout_profile(
     result["layout_complexity"] = _pdf_layout_complexity(result)
 
 
+def _page_ratio_denominator(result: dict) -> int:
+    if result.get("large_pdf_sampling_applied"):
+        sampled = result.get("sampled_page_count")
+        if isinstance(sampled, int) and sampled > 0:
+            return sampled
+    page_count = result.get("page_count")
+    return page_count if isinstance(page_count, int) else 0
+
+
 def _pdf_layout_complexity(result: dict) -> str:
     complex_profiles = {"slide_deck_or_ppt_export", "landscape_report", "image_heavy_document"}
     complex_subtypes = {"mixed_text_image", "ppt_exported_text_layer"}
@@ -259,7 +379,21 @@ def _pdf_layout_complexity(result: dict) -> str:
         return "complex"
     if result.get("pdf_subtype") in complex_subtypes:
         return "complex"
+    if _structure_signal_ratio(result) >= DIAGNOSIS_THRESHOLDS["pdf_structure_signal_ratio_complex"]:
+        return "complex"
     return "simple"
+
+
+def _structure_signal_ratio(result: dict) -> float:
+    denominator = _page_ratio_denominator(result)
+    if denominator <= 0:
+        return 0.0
+    signals = (
+        _positive_count(result.get("multi_column_pages")),
+        _positive_count(result.get("table_pages")),
+        _positive_count(result.get("image_text_interleaved_pages")),
+    )
+    return max(signals) / denominator
 
 
 def _apply_pdf_processing_strategy(result: dict) -> None:
@@ -273,8 +407,9 @@ def _apply_pdf_processing_strategy(result: dict) -> None:
         hints.append("Run OCR because the text layer is missing, image-heavy, or untrusted.")
     elif result.get("layout_complexity") == "complex":
         result["recommended_pipeline"] = "mineru_pipeline"
-        result["conversion_strategy"] = "mineru_auto"
-        hints.append("Use MinerU auto mode because the trusted text layer has complex visual layout.")
+        result["conversion_strategy"] = _complex_pdf_conversion_strategy(result)
+        mode = result["conversion_strategy"].removeprefix("mineru_")
+        hints.append(f"Use MinerU {mode} mode because the trusted text layer has complex visual layout.")
     else:
         result["recommended_pipeline"] = "pdf_text_layer"
         result["conversion_strategy"] = "pdf_text_layer"
@@ -293,3 +428,17 @@ def _apply_pdf_processing_strategy(result: dict) -> None:
         hints.append("Slides and report pages often contain sparse but important details; avoid over-aggressive cleanup.")
 
     result["processing_hints"] = hints
+
+
+def _complex_pdf_conversion_strategy(result: dict) -> str:
+    if (
+        _positive_count(result.get("table_pages"))
+        or _positive_count(result.get("image_text_interleaved_pages"))
+        or result.get("layout_profile") in {"slide_deck_or_ppt_export", "landscape_report", "image_heavy_document"}
+    ):
+        return "mineru_auto"
+    return "mineru_txt"
+
+
+def _positive_count(value: object) -> bool:
+    return isinstance(value, int) and value > 0

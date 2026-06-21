@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from .pdf_route_policy import selected_pdf_strategy
 from .supported_formats import (
     DIRECT_EXTENSIONS,
     EPUB_EXTENSIONS,
@@ -29,6 +30,7 @@ class ConversionRouteKind(str, Enum):
     DIRECT_TEXT = "direct_text"
     OFFICE_XML = "office_xml"
     EPUB_XHTML = "epub_xhtml"
+    PDF_PYMUPDF4LLM = "pymupdf4llm"
     PDF_TEXT_LAYER = "pdf_text_layer"
     MINERU_OCR = "mineru_ocr"
     IMAGE_TO_PDF_OCR = "image_to_pdf_ocr"
@@ -96,7 +98,7 @@ def select_conversion_route(extension: str, diagnosis: dict, file_identity: File
     if not ext and content_ext:
         ext = content_ext
 
-    strategy = str(diagnosis.get("conversion_strategy") or "")
+    strategy = selected_pdf_strategy(diagnosis) if ext in PDF_EXTENSIONS else str(diagnosis.get("conversion_strategy") or "")
     for registration in registered_converters():
         if not _registration_matches(registration, ext, identity):
             continue
@@ -134,6 +136,16 @@ _REGISTRATIONS = (
         signatures=("epub_mimetype",),
         converter="epub_xhtml",
         conversion_strategy="epub_xhtml",
+    ),
+    ConverterRegistration(
+        id="pymupdf4llm",
+        kind=ConversionRouteKind.PDF_PYMUPDF4LLM,
+        priority=39,
+        extensions=(".pdf",),
+        mime_types=("application/pdf",),
+        signatures=("pdf_header",),
+        converter="pymupdf4llm",
+        conversion_strategy="pymupdf4llm",
     ),
     ConverterRegistration(
         id="pdf_text_layer",
@@ -249,12 +261,14 @@ def _registration_matches(registration: ConverterRegistration, ext: str, identit
 
 
 def _strategy_for_registration(registration: ConverterRegistration, strategy: str) -> str | None:
+    if registration.id == "pymupdf4llm":
+        return "pymupdf4llm" if strategy == "pymupdf4llm" else None
     if registration.id == "pdf_text_layer":
         return "pdf_text_layer" if strategy == "pdf_text_layer" else None
     if registration.id == "mineru":
         if strategy in {"mineru_pipeline", "mineru_pipeline_ocr"}:
             return "mineru_ocr"
-        allowed = {"", "mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}
+        allowed = {"", "mineru_txt", "mineru_ocr", "mineru_auto", "mineru_mixed_text_image"}
         return (strategy or registration.conversion_strategy) if strategy in allowed else None
     return registration.conversion_strategy
 

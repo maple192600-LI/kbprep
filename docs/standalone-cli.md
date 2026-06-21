@@ -48,6 +48,10 @@ kbprep-batch --input ./sources --output ./.kbprep/batch --mode rules_only
 Every command supports `--help`.
 Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, and the evidence-backed rerun scope. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
 
+## PDF Routing
+
+PDF routing is diagnosis-selected: simple trusted text-layer PDFs use `pymupdf4llm`, complex trusted PDFs use MinerU `txt` or `auto`, and scanned or untrusted text-layer PDFs use MinerU `ocr`. `conversion_report.json.route_decision` records the selected tier, actual route, fallback or upgrade, and reason.
+
 ## Modes
 
 - `rules_only`: local deterministic cleanup only.

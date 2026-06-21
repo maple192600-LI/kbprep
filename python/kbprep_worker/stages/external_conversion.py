@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from ..atomic_io import atomic_write_text
 from ..converter_registry import ConversionRouteKind
+from ..pdf_route_policy import selected_pdf_strategy
 from .pipeline_helpers import (
-    _converted_text_quality,
-    _pdf_text_layer_fallback_warning,
-    _pdf_text_layer_output_needs_ocr,
+    _maybe_fallback_pdf_markdown_to_mineru,
+    _mineru_mode_for_strategy,
     _run_mineru_conversion,
 )
 from .pipeline_state import PipelineError, PipelineState
@@ -89,52 +88,40 @@ def _convert_generated_pdf(pdf_path: Path, converted_path: Path, run_dir: Path, 
     from ..diagnose.pdf_analysis import analyze_pdf
 
     pdf_diagnosis = analyze_pdf(str(pdf_path))
-    if pdf_diagnosis.get("conversion_strategy") == "pdf_text_layer":
-        artifacts = _convert_generated_pdf_text_layer(pdf_path, converted_path, run_dir, language)
+    strategy = selected_pdf_strategy(pdf_diagnosis)
+    if strategy in {"pymupdf4llm", "pdf_text_layer"}:
+        artifacts = _convert_generated_pdf_text_route(pdf_path, converted_path, run_dir, language, strategy)
     else:
-        mode = "ocr" if pdf_diagnosis.get("conversion_strategy") == "mineru_ocr" else "auto"
+        mode = _mineru_mode_for_strategy(strategy)
         artifacts = _run_mineru_conversion(pdf_path, converted_path, run_dir, language, mode)
+        artifacts["mineru_mode"] = mode
     return artifacts, pdf_diagnosis
 
 
-def _convert_generated_pdf_text_layer(pdf_path: Path, converted_path: Path, run_dir: Path, language: str) -> dict:
-    from .. import pdf_text
-
-    artifacts = pdf_text.convert_text_layer_pdf(pdf_path, converted_path, run_dir)
-    fallback = _maybe_fallback_pdf_text_layer_to_mineru(pdf_path, converted_path, run_dir, language, artifacts)
-    return fallback if fallback else artifacts
-
-
-def _maybe_fallback_pdf_text_layer_to_mineru(
+def _convert_generated_pdf_text_route(
     pdf_path: Path,
     converted_path: Path,
     run_dir: Path,
     language: str,
-    text_layer_artifacts: dict,
-) -> dict | None:
-    text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
-    rejected_quality = _converted_text_quality(text)
-    text_layer_artifacts["post_convert_text_quality"] = rejected_quality
-    if not _pdf_text_layer_output_needs_ocr(rejected_quality):
-        return None
-    rejected_path = run_dir / "converted.pdf_text_layer.rejected.md"
-    if converted_path.exists():
-        shutil.copy2(str(converted_path), str(rejected_path))
-    fallback = _run_mineru_conversion(pdf_path, converted_path, run_dir, language, "ocr")
-    fallback.update({
-        "fallback_from": "pdf_text_layer",
-        "fallback_reason": "post_convert_text_unreadable",
-        "rejected_text_layer_md": str(rejected_path),
-        "rejected_text_layer_quality": rejected_quality,
-    })
-    ocr_text = converted_path.read_text(encoding="utf-8") if converted_path.exists() else ""
-    fallback["post_convert_text_quality"] = _converted_text_quality(ocr_text)
-    fallback["warnings"] = [
-        *text_layer_artifacts.get("warnings", []),
-        *fallback.get("warnings", []),
-        _pdf_text_layer_fallback_warning(rejected_quality),
-    ]
-    return fallback
+    strategy: str,
+) -> dict:
+    if strategy == "pymupdf4llm":
+        from ..pymupdf4llm_adapter import convert_pymupdf4llm_pdf
+
+        artifacts = convert_pymupdf4llm_pdf(pdf_path, converted_path, run_dir)
+    else:
+        from .. import pdf_text
+
+        artifacts = pdf_text.convert_text_layer_pdf(pdf_path, converted_path, run_dir)
+    fallback = _maybe_fallback_pdf_markdown_to_mineru(
+        input_p=pdf_path,
+        converted_path=converted_path,
+        run_dir=run_dir,
+        language=language,
+        source_route=strategy,
+        source_artifacts=artifacts,
+    )
+    return fallback if fallback else artifacts
 
 
 def _raise_external_conversion_failure(report: dict) -> None:
