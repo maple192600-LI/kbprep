@@ -49,6 +49,7 @@
     "rules/**/*.json",
     "rules/**/*.md",
     "docs/agent-neutral.md",
+    "docs/ai-review-external-command.md",
     "docs/audit-remediation.md",
     "docs/audit-remediation-round2.md",
     "docs/capability-matrix.md",

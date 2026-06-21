@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,7 @@ from kbprep_worker.quality.thresholds import (
     OBSIDIAN_CONFIDENCE,
     review_pack_low_confidence_threshold,
 )
-from kbprep_worker.stages.pipeline_helpers import _generate_review_pack
+from kbprep_worker.stages.review_pack import _generate_review_pack
 
 
 class ThresholdContractTests(unittest.TestCase):
@@ -71,6 +72,46 @@ class ThresholdContractTests(unittest.TestCase):
             pack = (run_dir / "review_pack.json").read_text(encoding="utf-8")
 
         self.assertIn("low_conf_transcript", pack)
+
+    def test_review_pack_includes_bounded_policy_context(self):
+        blocks = [{
+            "block_id": "review_course_intro",
+            "type": "paragraph",
+            "status": "review",
+            "risk_tags": ["marketing_wrapper"],
+            "reason": "possible wrapper before reusable lesson content",
+            "confidence": 0.52,
+            "protected": False,
+            "heading_path": ["课程", "第一讲"],
+            "page_start": 2,
+            "page_end": 3,
+            "text": "这段需要结合规则上下文判断是否只是包装话术。",
+        }]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            _generate_review_pack(
+                blocks,
+                run_dir,
+                "markdown_note",
+                source_quality="high",
+                document_type="course",
+                profile="curated_obsidian_kb",
+                source_identity='{"source_domain":"example.com"}',
+            )
+            pack = json.loads((run_dir / "review_pack.json").read_text(encoding="utf-8"))
+
+        policy = pack["policy_context"]
+        self.assertEqual(policy["document_type"], "course")
+        self.assertEqual(policy["profile"], "curated_obsidian_kb")
+        self.assertLessEqual(len(policy["relevant_terms"]), 16)
+        self.assertLessEqual(len(policy["protected_patterns"]), 16)
+        self.assertTrue(policy["rule_sources"])
+        self.assertTrue(any(item["label"] and item["pattern"] for item in policy["protected_patterns"]))
+        self.assertEqual(pack["context_policy"]["neighbor_text"], "not_included")
+        self.assertEqual(pack["blocks"][0]["heading_path"], ["课程", "第一讲"])
+        self.assertEqual(pack["blocks"][0]["risk_tags"], ["marketing_wrapper"])
+        self.assertEqual(pack["blocks"][0]["reason"], "possible wrapper before reusable lesson content")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,13 @@ If no external command or injected backend is configured, review mode reports a 
 
 External command failures are explicit: invalid JSON, non-zero exit, and timeout surface as review errors or warnings with stderr evidence.
 
+Automated review supports two runtime modes:
+
+- `shadow`: validate model patch output and write `review_suggestions.json` without changing blocks, latest outputs, or final Markdown.
+- `apply`: validate model patch output, then call Python `apply_review`; this remains the default for existing `mode=ai_review` callers that do not pass `review_mode`.
+
+Use `shadow` for every new external model rollout. See `docs/ai-review-external-command.md` for the external command protocol.
+
 ## Runtime Setup
 
 On first use, KBPrep creates a package-local Python runtime under `.kbprep/venv`.
@@ -61,6 +68,7 @@ PDF routing is diagnosis-selected: simple trusted text-layer PDFs use `pymupdf4l
 - `ai_review`: available only when the caller injects a generic review backend through the runtime API.
 
 The CLI-safe path is `rules_plus_review_pack`, then `kbprep-apply-review` with a validated patch.
+The runtime API may run `ai_review` in `shadow` mode first; standalone CLI commands do not ship provider-specific model clients.
 
 `--max-quality-iterations <n>` controls how many quality and review passes may be recorded before KBPrep stops the loop with an iteration-limit error.
 

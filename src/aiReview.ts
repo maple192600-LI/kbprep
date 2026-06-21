@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import {
   buildBackend,
   resolveBackendName,
@@ -20,6 +21,7 @@ type PluginConfig = {
   ai_review_provider?: string;
   ai_review_model?: string;
   ai_review_command?: string;
+  review_mode?: "shadow" | "apply";
   device_override?: "cuda" | "cpu";
   max_cpu_threads?: number;
   min_free_memory_gb?: number;
@@ -31,6 +33,7 @@ type AiReviewParams = {
   ai_review_provider?: string;
   ai_review_model?: string;
   ai_review_command?: string;
+  review_mode?: "shadow" | "apply";
 };
 
 type AiReviewContext = {
@@ -106,6 +109,7 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
   }
 
   const combinedPatch: unknown[] = [];
+  const rejectedPatchOperations: Array<{ operation: unknown; reason: string }> = [];
   const aiWarnings: string[] = [];
   let failedBatches = 0;
   for (const [index, batch] of batches.entries()) {
@@ -132,6 +136,7 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
 
       const validation = pipelineValidateAiReviewPatch(patch);
       if (validation.rejected.length) {
+        rejectedPatchOperations.push(...validation.rejectedOperations);
         aiWarnings.push(pipelineFormatRejectedPatchWarning(index + 1, batches.length, attempt, validation.rejected));
       }
       if (validation.valid.length) {
@@ -161,6 +166,20 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
       ...result,
       warnings: [...(result.warnings ?? []), ...aiWarnings, "W_LLM_REVIEW_SKIPPED: AI review returned no patch operations."],
     };
+  }
+
+  const reviewMode = params.review_mode ?? config.review_mode ?? "apply";
+  if (reviewMode === "shadow") {
+    return writeShadowReviewSuggestions(
+      result,
+      sourceData,
+      runDir,
+      reviewPack,
+      combinedPatch,
+      rejectedPatchOperations,
+      aiWarnings,
+      batches.length,
+    );
   }
 
   const applied = await callWorker<T>("apply_review", {
@@ -227,4 +246,117 @@ function withAiWarning<T extends Record<string, unknown>>(result: WorkerResult<T
     ...result,
     warnings: [...(result.warnings ?? []), warning],
   };
+}
+
+async function writeShadowReviewSuggestions<T extends Record<string, unknown>>(
+  result: WorkerResult<T>,
+  sourceData: Record<string, unknown> | undefined,
+  runDir: string,
+  reviewPack: string,
+  patchOperations: unknown[],
+  rejectedOperations: Array<{ operation: unknown; reason: string }>,
+  aiWarnings: string[],
+  batches: number,
+): Promise<WorkerResult<T>> {
+  const suggestionsPath = join(runDir, "review_suggestions.json");
+  const metadata = {
+    mode: "shadow",
+    applied: false,
+    suggestions_path: suggestionsPath,
+    batches,
+    patch_ops: patchOperations.length,
+    rejected_patch_ops: rejectedOperations.length,
+  };
+  const payload = {
+    schema: "kbprep.review_suggestions.v1",
+    review_mode: "shadow",
+    summary: {
+      batches,
+      valid_patch_ops: patchOperations.length,
+      rejected_patch_ops: rejectedOperations.length,
+    },
+    patch_operations: patchOperations,
+    rejected_operations: rejectedOperations,
+    original_blocks: originalBlockStatusMap(reviewPack),
+    warnings: aiWarnings,
+  };
+  try {
+    await writeFile(suggestionsPath, `${JSON.stringify(payload, null, 2)}\n`, "utf-8");
+  } catch (err) {
+    return withAiWarning(result, `W_LLM_REVIEW_SHADOW_WRITE_FAILED: ${String(err)}`);
+  }
+  return attachAiReviewMetadata(result, sourceData, metadata, [
+    ...aiWarnings,
+    `W_LLM_REVIEW_SHADOW_SUGGESTIONS: wrote shadow suggestions to ${suggestionsPath}.`,
+  ]);
+}
+
+function attachAiReviewMetadata<T extends Record<string, unknown>>(
+  result: WorkerResult<T>,
+  sourceData: Record<string, unknown> | undefined,
+  metadata: Record<string, unknown>,
+  warnings: string[],
+): WorkerResult<T> {
+  if (result.ok) {
+    return {
+      ...result,
+      data: aiReviewData<T>(sourceData, metadata),
+      warnings: [...(result.warnings ?? []), ...warnings],
+    };
+  }
+  return {
+    ...result,
+    error: result.error
+      ? {
+        ...result.error,
+        details: {
+          ...result.error.details,
+          ai_review: metadata,
+        },
+      }
+      : result.error,
+    warnings: [...(result.warnings ?? []), ...warnings],
+  };
+}
+
+function aiReviewData<T extends Record<string, unknown>>(
+  sourceData: Record<string, unknown> | undefined,
+  metadata: Record<string, unknown>,
+): T {
+  const data: Record<string, unknown> = {
+    ...(sourceData ?? {}),
+    ai_review: metadata,
+  };
+  return data as T;
+}
+
+function originalBlockStatusMap(reviewPack: string): Record<string, Record<string, unknown>> {
+  const parsed = parseReviewPack(reviewPack);
+  const blocks = Array.isArray(parsed?.blocks) ? parsed.blocks : [];
+  const result: Record<string, Record<string, unknown>> = {};
+  for (const item of blocks) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const block = item as Record<string, unknown>;
+    const blockId = typeof block.block_id === "string" ? block.block_id : "";
+    if (!blockId) continue;
+    result[blockId] = {
+      status: block.status,
+      risk_tags: block.risk_tags,
+      reason: block.reason,
+      confidence: block.confidence,
+      protected: block.protected,
+    };
+  }
+  return result;
+}
+
+function parseReviewPack(reviewPack: string): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(reviewPack) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }

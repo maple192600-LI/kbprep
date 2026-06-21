@@ -15,6 +15,7 @@ export const AI_REVIEW_SYSTEM_PROMPT = [
 ].join(" ");
 
 export function buildReviewPrompt(reviewPack: string, batchNumber = 1, batchCount = 1, attempt = 1): string {
+  const policyContext = summarizePolicyContext(reviewPack);
   return [
     `Review this kbprep review_pack.json batch ${batchNumber}/${batchCount}.`,
     "Return ONLY an RFC 6902 JSON Patch array.",
@@ -25,6 +26,7 @@ export function buildReviewPrompt(reviewPack: string, batchNumber = 1, batchCoun
     "For curated Obsidian knowledge-base use, discard pure author bios, usernames, personal introductions, credentials, and ad/backstory blocks that do not carry reusable knowledge.",
     "Keep original source text intact. If deleting a block would break pronoun/reference continuity or remove setup needed by a later method, set status to review instead of discard.",
     "If context is insufficient, set status to review.",
+    ...policyContext,
     attempt > 1 ? "Previous response was invalid or unsafe. Return a valid patch array only, or [] if no safe change is needed." : "",
     "",
     reviewPack,
@@ -85,13 +87,79 @@ export function extractJsonPatch(messages: unknown[]): unknown[] | null {
   return null;
 }
 
-export function validateAiReviewPatch(patch: unknown[]): { valid: unknown[]; rejected: string[] } {
+function summarizePolicyContext(reviewPack: string): string[] {
+  const pack = parseReviewPackObject(reviewPack);
+  const policy = pack ? objectField(pack, "policy_context") : undefined;
+  if (!policy) return [];
+
+  const documentType = stringField(policy, "document_type");
+  const profile = stringField(policy, "profile");
+  const relevantTerms = stringArrayField(policy, "relevant_terms");
+  const protectedPatterns = protectedPatternLabels(policy);
+  const ruleSources = stringArrayField(policy, "rule_sources");
+
+  return [
+    "Policy context:",
+    documentType ? `document_type: ${documentType}` : "",
+    profile ? `profile: ${profile}` : "",
+    relevantTerms.length ? `relevant terms: ${relevantTerms.join(", ")}` : "",
+    protectedPatterns.length ? `protected patterns: ${protectedPatterns.join(", ")}` : "",
+    ruleSources.length ? `rule sources: ${ruleSources.join(", ")}` : "",
+  ].filter(Boolean);
+}
+
+function parseReviewPackObject(reviewPack: string): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(reviewPack) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function objectField(record: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const value = record[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
+}
+
+function stringField(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value : "";
+}
+
+function stringArrayField(record: Record<string, unknown>, key: string): string[] {
+  const value = record[key];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function protectedPatternLabels(policy: Record<string, unknown>): string[] {
+  const value = policy.protected_patterns;
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => item && typeof item === "object" && !Array.isArray(item)
+      ? stringField(item as Record<string, unknown>, "label")
+      : "")
+    .filter(Boolean);
+}
+
+export function validateAiReviewPatch(
+  patch: unknown[],
+): { valid: unknown[]; rejected: string[]; rejectedOperations: Array<{ operation: unknown; reason: string }> } {
   const valid: unknown[] = [];
   const rejected: string[] = [];
+  const rejectedOperations: Array<{ operation: unknown; reason: string }> = [];
 
   for (const item of patch) {
+    const reject = (reason: string) => {
+      rejected.push(reason);
+      rejectedOperations.push({ operation: item, reason });
+    };
     if (!item || typeof item !== "object" || Array.isArray(item)) {
-      rejected.push("operation is not an object");
+      reject("operation is not an object");
       continue;
     }
     const op = item as Record<string, unknown>;
@@ -99,34 +167,34 @@ export function validateAiReviewPatch(patch: unknown[]): { valid: unknown[]; rej
     const path = op.path;
     const value = op.value;
     if (opType !== "replace" && opType !== "add") {
-      rejected.push(`unsupported op ${String(opType)}`);
+      reject(`unsupported op ${String(opType)}`);
       continue;
     }
     if (typeof path !== "string") {
-      rejected.push("path must be a string");
+      reject("path must be a string");
       continue;
     }
     const parts = path.split("/").filter(Boolean);
     if (parts.length !== 3 || parts[0] !== "blocks") {
-      rejected.push(`invalid path ${path}`);
+      reject(`invalid path ${path}`);
       continue;
     }
     const field = parts[2];
     if (!AI_REVIEW_ALLOWED_FIELDS.has(field)) {
-      rejected.push(`field ${field} is not allowed`);
+      reject(`field ${field} is not allowed`);
       continue;
     }
 
     const valueError = validateAiReviewPatchValue(opType, field, value);
     if (valueError) {
-      rejected.push(valueError);
+      reject(valueError);
       continue;
     }
 
     valid.push(item);
   }
 
-  return { valid, rejected };
+  return { valid, rejected, rejectedOperations };
 }
 
 export function formatRejectedPatchWarning(batchNumber: number, batchCount: number, attempt: number, rejected: string[]): string {

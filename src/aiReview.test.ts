@@ -31,6 +31,26 @@ describe("agent-independent AI review protocol", () => {
     expect(buildReviewBatches(`[${"x".repeat(80_100)}`)).toEqual([]);
   });
 
+  it("summarizes review pack policy context in the prompt", () => {
+    const prompt = buildReviewPrompt(JSON.stringify({
+      schema: "kbprep.review_pack.v1",
+      policy_context: {
+        document_type: "course",
+        profile: "curated_obsidian_kb",
+        relevant_terms: ["步骤", "案例"],
+        protected_patterns: [{ label: "prompt", pattern: "^Prompt" }],
+        rule_sources: ["rules/base/obvious_noise.json"],
+      },
+      blocks: [],
+    }));
+
+    expect(prompt).toContain("Policy context");
+    expect(prompt).toContain("document_type: course");
+    expect(prompt).toContain("profile: curated_obsidian_kb");
+    expect(prompt).toContain("relevant terms: 步骤, 案例");
+    expect(prompt).toContain("protected patterns: prompt");
+  });
+
   it("extracts and validates only guarded AI review patch operations", () => {
     const extracted = extractJsonPatch([
       { content: "not a patch" },
@@ -306,6 +326,107 @@ describe("agent-independent AI review protocol", () => {
     }
   });
 
+  it("writes shadow review suggestions without applying safe patches", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-ai-review-shadow-"));
+    try {
+      const outputRoot = path.join(root, "output");
+      const runDir = path.join(outputRoot, "runs", "run-ai-review-shadow");
+      mkdirSync(runDir, { recursive: true });
+      mkdirSync(path.join(runDir, "chunks"));
+
+      const block = {
+        block_id: "b_review",
+        source_sha256: "ai-review-source",
+        status: "keep",
+        type: "paragraph",
+        text: "Shadow mode must not change this block.",
+        protected: false,
+        risk_tags: [],
+        reason: "initial",
+        confidence: 0.6,
+      };
+      const blocksPath = path.join(runDir, "blocks.jsonl");
+      writeFileSync(blocksPath, `${JSON.stringify(block)}\n`, "utf8");
+      const reviewPackPath = path.join(runDir, "review_pack.json");
+      writeFileSync(reviewPackPath, JSON.stringify({
+        schema: "kbprep.review_pack.v1",
+        policy_context: {
+          document_type: "course",
+          profile: "curated_obsidian_kb",
+          relevant_terms: ["步骤"],
+          protected_patterns: [],
+          rule_sources: ["rules/base/obvious_noise.json"],
+        },
+        blocks: [block],
+      }), "utf8");
+
+      const backend: AIReviewBackend = {
+        async review() {
+          return {
+            messages: [JSON.stringify([
+              { op: "replace", path: "/blocks/b_review/text", value: "rewritten text is not allowed" },
+              { op: "replace", path: "/blocks/b_review/status", value: "review" },
+            ])],
+            warning: "W_TEST_BACKEND_USED",
+          };
+        },
+      };
+      const initial: WorkerResult<Record<string, unknown>> = {
+        ok: true,
+        data: {
+          run_id: "run-ai-review-shadow",
+          run_dir: runDir,
+          outputs: { review_pack: reviewPackPath },
+          latest_outputs: {},
+        },
+        warnings: [],
+      };
+
+      const reviewed = await maybeRunAiReview(
+        initial,
+        { mode: "ai_review", ai_review_backend: "external", review_mode: "shadow" },
+        {},
+        {
+          api: { runtime: { aiReviewBackend: backend } },
+          toolCallId: "test-review-shadow",
+        },
+        {
+          pythonPath: "python",
+          timeoutMs: 60_000,
+          workerConfig: {},
+        },
+      );
+
+      const suggestionsPath = path.join(runDir, "review_suggestions.json");
+      const suggestions = JSON.parse(readFileSync(suggestionsPath, "utf8"));
+      expect(reviewed.ok).toBe(true);
+      expect(reviewed.data?.ai_review).toMatchObject({
+        mode: "shadow",
+        applied: false,
+        patch_ops: 1,
+        rejected_patch_ops: 1,
+      });
+      expect(reviewed.warnings).toContain("W_TEST_BACKEND_USED");
+      expect(reviewed.warnings?.some((warning) => warning.includes("shadow suggestions"))).toBe(true);
+      expect(suggestions.summary).toMatchObject({
+        valid_patch_ops: 1,
+        rejected_patch_ops: 1,
+      });
+      expect(suggestions.rejected_operations[0]).toMatchObject({
+        operation: { path: "/blocks/b_review/text" },
+        reason: "field text is not allowed",
+      });
+      expect(suggestions.original_blocks.b_review.status).toBe("keep");
+      expect(suggestions.patch_operations).toEqual([
+        { op: "replace", path: "/blocks/b_review/status", value: "review" },
+      ]);
+      expect(readFileSync(blocksPath, "utf8")).toBe(`${JSON.stringify(block)}\n`);
+      expect(existsSync(path.join(outputRoot, "latest.json"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("uses an injected generic backend and filters malformed patch operations before applying review", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-ai-review-"));
     try {
@@ -398,6 +519,92 @@ describe("agent-independent AI review protocol", () => {
       expect(updatedBlocks[0].text).toBe(block.text);
       expect(updatedBlocks[0].status).toBe("review");
       expect(updatedBlocks[0].reason).toBe("external reviewer marked this for human review");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps protected blocks safe when apply mode receives a discard patch", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-ai-review-protected-"));
+    try {
+      const outputRoot = path.join(root, "output");
+      const runDir = path.join(outputRoot, "runs", "run-ai-review-protected");
+      mkdirSync(runDir, { recursive: true });
+      mkdirSync(path.join(runDir, "chunks"));
+
+      const block = {
+        block_id: "prompt_block",
+        source_sha256: "ai-review-source",
+        status: "keep",
+        type: "prompt",
+        text: "Prompt：请保留完整操作步骤。",
+        protected: true,
+        risk_tags: [],
+        confidence: 0.9,
+      };
+      const blocksPath = path.join(runDir, "blocks.jsonl");
+      writeFileSync(blocksPath, `${JSON.stringify(block)}\n`, "utf8");
+      writeFileSync(path.join(runDir, "diagnosis_report.json"), JSON.stringify({ diagnosis: { file_id: "ai-review-source" } }), "utf8");
+      writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
+        source_type: "generic_block",
+        source_sha256: "ai-review-source",
+        plugin_version: "0.5.1",
+      }), "utf8");
+      writeFileSync(path.join(runDir, "run_metadata.json"), JSON.stringify({
+        input_path: path.join(root, "missing-source.bin"),
+      }), "utf8");
+      const reviewPackPath = path.join(runDir, "review_pack.json");
+      writeFileSync(reviewPackPath, JSON.stringify({
+        schema: "kbprep.review_pack.v1",
+        blocks: [block],
+      }), "utf8");
+
+      const backend: AIReviewBackend = {
+        async review() {
+          return {
+            messages: [JSON.stringify([
+              { op: "replace", path: "/blocks/prompt_block/status", value: "discard" },
+            ])],
+          };
+        },
+      };
+      const initial: WorkerResult<Record<string, unknown>> = {
+        ok: true,
+        data: {
+          run_id: "run-ai-review-protected",
+          run_dir: runDir,
+          outputs: { review_pack: reviewPackPath },
+          latest_outputs: {},
+        },
+        warnings: [],
+      };
+
+      const reviewed = await maybeRunAiReview(
+        initial,
+        { mode: "ai_review", ai_review_backend: "external" },
+        {},
+        {
+          api: { runtime: { aiReviewBackend: backend } },
+          toolCallId: "test-review-protected",
+        },
+        {
+          pythonPath: "python",
+          timeoutMs: 60_000,
+          workerConfig: {},
+        },
+      );
+
+      expect(reviewed.ok).toBe(true);
+      expect(reviewed.data?.ai_review).toMatchObject({
+        applied: 0,
+        rejected: 1,
+        patch_ops: 1,
+      });
+      expect(JSON.stringify(reviewed.data?.ai_review)).toContain("cannot discard");
+      const updatedBlock = JSON.parse(readFileSync(blocksPath, "utf8").trim());
+      expect(updatedBlock.status).toBe("keep");
+      expect(updatedBlock.text).toBe(block.text);
+      expect(updatedBlock.protected).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

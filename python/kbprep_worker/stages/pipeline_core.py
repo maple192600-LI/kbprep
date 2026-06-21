@@ -66,7 +66,6 @@ from .pipeline_helpers import (  # noqa: F401
     _domain_from_identity_url,
     _find_existing_run,
     _generate_audit_md,
-    _generate_review_pack,
     _identity_scalar,
     _is_nonlocal_markdown_image,
     _looks_like_image_reference,
@@ -85,6 +84,7 @@ from .pipeline_helpers import (  # noqa: F401
     _write_run_metadata,
 )
 from .pipeline_state import PipelineError, PipelineState, _stderr_log
+from .review_pack import _generate_review_pack
 
 logger = logging.getLogger(__name__)
 
@@ -497,6 +497,8 @@ def _stage_review_pack(state: PipelineState) -> None:
             state.source_type,
             source_quality=str(state.diagnosis.get("text_layer_health") or ""),
             document_type=state.document_type,
+            profile=state.profile,
+            source_identity=json.dumps(state.source_identity, ensure_ascii=False, sort_keys=True),
         )
 
 

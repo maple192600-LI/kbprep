@@ -17,7 +17,7 @@ from ..converter_capabilities import get_capability_for_extension
 from ..converter_registry import ConversionRoute
 from ..converters.direct import read_direct_source as _read_direct_source_impl
 from ..converters.html import html_to_markdown as _html_to_markdown
-from ..quality.thresholds import DIAGNOSIS_THRESHOLDS, review_pack_low_confidence_threshold
+from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
 from ..supported_formats import IMAGE_EXTENSIONS
 from .pipeline_state import PipelineError
 
@@ -483,68 +483,6 @@ def _run_diagnose_direct(input_path: str, output_root: str, source_type: str) ->
                 "details": exc.details,
             },
         }
-
-
-def _generate_review_pack(
-    blocks: list[dict],
-    run_dir: Path,
-    source_type: str,
-    *,
-    source_quality: str = "",
-    document_type: str = "",
-) -> None:
-    candidates = []
-    low_confidence_threshold = review_pack_low_confidence_threshold(
-        source_quality=source_quality,
-        document_type=document_type,
-    )
-    for block in blocks:
-        if _review_pack_block_needs_review(block, low_confidence_threshold):
-            candidates.append(_review_pack_candidate(block))
-    pack = {
-        "schema": "kbprep.review_pack.v1",
-        "source_type": source_type,
-        "document_type": document_type,
-        "low_confidence_threshold": low_confidence_threshold,
-        "instructions": [
-            "Classify blocks only; never rewrite text.",
-            "Prefer keep or review when a block may contain usable knowledge.",
-            "Never discard steps, prompts, code, tables, tool names, numbers, parameters, links, or concrete examples.",
-            "For curated Obsidian use, discard pure author bios, usernames, self-introductions, credentials, and identity wrappers when they do not carry reusable knowledge.",  # noqa: E501
-            "If removing a block would break continuity, references, setup, or a later method/case, mark it review instead of discard.",
-            "Return RFC 6902 JSON Patch operations against /blocks/<block_id>/<field>.",
-        ],
-        "blocks": candidates,
-    }
-    atomic_write_json(
-        run_dir / "review_pack.json",
-        pack,
-        indent=2,
-        trailing_newline=False,
-    )
-
-
-def _review_pack_block_needs_review(block: dict, low_confidence_threshold: float) -> bool:
-    status = block.get("status")
-    risk_tags = block.get("risk_tags", [])
-    confidence = float(block.get("confidence") or 0)
-    return status == "review" or bool(risk_tags) or confidence < low_confidence_threshold
-
-
-def _review_pack_candidate(block: dict) -> dict:
-    return {
-        "block_id": block.get("block_id"),
-        "type": block.get("type"),
-        "status": block.get("status"),
-        "risk_tags": block.get("risk_tags", []),
-        "reason": block.get("reason", ""),
-        "confidence": float(block.get("confidence") or 0),
-        "protected": bool(block.get("protected")),
-        "heading_path": block.get("heading_path", []),
-        "page_range": [block.get("page_start"), block.get("page_end")],
-        "text": block.get("text", ""),
-        "allowed_patch_fields": ["status", "risk_tags", "reason", "confidence"],
-    }
 
 
 def _primary_quality_issue(quality_report: dict) -> dict:
