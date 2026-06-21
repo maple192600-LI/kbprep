@@ -138,6 +138,8 @@ class ReviewRegressionGuardTests(unittest.TestCase):
 
         self.assertIn("node scripts/python-venv.mjs -m unittest discover -s python/tests", ci)
         self.assertIn("node scripts/python-venv.mjs -m kbprep_worker.cli --help", ci)
+        self.assertIn("KBPREP_WORKER_NOT_READY", ci)
+        self.assertIn("preflight should report missing MinerU in the lightweight CI worker", ci)
         self.assertNotIn(direct_pythonpath, ci)
         self.assertNotIn(direct_system_install, ci)
         self.assertNotIn(direct_unittest, ci)
