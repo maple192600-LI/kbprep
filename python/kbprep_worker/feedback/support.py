@@ -11,8 +11,9 @@ from typing import Any, cast
 from urllib.parse import urlparse
 
 from ..envelope import fail
+from ..private_rules import project_private_rules_root
 from ..quality import _positive_int as _positive_int
-from ..rule_loader import load_cleaning_rules, rules_root
+from ..rule_loader import builtin_rules_root, load_cleaning_rules
 
 
 class _JsonlFileLock:
@@ -165,7 +166,19 @@ def _target_rules_dir(data: dict) -> Path:
     value = _optional_string(data.get("target_rules_dir"))
     if value:
         return Path(value).expanduser().resolve()
-    return rules_root()
+    return project_private_rules_root().resolve()
+
+
+def _is_public_rules_target(target_rules_dir: Path) -> bool:
+    public_rules_dir = builtin_rules_root().resolve()
+    resolved_target = target_rules_dir.resolve()
+    return resolved_target == public_rules_dir or public_rules_dir in resolved_target.parents
+
+
+def _promotion_history_rules_dir(target_rules_dir: Path) -> Path:
+    if _is_public_rules_target(target_rules_dir):
+        return project_private_rules_root().resolve()
+    return target_rules_dir
 
 
 def _required_path(data: dict, key: str) -> Path:

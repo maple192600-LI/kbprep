@@ -49,10 +49,14 @@ Each proposal should contain:
 ```text
 .kbprep/
   rules/
+    document_types/
+      <type>.json
+    promotion_history.jsonl
     user/
       proposed_rules.jsonl
       accepted_rules.jsonl
       rejected_rules.jsonl
+      dictionary_suggestions.jsonl
       protected_terms.jsonl
 
 rules/
@@ -64,6 +68,8 @@ rules/
 ```
 
 Project feedback rules live under the current working directory's `.kbprep/rules/user/` by default. Generic packaged base rules must stay small and obvious. Private source, platform, brand, or course rules belong under `.kbprep/rules/`, not public `rules/`.
+
+Dictionary suggestions are promoted to `.kbprep/rules/document_types/<type>.json` by default, with promotion history under `.kbprep/rules/promotion_history.jsonl`. Writing a promoted dictionary into packaged public `rules/` requires both `confirm_dictionary_update=true` and `confirm_public_write=true`; promotion history still remains private for later summary and resolution.
 
 ## Feedback Flow
 
@@ -96,6 +102,7 @@ Implemented behavior includes:
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
 - dictionary suggestions require explicit confirmation before promotion
+- dictionary promotion defaults to private project rules and requires a second explicit confirmation before writing packaged public rules
 - promotion history records pass, fail, or unverified outcomes
 
 ## Acceptance

@@ -94,6 +94,178 @@ class FeedbackPromotionRound2CoverageTests(unittest.TestCase):
             self.assertEqual(envelope["data"]["promoted"]["skipped_duplicates"], 2)
             self.assertTrue(Path(envelope["data"]["promoted"]["backup_path"]).exists())
 
+    def test_dictionary_promotion_defaults_to_project_private_rules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "feedback" / "user"
+            public_rules_dir = root / "public-rules"
+            suggestions_path = rules_dir / "dictionary_suggestions.jsonl"
+            _write_jsonl(suggestions_path, [
+                {
+                    "schema": "kbprep.dictionary_suggestion.v1",
+                    "document_type": "course",
+                    "target": "rules/document_types/course.json",
+                    "required_confirmation": True,
+                    "proposed_rules": [
+                        {
+                            "action": "discard",
+                            "match": "literal",
+                            "pattern": "扫码关注",
+                            "reason": "confirmed CTA",
+                        },
+                    ],
+                },
+            ])
+
+            with patch.dict("os.environ", {"KBPREP_PROJECT_ROOT": str(root), "KBPREP_RULES_ROOT": str(public_rules_dir)}):
+                code, envelope = _capture_envelope(
+                    dictionary_suggestions._promote_dictionary_suggestion,
+                    {
+                        "confirm_dictionary_update": True,
+                        "document_type": "course",
+                        "rules_dir": str(rules_dir),
+                        "suggestions_file": str(suggestions_path),
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            target_path = Path(envelope["data"]["promoted"]["target_path"])
+            self.assertEqual(target_path, root / ".kbprep" / "rules" / "document_types" / "course.json")
+            self.assertTrue(target_path.exists())
+            self.assertFalse((public_rules_dir / "document_types" / "course.json").exists())
+
+    def test_dictionary_promotion_requires_public_write_confirmation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "feedback" / "user"
+            public_rules_dir = root / "public-rules"
+            suggestions_path = rules_dir / "dictionary_suggestions.jsonl"
+            _write_jsonl(suggestions_path, [
+                {
+                    "schema": "kbprep.dictionary_suggestion.v1",
+                    "document_type": "course",
+                    "target": "rules/document_types/course.json",
+                    "required_confirmation": True,
+                    "proposed_rules": [
+                        {
+                            "action": "discard",
+                            "match": "literal",
+                            "pattern": "扫码关注",
+                            "reason": "confirmed CTA",
+                        },
+                    ],
+                },
+            ])
+            payload = {
+                "confirm_dictionary_update": True,
+                "document_type": "course",
+                "rules_dir": str(rules_dir),
+                "target_rules_dir": str(public_rules_dir),
+                "suggestions_file": str(suggestions_path),
+            }
+
+            with (
+                patch.dict("os.environ", {"KBPREP_RULES_ROOT": str(public_rules_dir)}),
+                patch("kbprep_worker.feedback.support.builtin_rules_root", return_value=public_rules_dir),
+            ):
+                code, envelope = _capture_envelope(
+                    dictionary_suggestions._promote_dictionary_suggestion,
+                    payload,
+                )
+
+            self.assertEqual(code, 1)
+            self.assertEqual(envelope["error"]["code"], "E_CONFIRMATION_REQUIRED")
+            self.assertIn("confirm_public_write", envelope["error"]["message"])
+            self.assertFalse((public_rules_dir / "document_types" / "course.json").exists())
+
+            with (
+                patch.dict("os.environ", {"KBPREP_PROJECT_ROOT": str(root), "KBPREP_RULES_ROOT": str(public_rules_dir)}),
+                patch("kbprep_worker.feedback.support.builtin_rules_root", return_value=public_rules_dir),
+            ):
+                code, envelope = _capture_envelope(
+                    dictionary_suggestions._promote_dictionary_suggestion,
+                    {**payload, "confirm_public_write": True},
+                )
+
+            self.assertEqual(code, 0)
+            self.assertTrue((public_rules_dir / "document_types" / "course.json").exists())
+            self.assertEqual(Path(envelope["data"]["promoted"]["target_path"]).parent, public_rules_dir / "document_types")
+            self.assertFalse((public_rules_dir / "promotion_history.jsonl").exists())
+            private_history = root / ".kbprep" / "rules" / "promotion_history.jsonl"
+            self.assertTrue(private_history.exists())
+            self.assertEqual(Path(envelope["data"]["promoted"]["promotion_history_path"]), private_history)
+
+            with (
+                patch.dict("os.environ", {"KBPREP_PROJECT_ROOT": str(root)}),
+                patch("kbprep_worker.feedback.support.builtin_rules_root", return_value=public_rules_dir),
+            ):
+                code, envelope = _capture_envelope(
+                    promotion_history._summarize_promotion_history,
+                    {"target_rules_dir": str(public_rules_dir), "document_type": "course"},
+                )
+            self.assertEqual(code, 0)
+            self.assertEqual(envelope["data"]["summary"]["history_path"], str(private_history))
+            self.assertEqual(envelope["data"]["summary"]["total_promotions"], 1)
+
+            with (
+                patch.dict("os.environ", {"KBPREP_PROJECT_ROOT": str(root)}),
+                patch("kbprep_worker.feedback.support.builtin_rules_root", return_value=public_rules_dir),
+            ):
+                code, envelope = _capture_envelope(
+                    promotion_history._resolve_promotion_failures,
+                    {
+                        "target_rules_dir": str(public_rules_dir),
+                        "document_type": "course",
+                        "confirm_failure_resolved": True,
+                    },
+                )
+            self.assertEqual(code, 0)
+            self.assertEqual(envelope["data"]["resolution"]["status"], "not_needed")
+
+    def test_packaged_public_detection_ignores_rules_root_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "feedback" / "user"
+            packaged_rules_dir = root / "packaged-rules"
+            override_rules_dir = root / "override-rules"
+            suggestions_path = rules_dir / "dictionary_suggestions.jsonl"
+            _write_jsonl(suggestions_path, [
+                {
+                    "schema": "kbprep.dictionary_suggestion.v1",
+                    "document_type": "course",
+                    "target": "rules/document_types/course.json",
+                    "required_confirmation": True,
+                    "proposed_rules": [
+                        {
+                            "action": "discard",
+                            "match": "literal",
+                            "pattern": "扫码关注",
+                            "reason": "confirmed CTA",
+                        },
+                    ],
+                },
+            ])
+
+            with (
+                patch.dict("os.environ", {"KBPREP_RULES_ROOT": str(override_rules_dir)}),
+                patch("kbprep_worker.feedback.support.builtin_rules_root", return_value=packaged_rules_dir),
+            ):
+                code, envelope = _capture_envelope(
+                    dictionary_suggestions._promote_dictionary_suggestion,
+                    {
+                        "confirm_dictionary_update": True,
+                        "document_type": "course",
+                        "rules_dir": str(rules_dir),
+                        "target_rules_dir": str(packaged_rules_dir),
+                        "suggestions_file": str(suggestions_path),
+                    },
+                )
+
+            self.assertEqual(code, 1)
+            self.assertEqual(envelope["error"]["code"], "E_CONFIRMATION_REQUIRED")
+            self.assertIn("confirm_public_write", envelope["error"]["message"])
+            self.assertFalse((packaged_rules_dir / "document_types" / "course.json").exists())
+
     def test_dictionary_promotion_validation_failures_are_explicit(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

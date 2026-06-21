@@ -13,7 +13,15 @@ from ..rule_schema import validate_rule_file
 from .promotion_history import _append_promotion_history, _promotion_history_risk
 from .proposals import _proposal_string_list
 from .rerun_verification import _rerun_after_dictionary_promotion
-from .support import _optional_string, _positive_int, _read_jsonl, _rules_dir, _target_rules_dir
+from .support import (
+    _is_public_rules_target,
+    _optional_string,
+    _positive_int,
+    _promotion_history_rules_dir,
+    _read_jsonl,
+    _rules_dir,
+    _target_rules_dir,
+)
 
 
 def _suggest_dictionary_updates(data: dict) -> None:
@@ -79,7 +87,9 @@ def _promote_dictionary_suggestion(data: dict) -> None:
 
     validation = _validate_dictionary_suggestion(suggestion, str(suggestions_path))
     target_rules_dir = _target_rules_dir(data)
-    history_risk = _dictionary_promotion_history_risk(data, target_rules_dir, document_type)
+    _require_public_write_confirmation(data, target_rules_dir)
+    history_rules_dir = _promotion_history_rules_dir(target_rules_dir)
+    history_risk = _dictionary_promotion_history_risk(data, history_rules_dir, document_type)
 
     target_path = target_rules_dir / "document_types" / f"{document_type}.json"
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,6 +106,7 @@ def _promote_dictionary_suggestion(data: dict) -> None:
         data=data,
         suggestion=suggestion,
         target_rules_dir=target_rules_dir,
+        history_rules_dir=history_rules_dir,
         document_type=document_type,
         target_path=target_path,
         backup_path=backup_path,
@@ -111,6 +122,7 @@ def _finish_dictionary_promotion(
     data: dict,
     suggestion: dict,
     target_rules_dir: Path,
+    history_rules_dir: Path,
     document_type: str,
     target_path: Path,
     backup_path: Path | None,
@@ -127,7 +139,7 @@ def _finish_dictionary_promotion(
     )
     promotion_history = _append_promotion_history(
         document_type=document_type,
-        target_rules_dir=target_rules_dir,
+        target_rules_dir=history_rules_dir,
         target_path=target_path,
         backup_path=backup_path,
         promoted_rules=promoted_rules,
@@ -207,6 +219,22 @@ def _dictionary_promotion_history_risk(data: dict, target_rules_dir: Path, docum
             suggested_action="Review promotion_history.jsonl and failed regression samples, or rerun with allow_failed_promotion_history=true if the user explicitly accepts the risk.",  # noqa: E501
         )
     return {**history_risk, "status": "override_used"}
+
+
+def _require_public_write_confirmation(data: dict, target_rules_dir: Path) -> None:
+    if not _is_public_rules_target(target_rules_dir):
+        return
+    if data.get("confirm_public_write") is True:
+        return
+    fail(
+        "E_CONFIRMATION_REQUIRED",
+        "confirm_public_write must be true before a dictionary suggestion can write to public packaged rules.",
+        recoverable=True,
+        suggested_action=(
+            "Use the default private .kbprep/rules target, or rerun with "
+            "confirm_public_write=true after confirming the rule is generic and safe to version."
+        ),
+    )
 
 
 def _document_type_rules(rule_file: dict, target_path: Path) -> list[dict] | None:

@@ -5,7 +5,14 @@ from pathlib import Path
 
 from ..envelope import fail, ok
 from .rerun_verification import _dedupe_paths_local, _rerun_representative_source
-from .support import _append_jsonl_locked, _optional_string, _read_jsonl, _string_list, _target_rules_dir
+from .support import (
+    _append_jsonl_locked,
+    _optional_string,
+    _promotion_history_rules_dir,
+    _read_jsonl,
+    _string_list,
+    _target_rules_dir,
+)
 
 
 def _promotion_history_risk(*, target_rules_dir: Path, document_type: str) -> dict:
@@ -83,8 +90,9 @@ def _append_promotion_history(
 
 def _summarize_promotion_history(data: dict) -> None:
     target_rules_dir = _target_rules_dir(data)
+    history_rules_dir = _promotion_history_rules_dir(target_rules_dir)
     history_path = Path(
-        _optional_string(data.get("promotion_history_file")) or str(target_rules_dir / "promotion_history.jsonl")
+        _optional_string(data.get("promotion_history_file")) or str(history_rules_dir / "promotion_history.jsonl")
     ).expanduser().resolve()
     document_type_filter = _optional_string(data.get("document_type"))
     if not history_path.exists():
@@ -153,7 +161,8 @@ def _resolve_promotion_failures(data: dict) -> None:
     if not document_type:
         return
     target_rules_dir = _target_rules_dir(data)
-    history_path = target_rules_dir / "promotion_history.jsonl"
+    history_rules_dir = _promotion_history_rules_dir(target_rules_dir)
+    history_path = history_rules_dir / "promotion_history.jsonl"
     if not history_path.exists():
         fail("E_INPUT_NOT_FOUND", f"promotion_history.jsonl does not exist: {history_path}")
 

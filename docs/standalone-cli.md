@@ -41,6 +41,8 @@ kbprep-prepare --input ./source.pdf --output ./.kbprep/source --mode rules_only 
 kbprep-apply-review --run-dir ./.kbprep/source/runs/<run-id> --patch-file ./review.patch.json
 kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --feedback-text "下次删除「关注公众号」这种污染"
 kbprep-feedback --accept-proposal latest --confirm-rule-acceptance
+kbprep-feedback --suggest-dictionary-updates
+kbprep-feedback --promote-dictionary-suggestion --document-type course --confirm-dictionary-update
 kbprep-cleanup --output ./.kbprep/source --action finalize
 kbprep-batch --input ./sources --output ./.kbprep/batch --mode rules_only
 ```
@@ -81,6 +83,8 @@ Use `kbprep-cleanup --action finalize` only after checking `quality_report.json`
 `kbprep-feedback` writes proposed rules first. Only an explicit accept command with `--confirm-rule-acceptance` promotes a proposal into accepted rules.
 
 Use source-specific scope only when the cleanup should be limited to a known source family. Accepted source-specific rules match recorded source identity fields, not arbitrary body text.
+
+Dictionary promotion writes to `.kbprep/rules/document_types/` by default. Passing `--target-rules-dir rules` points at packaged public rules and also requires `--confirm-public-write`; use that only for generic, sanitized rules that are safe to version. Promotion history stays under private `.kbprep/rules/`, including later promotion-history summary and resolution commands for that public target.
 
 ## Path Safety
 

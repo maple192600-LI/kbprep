@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const publicRuleDirs = ["rules/base", "rules/document_types", "rules/templates"];
+const publicRulesRoot = path.join(repoRoot, "rules");
 const publicUserDir = path.join(repoRoot, "rules", "user");
 
 const forbiddenTerms = [
@@ -41,6 +42,16 @@ const allowedTerms = [
   "Obsidian",
 ];
 
+const runtimeRuleArtifacts = new Set([
+  "accepted_rules.jsonl",
+  "dictionary_suggestions.jsonl",
+  "promotion_history.jsonl",
+  "proposed_rules.jsonl",
+  "protected_terms.jsonl",
+  "rejected_rules.jsonl",
+  "rule_proposals.jsonl",
+]);
+
 const failures = [];
 
 for (const dir of publicRuleDirs) {
@@ -67,6 +78,16 @@ if (existsSync(publicUserDir)) {
     }
   }
 }
+if (existsSync(publicRulesRoot)) {
+  for (const file of collectRuleFiles(publicRulesRoot)) {
+    if (runtimeRuleArtifacts.has(path.basename(file))) {
+      failures.push({
+        file: path.relative(repoRoot, file).replaceAll(path.sep, "/"),
+        term: "runtime_rule_artifact_in_public_rules",
+      });
+    }
+  }
+}
 
 if (failures.length) {
   process.stderr.write(JSON.stringify({ ok: false, failures }, null, 2));
@@ -78,6 +99,7 @@ process.stdout.write(JSON.stringify({
   ok: true,
   checkedDirs: publicRuleDirs,
   forbiddenTerms: forbiddenTerms.length,
+  runtimeRuleArtifacts: runtimeRuleArtifacts.size,
 }, null, 2));
 process.stdout.write("\n");
 

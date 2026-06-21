@@ -378,6 +378,7 @@ describe("standalone KBPrep CLI adapter", () => {
       "course",
       "--rerun-after-promotion",
       "--allow-failed-promotion-history",
+      "--confirm-public-write",
       "--representative-run-dir",
       ".kbprep/source/runs/run-1",
       "--rules-dir",
@@ -391,12 +392,30 @@ describe("standalone KBPrep CLI adapter", () => {
     expect(plan.input.run_dir).toBeUndefined();
     expect(plan.input.promote_dictionary_suggestion).toBe(true);
     expect(plan.input.confirm_dictionary_update).toBe(true);
+    expect(plan.input.confirm_public_write).toBe(true);
     expect(plan.input.rerun_after_promotion).toBe(true);
     expect(plan.input.allow_failed_promotion_history).toBe(true);
     expect(plan.input.representative_run_dirs).toHaveLength(1);
     expect((plan.input.representative_run_dirs as string[])[0]).toContain(join(".kbprep", "source", "runs", "run-1"));
     expect(plan.input.document_type).toBe("course");
     expect(plan.input.rules_dir).toContain(join(".kbprep", "rules", "user"));
+    expect(plan.input.target_rules_dir).toContain("rules");
+  });
+
+  it("keeps public dictionary promotion confirmation disabled by default", () => {
+    const parsed = parseStandaloneArgs([
+      "--promote-dictionary-suggestion",
+      "--confirm-dictionary-update",
+      "--document-type",
+      "course",
+      "--target-rules-dir",
+      "rules",
+    ]);
+    const plan = buildCliPlan("feedback", parsed.options);
+
+    expect(plan.command).toBe("feedback");
+    expect(plan.input.confirm_dictionary_update).toBe(true);
+    expect(plan.input.confirm_public_write).toBe(false);
     expect(plan.input.target_rules_dir).toContain("rules");
   });
 
