@@ -42,13 +42,20 @@ class CanonicalIrManifestTests(unittest.TestCase):
             self.assertTrue(document_manifest_path.exists())
 
             canonical_manifest = json.loads(canonical_manifest_path.read_text(encoding="utf-8"))
+            typed_nodes_path = run_dir / "canonical_ir" / "typed_nodes.json"
             self.assertEqual(canonical_manifest["schema"], "kbprep.canonical_ir_manifest.v1")
             self.assertEqual(canonical_manifest["status"], "partial")
             self.assertEqual(canonical_manifest["source_snapshot"]["input_name"], source.name)
             self.assertEqual(canonical_manifest["source_snapshot"]["input_size"], source.stat().st_size)
             self.assertEqual(canonical_manifest["conversion"]["actual_route"], "direct_text")
-            self.assertFalse(canonical_manifest["coverage"]["typed_nodes_available"])
+            self.assertTrue(canonical_manifest["coverage"]["typed_nodes_available"])
             self.assertFalse(canonical_manifest["coverage"]["source_spans_available"])
+            self.assertEqual(canonical_manifest["artifacts"]["typed_nodes"], "canonical_ir/typed_nodes.json")
+            self.assertTrue(typed_nodes_path.exists())
+            typed_nodes = json.loads(typed_nodes_path.read_text(encoding="utf-8"))
+            self.assertEqual(typed_nodes["schema"], "kbprep.canonical_ir_typed_nodes.v1")
+            self.assertEqual(typed_nodes["source_artifact"], "converted.md")
+            self.assertEqual(typed_nodes["document_id"], canonical_manifest["document_id"])
 
             document_manifest = json.loads(document_manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(document_manifest["schema"], "kbprep.document_manifest.v1")
