@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | partial | Gate exists; must read Canonical IR evidence across every route. |
-| canonical_ir_contract | partial | Only a minimal manifest; `typed_nodes_available` and `source_spans_available` hardcoded `False`. |
+| conversion_quality_gate | partial | Gate validates manifest evidence and the first typed-node artifact; complete source-span and route-wide IR evidence remain future work. |
+| canonical_ir_contract | partial | Manifest plus first `typed_nodes.json` artifact exist for heading, paragraph, list, table, code, and quote; source spans and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
@@ -114,14 +114,19 @@ a metadata manifest.
 
 Slices:
 
-- **C1** `TypedNode` schema and builder (heading, paragraph, list, table, code,
-  formula, figure, quote, transcript cue, metadata).
+- **C1** Landed first slice: `TypedNode` schema and builder for heading,
+  paragraph, list, table, code, and quote, with a validated
+  `canonical_ir/typed_nodes.json` artifact.
+- **C1b** Complete remaining typed-node coverage for formula, figure,
+  transcript cue, metadata, and any route-specific structure required by the
+  protected design.
 - **C2** `SourceSpan` variants per source kind (protected design §6 table).
 - **C3** `TransformationLedger` append-only record.
-- **C4** Flip `typed_nodes_available` and `source_spans_available` to `True`
-  with builder coverage.
-- **C5** Conversion quality gate reads typed-node evidence instead of relying
-  on rendered Markdown.
+- **C4** Complete coverage reporting: keep `typed_nodes_available` true only
+  for validated typed-node artifacts, and flip `source_spans_available` only
+  after SourceSpan coverage exists.
+- **C5** Conversion quality gate reads complete typed-node and source-span
+  evidence instead of relying on rendered Markdown.
 
 Acceptance: `canonical_ir_contract` moves from partial to implemented;
 `canonical_ir.py` is no longer "minimal"; renderable Markdown can be

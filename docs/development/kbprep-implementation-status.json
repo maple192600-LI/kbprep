@@ -1,6 +1,6 @@
 {
   "schema": "kbprep.implementation_status.v1",
-  "updated": "2026-06-21",
+  "updated": "2026-06-22",
   "capabilities": [
     {
       "id": "design_source_alignment",
@@ -35,11 +35,12 @@
       "id": "conversion_quality_gate",
       "label": "Conversion quality gate",
       "status": "partial",
-      "scope": "Current code has conversion quality checks and manifest checks; the target gate must read complete Canonical IR typed-node and source-span evidence across every route.",
+      "scope": "Current code has conversion quality checks, manifest checks, and validation for the first Canonical IR typed-node artifact; the target gate must still read complete typed-node and source-span evidence across every route.",
       "evidence": [
         "docs/development/04-conversion-quality-gate.md",
         "python/kbprep_worker/quality/conversion_gate.py",
         "python/tests/test_conversion_gate.py",
+        "python/tests/test_canonical_ir_schema.py",
         "src/test/scenarios/worker-quality-gates-part1.test.ts"
       ],
       "prohibitedClaims": [
@@ -50,11 +51,14 @@
       "id": "canonical_ir_contract",
       "label": "Canonical IR contract",
       "status": "partial",
-      "scope": "The worker emits a minimal partial Canonical IR manifest beside conversion artifacts; full typed nodes, source spans, and universal fact-layer usage are not shipped.",
+      "scope": "The worker emits a partial Canonical IR manifest and a validated canonical_ir/typed_nodes.json artifact for heading, paragraph, list, table, code, and quote nodes. Full route-specific typed-node coverage, source spans, and universal fact-layer usage are not shipped.",
       "evidence": [
         "docs/development/02-canonical-ir-contract.md",
+        "python/kbprep_worker/canonical_nodes.py",
         "python/kbprep_worker/canonical_ir.py",
-        "python/tests/test_canonical_ir_manifest.py"
+        "python/tests/test_canonical_ir_manifest.py",
+        "python/tests/test_canonical_ir_schema.py",
+        "python/tests/test_canonical_ir_typed_nodes.py"
       ],
       "prohibitedClaims": [
         "Canonical IR is the complete shipped worker fact layer"

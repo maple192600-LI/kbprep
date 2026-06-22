@@ -188,6 +188,8 @@ def _failure_action(code: str) -> dict[str, str]:
         return _action(code, "fix_conversion_failure", "Fix the failed converter or choose another route.")
     if code in {"E_CANONICAL_IR_MANIFEST_MISSING", "E_DOCUMENT_MANIFEST_MISSING"}:
         return _action(code, "regenerate_canonical_ir", "Regenerate Canonical IR evidence before cleanup.")
+    if code == "E_CANONICAL_IR_TYPED_NODES_INVALID":
+        return _action(code, "regenerate_canonical_ir", "Regenerate Canonical IR typed-node evidence before cleanup.")
     if code in {"E_CANONICAL_IR_MANIFEST_INVALID", "E_DOCUMENT_MANIFEST_INVALID"}:
         return _action(code, "repair_manifest", "Repair manifest schema and artifact references before cleanup.")
     if code in {"E_CONVERT_OUTPUT_MISSING", "E_CONVERT_OUTPUT_EMPTY"}:

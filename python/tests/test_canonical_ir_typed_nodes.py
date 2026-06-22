@@ -1,0 +1,137 @@
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+from kbprep_worker.canonical_nodes import (
+    CANONICAL_IR_TYPED_NODES_SCHEMA,
+    build_typed_nodes_from_markdown,
+    write_typed_nodes_artifact,
+)
+
+
+class CanonicalIrTypedNodeTests(unittest.TestCase):
+    def test_builds_core_markdown_typed_nodes_in_source_order(self) -> None:
+        markdown = """# Title
+
+Intro line
+continued line
+
+- First
+- Second
+
+| Key | Value |
+| --- | --- |
+| A | 1 |
+
+```python
+# not a heading
+- not a list
+```
+
+> Quote one
+> Quote two
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["heading", "paragraph", "list", "table", "code", "quote"])
+        self.assertEqual([node.node_id for node in nodes], [f"n_{index:06d}" for index in range(1, 7)])
+        self.assertEqual([node.ordinal for node in nodes], list(range(1, 7)))
+        self.assertEqual(nodes[0].metadata, {"heading_level": 1})
+        self.assertEqual(nodes[2].text, "First\nSecond")
+        self.assertEqual(nodes[3].metadata, {"rows": 3})
+        self.assertEqual(nodes[4].metadata, {"language": "python"})
+        self.assertIn("# not a heading", nodes[4].text)
+        self.assertEqual(nodes[5].text, "Quote one\nQuote two")
+
+    def test_writes_typed_nodes_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Note\n\nA useful note.\n", encoding="utf-8")
+
+            artifact = write_typed_nodes_artifact(run_dir=run_dir, document_id="doc_test", converted_path=converted)
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+        self.assertEqual(payload["schema"], CANONICAL_IR_TYPED_NODES_SCHEMA)
+        self.assertEqual(payload["document_id"], "doc_test")
+        self.assertEqual(payload["source_artifact"], "converted.md")
+        self.assertEqual(payload["node_count"], 2)
+        self.assertEqual([node["type"] for node in payload["nodes"]], ["heading", "paragraph"])
+        self.assertEqual(set(payload["nodes"][0]), {"node_id", "ordinal", "type", "text", "metadata"})
+
+    def test_parser_keeps_code_fence_content_as_one_code_node(self) -> None:
+        markdown = """```markdown
+# Not a heading
+- not a list item
+> not a quote
+| not | a table |
+```
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["code"])
+        self.assertIn("# Not a heading", nodes[0].text)
+        self.assertEqual(nodes[0].metadata, {"language": "markdown"})
+
+    def test_parser_supports_tilde_code_fences(self) -> None:
+        markdown = """~~~python
+# Not a heading
+- not a list item
+~~~
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["code"])
+        self.assertIn("- not a list item", nodes[0].text)
+        self.assertEqual(nodes[0].metadata, {"language": "python"})
+
+    def test_parser_keeps_shorter_backticks_inside_longer_fence(self) -> None:
+        markdown = """````
+```
+content
+````
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["code"])
+        self.assertEqual(nodes[0].text, "```\ncontent")
+
+    def test_parser_does_not_treat_pipe_sentence_as_table(self) -> None:
+        nodes = build_typed_nodes_from_markdown("The standard A | B appears inside prose.\n")
+
+        self.assertEqual([node.node_type for node in nodes], ["paragraph"])
+
+    def test_parser_recognizes_pipe_table_without_outer_pipes(self) -> None:
+        nodes = build_typed_nodes_from_markdown("A | B\n--- | ---\n1 | 2\n")
+
+        self.assertEqual([node.node_type for node in nodes], ["table"])
+        self.assertEqual(nodes[0].metadata, {"rows": 3})
+
+    def test_parser_keeps_table_with_empty_cell_as_one_table(self) -> None:
+        nodes = build_typed_nodes_from_markdown("A | B\n--- | ---\n1 | \n")
+
+        self.assertEqual([node.node_type for node in nodes], ["table"])
+        self.assertEqual(nodes[0].metadata, {"rows": 3})
+
+    def test_parser_merges_ordered_list_and_multiline_paragraph(self) -> None:
+        markdown = """First paragraph line
+Second paragraph line
+
+1. Collect source evidence
+2. Record acceptance criteria
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["paragraph", "list"])
+        self.assertEqual(nodes[0].text, "First paragraph line\nSecond paragraph line")
+        self.assertEqual(nodes[1].text, "Collect source evidence\nRecord acceptance criteria")
+
+
+if __name__ == "__main__":
+    unittest.main()
