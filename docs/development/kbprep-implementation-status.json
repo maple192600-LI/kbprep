@@ -51,7 +51,7 @@
       "id": "canonical_ir_contract",
       "label": "Canonical IR contract",
       "status": "partial",
-      "scope": "The worker emits a partial Canonical IR manifest and a validated canonical_ir/typed_nodes.json artifact for heading, paragraph, list, table, code, and quote nodes. Full route-specific typed-node coverage, source spans, and universal fact-layer usage are not shipped.",
+      "scope": "The worker emits a partial Canonical IR manifest and a validated canonical_ir/typed_nodes.json artifact for heading, paragraph, list, table, code, quote, formula, figure, and metadata nodes. Transcript cues, full route-specific typed-node coverage, source spans, and universal fact-layer usage are not shipped.",
       "evidence": [
         "docs/development/02-canonical-ir-contract.md",
         "python/kbprep_worker/canonical_nodes.py",

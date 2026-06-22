@@ -45,6 +45,54 @@ continued line
         self.assertIn("# not a heading", nodes[4].text)
         self.assertEqual(nodes[5].text, "Quote one\nQuote two")
 
+    def test_parser_builds_c1b_metadata_figure_and_formula_nodes(self) -> None:
+        markdown = """---
+title: Example Note
+tags:
+  - canonical-ir
+---
+
+![Architecture diagram](assets/diagram.png "Architecture")
+
+$$
+E = mc^2
+$$
+
+$a + b = c$
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["metadata", "figure", "formula", "formula"])
+        self.assertEqual(nodes[0].metadata, {"format": "yaml_frontmatter", "lines": 3})
+        self.assertIn("title: Example Note", nodes[0].text)
+        self.assertEqual(
+            nodes[1].metadata,
+            {"alt": "Architecture diagram", "target": "assets/diagram.png", "title": "Architecture"},
+        )
+        self.assertEqual(nodes[2].text, "E = mc^2")
+        self.assertEqual(nodes[2].metadata, {"syntax": "dollar_block"})
+        self.assertEqual(nodes[3].text, "a + b = c")
+        self.assertEqual(nodes[3].metadata, {"syntax": "dollar_inline"})
+
+    def test_parser_keeps_c1b_syntax_inside_code_fence_as_code(self) -> None:
+        markdown = """```markdown
+---
+title: Not metadata
+---
+![not a figure](image.png)
+$$
+not_formula()
+$$
+```
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown)
+
+        self.assertEqual([node.node_type for node in nodes], ["code"])
+        self.assertIn("![not a figure](image.png)", nodes[0].text)
+        self.assertIn("not_formula()", nodes[0].text)
+
     def test_writes_typed_nodes_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)

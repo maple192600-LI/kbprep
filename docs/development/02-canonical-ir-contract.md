@@ -14,9 +14,10 @@ The current worker ships a partial Canonical IR contract. It writes
 `canonical_ir/manifest.json`, `document_manifest.json`, and a validated
 `canonical_ir/typed_nodes.json` artifact for converted Markdown blocks.
 
-The first typed-node slice covers heading, paragraph, list, table, code, and
-quote nodes in source order. `typed_nodes_available` is true only when that
-artifact validates. `source_spans_available` remains false; SourceSpan coverage,
+The shipped typed-node slices cover heading, paragraph, list, table, code,
+quote, formula, figure, and metadata nodes in source order.
+`typed_nodes_available` is true only when that artifact validates.
+`source_spans_available` remains false; transcript cues, SourceSpan coverage,
 relationship evidence, assets, annotations, a transformation ledger, and
 Markdown regeneration from IR plus accepted changes are still target work.
 

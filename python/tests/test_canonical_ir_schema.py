@@ -448,6 +448,49 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
         self.assertTrue(any(issue.message == "typed_nodes node keys must match C1 schema exactly" for issue in issues))
 
+    def test_validator_accepts_c1b_typed_node_types(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("---\ntitle: Example\n---\n\n![Alt](image.png)\n\n$$\nx\n$$\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
+                coverage={"typed_nodes_available": True},
+            )
+            nodes = [
+                {
+                    "node_id": "n_000001",
+                    "ordinal": 1,
+                    "type": "metadata",
+                    "text": "title: Example",
+                    "metadata": {"format": "yaml_frontmatter"},
+                },
+                {
+                    "node_id": "n_000002",
+                    "ordinal": 2,
+                    "type": "figure",
+                    "text": "![Alt](image.png)",
+                    "metadata": {"alt": "Alt", "target": "image.png"},
+                },
+                {
+                    "node_id": "n_000003",
+                    "ordinal": 3,
+                    "type": "formula",
+                    "text": "x",
+                    "metadata": {"syntax": "dollar_block"},
+                },
+            ]
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload(node_count=3, nodes=nodes)),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertEqual(issues, [])
+
     def test_validator_rejects_non_integer_typed_node_count(self):
         invalid_counts = (True, "1", -1)
         for invalid_count in invalid_counts:

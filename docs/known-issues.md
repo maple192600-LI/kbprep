@@ -4,7 +4,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 
 ## Current Target Gaps
 
-- Canonical IR is documented as the target fact layer, and the worker now writes a first validated `typed_nodes.json` artifact, but every route has not fully moved to that contract.
+- Canonical IR is documented as the target fact layer, and the worker now writes a validated `typed_nodes.json` artifact with core text, formula, figure, and metadata nodes, but transcript cues and every route-specific structure have not fully moved to that contract.
 - SourceSpan coverage is not yet complete across every source kind; `source_spans_available` remains false for the current C1 slice.
 - CleaningPolicySnapshot now records the first policy input/hash artifact, but full reproducibility coverage still needs implementation.
 - CleaningPatch and Clean View are target contracts; current cleanup artifacts are not fully migrated.

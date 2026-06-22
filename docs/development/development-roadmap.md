@@ -28,7 +28,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
 | conversion_quality_gate | partial | Gate validates manifest evidence and the first typed-node artifact; complete source-span and route-wide IR evidence remain future work. |
-| canonical_ir_contract | partial | Manifest plus first `typed_nodes.json` artifact exist for heading, paragraph, list, table, code, and quote; source spans and full fact-layer usage are not shipped. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json` artifact exist for heading, paragraph, list, table, code, quote, formula, figure, and metadata; transcript cues, source spans, and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
@@ -117,9 +117,10 @@ Slices:
 - **C1** Landed first slice: `TypedNode` schema and builder for heading,
   paragraph, list, table, code, and quote, with a validated
   `canonical_ir/typed_nodes.json` artifact.
-- **C1b** Complete remaining typed-node coverage for formula, figure,
-  transcript cue, metadata, and any route-specific structure required by the
-  protected design.
+- **C1b-1** Landed: formula, figure, and metadata typed-node coverage
+  for converted Markdown.
+- **C1b-2** Complete remaining typed-node coverage for transcript cue and
+  any route-specific structure required by the protected design.
 - **C2** `SourceSpan` variants per source kind (protected design §6 table).
 - **C3** `TransformationLedger` append-only record.
 - **C4** Complete coverage reporting: keep `typed_nodes_available` true only

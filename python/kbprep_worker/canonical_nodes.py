@@ -10,13 +10,25 @@ from pathlib import Path
 from .atomic_io import atomic_write_json
 
 CANONICAL_IR_TYPED_NODES_SCHEMA = "kbprep.canonical_ir_typed_nodes.v1"
-SUPPORTED_NODE_TYPES = frozenset({"heading", "paragraph", "list", "table", "code", "quote"})
+SUPPORTED_NODE_TYPES = frozenset({
+    "heading",
+    "paragraph",
+    "list",
+    "table",
+    "code",
+    "quote",
+    "formula",
+    "figure",
+    "metadata",
+})
 TYPED_NODE_KEYS = frozenset({"node_id", "ordinal", "type", "text", "metadata"})
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _ORDERED_LIST_RE = re.compile(r"^\s*\d+[.)]\s+(.+)$")
 _UNORDERED_LIST_RE = re.compile(r"^\s*[-*+]\s+(.+)$")
 _TABLE_SEPARATOR_CELL_RE = re.compile(r"^\s*:?-{3,}:?\s*$")
+_FIGURE_RE = re.compile(r'^\s*!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)\s*$')
+_INLINE_FORMULA_RE = re.compile(r"^\$(?!\$)(.+?)(?<!\\)\$$")
 
 
 @dataclass(frozen=True)
@@ -64,6 +76,10 @@ def _consume_block(lines: list[str], index: int) -> tuple[str, str, dict[str, ob
     line = lines[index]
     if _parse_fence(line) is not None:
         return _consume_code(lines, index)
+    if _is_yaml_frontmatter_start(lines, index):
+        return _consume_metadata(lines, index)
+    if _is_formula_start(line):
+        return _consume_formula(lines, index)
     heading = _HEADING_RE.match(line)
     if heading:
         return "heading", heading.group(2).strip(), {"heading_level": len(heading.group(1))}, index + 1
@@ -73,6 +89,8 @@ def _consume_block(lines: list[str], index: int) -> tuple[str, str, dict[str, ob
         return _consume_table(lines, index)
     if line.lstrip().startswith(">"):
         return _consume_quote(lines, index)
+    if _figure_metadata(line) is not None:
+        return _consume_figure(lines, index)
     return _consume_paragraph(lines, index)
 
 
@@ -118,6 +136,48 @@ def _consume_quote(lines: list[str], index: int) -> tuple[str, str, dict[str, ob
     return "quote", "\n".join(quoted), {"lines": len(quoted)}, index
 
 
+def _consume_metadata(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
+    metadata_lines: list[str] = []
+    index += 1
+    while index < len(lines):
+        if lines[index].strip() == "---":
+            return "metadata", "\n".join(metadata_lines), {"format": "yaml_frontmatter", "lines": len(metadata_lines)}, index + 1
+        metadata_lines.append(lines[index])
+        index += 1
+    return "paragraph", "---\n" + "\n".join(metadata_lines), {}, index
+
+
+def _consume_figure(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
+    line = lines[index].strip()
+    metadata = _figure_metadata(line)
+    if metadata is None:
+        return _consume_paragraph(lines, index)
+    return "figure", line, metadata, index + 1
+
+
+def _consume_formula(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
+    stripped = lines[index].strip()
+    if stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) > 4:
+        return "formula", stripped[2:-2].strip(), {"syntax": "dollar_block"}, index + 1
+    if stripped == "$$":
+        return _consume_formula_block(lines, index)
+    inline = _INLINE_FORMULA_RE.match(stripped)
+    if inline:
+        return "formula", inline.group(1).strip(), {"syntax": "dollar_inline"}, index + 1
+    return _consume_paragraph(lines, index)
+
+
+def _consume_formula_block(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
+    formula_lines: list[str] = []
+    index += 1
+    while index < len(lines):
+        if lines[index].strip() == "$$":
+            return "formula", "\n".join(formula_lines).strip(), {"syntax": "dollar_block"}, index + 1
+        formula_lines.append(lines[index])
+        index += 1
+    return "formula", "\n".join(formula_lines).strip(), {"syntax": "dollar_block"}, index
+
+
 def _consume_paragraph(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
     paragraph: list[str] = []
     while index < len(lines) and lines[index].strip():
@@ -132,10 +192,13 @@ def _is_special_block_start(lines: list[str], index: int) -> bool:
     line = lines[index]
     return (
         _parse_fence(line) is not None
+        or _is_yaml_frontmatter_start(lines, index)
+        or _is_formula_start(line)
         or _HEADING_RE.match(line) is not None
         or _list_item_text(line) is not None
         or _starts_table(lines, index)
         or line.lstrip().startswith(">")
+        or _figure_metadata(line) is not None
     )
 
 
@@ -180,6 +243,30 @@ def _parse_fence(line: str) -> tuple[str, int, str] | None:
     if fence_len < 3:
         return None
     return fence_char, fence_len, stripped[fence_len:].strip()
+
+
+def _is_yaml_frontmatter_start(lines: list[str], index: int) -> bool:
+    return index == 0 and lines[index].strip() == "---" and any(line.strip() == "---" for line in lines[index + 1 :])
+
+
+def _figure_metadata(line: str) -> dict[str, object] | None:
+    match = _FIGURE_RE.match(line)
+    if match is None:
+        return None
+    metadata: dict[str, object] = {"alt": match.group(1), "target": match.group(2)}
+    title = match.group(3)
+    if title:
+        metadata["title"] = title
+    return metadata
+
+
+def _is_formula_start(line: str) -> bool:
+    stripped = line.strip()
+    if stripped == "$$":
+        return True
+    if stripped.startswith("$$") and stripped.endswith("$$") and len(stripped) > 4:
+        return True
+    return _INLINE_FORMULA_RE.match(stripped) is not None
 
 
 def _is_closing_fence(line: str, fence_char: str, fence_len: int) -> bool:
