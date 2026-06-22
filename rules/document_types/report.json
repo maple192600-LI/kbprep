@@ -1,7 +1,35 @@
 {
   "schema": "kbprep.cleaning_rules.v1",
   "description": "Report-specific cleanup and protection vocabulary.",
-  "rules": [],
+  "rules": [
+    {
+      "id": "report.promotional_line.author_byline_heading",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "^#{0,6}\\s*@[^\\s:：]{1,32}\\s*[:：]?$",
+      "risk_tag": "report_author_byline_heading",
+      "reason": "standalone author byline heading without reusable knowledge content"
+    },
+    {
+      "id": "report.promotional_line.author_self_intro",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "^大家好[，,。\\s]*我是.{1,40}(?:创始人|主理人|负责人|创业者|总教练).{0,80}$",
+      "risk_tag": "report_author_intro",
+      "reason": "standalone report author self-introduction without reusable method content"
+    },
+    {
+      "id": "report.promotional_line.peer_learning_offer",
+      "type": "promotional_line",
+      "action": "discard",
+      "match": "regex",
+      "pattern": "^(?:.{0,40}[：:])?(?:和\\s*[\\d,.万千+]+\\s*\\+?\\s*)?(?:实战派)?同行(?:一起)?(?:学习|交流|共创).{0,80}$",
+      "risk_tag": "report_source_wrapper_line",
+      "reason": "standalone source or community wrapper offer around report content"
+    }
+  ],
   "keyword_sets": {
     "cta_keywords": [],
     "qr_image_markers": [],

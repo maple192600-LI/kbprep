@@ -69,7 +69,7 @@ rules/
 
 Project feedback rules live under the current working directory's `.kbprep/rules/user/` by default. Generic packaged base rules must stay small and obvious. Private source, platform, brand, or course rules belong under `.kbprep/rules/`, not public `rules/`.
 
-Dictionary suggestions are promoted to `.kbprep/rules/document_types/<type>.json` by default, with promotion history under `.kbprep/rules/promotion_history.jsonl`. Writing a promoted dictionary into packaged public `rules/` requires both `confirm_dictionary_update=true` and `confirm_public_write=true`; promotion history still remains private for later summary and resolution.
+Dictionary suggestions are promoted to `.kbprep/rules/document_types/<type>.json` by default, with promotion history under `.kbprep/rules/promotion_history.jsonl`. Matching private document-type dictionaries are loaded automatically by later prepare runs for that project. Writing a promoted dictionary into packaged public `rules/` requires both `confirm_dictionary_update=true` and `confirm_public_write=true`; promotion history still remains private for later summary and resolution.
 
 ## Feedback Flow
 
@@ -104,6 +104,7 @@ Implemented behavior includes:
 - dictionary suggestions require explicit confirmation before promotion
 - dictionary suggestion thresholds are scope-based: user/project/source-pattern evidence can start lower, document-type promotion needs more evidence, and global/public-style promotion needs the highest evidence count
 - dictionary promotion defaults to private project rules and requires a second explicit confirmation before writing packaged public rules
+- private document-type dictionary rules participate in later cleanup and policy snapshots without copying private rule contents into public artifacts
 - promotion history records pass, fail, or unverified outcomes; failed history blocks new promotion by default
 - overriding failed promotion history requires an explicit flag and reports the failed sample evidence in the response
 

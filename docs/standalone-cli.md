@@ -92,7 +92,7 @@ Use `kbprep-cleanup --action finalize` only after checking `quality_report.json`
 
 Use source-specific scope only when the cleanup should be limited to a known source family. Accepted source-specific rules match recorded source identity fields, not arbitrary body text.
 
-Dictionary promotion writes to `.kbprep/rules/document_types/` by default. Passing `--target-rules-dir rules` points at packaged public rules and also requires `--confirm-public-write`; use that only for generic, sanitized rules that are safe to version. Promotion history stays under private `.kbprep/rules/`, including later promotion-history summary and resolution commands for that public target.
+Dictionary promotion writes to `.kbprep/rules/document_types/` by default. Later `kbprep-prepare` runs automatically load the matching private document-type dictionary for the current project and record its path/hash in the cleaning policy snapshot without copying private rule contents. Passing `--target-rules-dir rules` points at packaged public rules and also requires `--confirm-public-write`; use that only for generic, sanitized rules that are safe to version. Promotion history stays under private `.kbprep/rules/`, including later promotion-history summary and resolution commands for that public target.
 
 ## Path Safety
 

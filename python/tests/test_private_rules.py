@@ -5,6 +5,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 
+from kbprep_worker.clean_rules import apply_clean_rules
 from kbprep_worker.cleanup import _delete_standard_artifacts
 from kbprep_worker.obsidian_template import load_obsidian_template
 from kbprep_worker.rule_loader import load_cleaning_rules
@@ -131,6 +132,54 @@ class PrivateRuleTests(unittest.TestCase):
         self.assertIn(".kbprep/rules/user/accepted_rules.jsonl", rules.sources)
         self.assertTrue(any(rule.pattern == "LOCAL_PRIVATE_ACCEPTED_MARKER" for rule in rules.promotional_line_rules))
 
+    def test_project_private_document_type_dictionary_is_loaded_for_matching_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rule_path = root / ".kbprep" / "rules" / "document_types" / "report.json"
+            rule_path.parent.mkdir(parents=True)
+            rule_path.write_text(
+                json.dumps(_private_report_dictionary(), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            blocks = [{
+                "block_id": "private_report_wrapper",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "ExamplePrivateReportWrapper",
+                "heading_path": ["封面"],
+            }]
+
+            with _cwd(root):
+                load_cleaning_rules.cache_clear()
+                rules = load_cleaning_rules(document_type="report")
+                cleaned = apply_clean_rules(blocks, document_type="report")
+
+        self.assertIn(".kbprep/rules/document_types/report.json", rules.sources)
+        self.assertEqual(cleaned[0]["status"], "discard")
+
+    def test_project_private_learned_dictionary_rule_can_override_knowledge_terms(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rule_path = root / ".kbprep" / "rules" / "document_types" / "report.json"
+            rule_path.parent.mkdir(parents=True)
+            rule_path.write_text(
+                json.dumps(_private_learned_report_dictionary(), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            blocks = [{
+                "block_id": "learned_report_wrapper",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "案例复盘：ExamplePrivateWrapper",
+                "heading_path": ["封面"],
+            }]
+
+            with _cwd(root):
+                load_cleaning_rules.cache_clear()
+                cleaned = apply_clean_rules(blocks, document_type="report")
+
+        self.assertEqual(cleaned[0]["status"], "discard")
+
     def test_cleanup_all_preserves_local_private_rules_area(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -156,6 +205,44 @@ def _minimal_cleaning_template() -> dict:
         "keyword_sets": {
             "cta_keywords": ["PRIVATE_TEMPLATE_MARKER"],
         },
+    }
+
+
+def _private_report_dictionary() -> dict:
+    return {
+        "schema": "kbprep.cleaning_rules.v1",
+        "description": "test private report dictionary",
+        "rules": [
+            {
+                "id": "private.report.wrapper",
+                "type": "promotional_line",
+                "action": "discard",
+                "match": "literal",
+                "pattern": "ExamplePrivateReportWrapper",
+                "risk_tag": "private_report_wrapper",
+                "reason": "private report wrapper cleanup",
+            },
+        ],
+        "keyword_sets": {},
+    }
+
+
+def _private_learned_report_dictionary() -> dict:
+    return {
+        "schema": "kbprep.cleaning_rules.v1",
+        "description": "test private learned report dictionary",
+        "rules": [
+            {
+                "id": "learned-report-wrapper",
+                "type": "promotional_line",
+                "action": "discard",
+                "match": "literal",
+                "pattern": "案例复盘：ExamplePrivateWrapper",
+                "risk_tag": "learned_feedback_report",
+                "reason": "confirmed learned report wrapper cleanup",
+            },
+        ],
+        "keyword_sets": {},
     }
 
 

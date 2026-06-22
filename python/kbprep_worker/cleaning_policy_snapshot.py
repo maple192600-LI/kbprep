@@ -13,6 +13,7 @@ from .cleaning_registry import (
     CleaningRuleRouteKind,
     select_accepted_rule_routes,
     select_base_cleaning_routes,
+    select_private_document_type_routes,
 )
 from .private_rules import accepted_rule_dirs_from_env, template_candidates
 from .quality.thresholds import (
@@ -129,6 +130,11 @@ def _route_snapshots(
         document_type=document_type,
         templates=rule_templates,
     )
+    private_document_type_routes = select_private_document_type_routes(
+        root,
+        document_type=document_type,
+        cwd=cwd,
+    )
     accepted_routes = select_accepted_rule_routes(
         root,
         cwd=cwd,
@@ -136,7 +142,7 @@ def _route_snapshots(
     )
     source_identity_text = json.dumps(_json_safe(source_identity), ensure_ascii=False, sort_keys=True)
     snapshots: list[dict[str, Any]] = []
-    for route in (*base_routes, *accepted_routes):
+    for route in (*base_routes, *private_document_type_routes, *accepted_routes):
         snapshot = _route_snapshot(route, root, cwd, document_type, source_identity_text)
         if snapshot is not None:
             snapshots.append(snapshot)

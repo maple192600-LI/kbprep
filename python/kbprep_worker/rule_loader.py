@@ -15,6 +15,7 @@ from .cleaning_registry import (
     CleaningRuleRoute,
     select_accepted_rule_routes,
     select_base_cleaning_routes,
+    select_private_document_type_routes,
 )
 from .cleaning_registry import (
     profile_templates as registry_profile_templates,
@@ -187,7 +188,8 @@ def load_cleaning_rules(
     source_identity: str = "",
 ) -> LoadedCleaningRules:
     root = rules_root()
-    base = _load_base_cleaning_rules(str(root), profile, document_type, templates)
+    private_project_root = project_root().resolve()
+    base = _load_base_cleaning_rules(str(root), str(private_project_root), profile, document_type, templates)
     accepted_rules: list[CleaningRule] = []
     accepted_sources: list[str] = []
     for path in _accepted_rule_paths():
@@ -205,12 +207,17 @@ def load_cleaning_rules(
 @lru_cache(maxsize=64)
 def _load_base_cleaning_rules(
     root_key: str,
+    private_project_root_key: str,
     profile: str = "standard",
     document_type: str = "",
     templates: tuple[str, ...] = (),
 ) -> LoadedCleaningRules:
     root = Path(root_key)
-    selected = select_base_cleaning_routes(root, profile=profile, document_type=document_type, templates=templates)
+    private_project_root = Path(private_project_root_key)
+    selected = (
+        *select_base_cleaning_routes(root, profile=profile, document_type=document_type, templates=templates),
+        *select_private_document_type_routes(root, document_type=document_type, cwd=private_project_root),
+    )
     rule_sets = _load_rule_sets(selected, root)
     return LoadedCleaningRules(
         cleaning=_cleaning_rule_group(rule_sets),

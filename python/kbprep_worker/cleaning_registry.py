@@ -59,6 +59,26 @@ def select_base_cleaning_routes(
     return tuple(routes)
 
 
+def select_private_document_type_routes(
+    root: Path,
+    document_type: str = "",
+    cwd: Path | None = None,
+) -> tuple[CleaningRuleRoute, ...]:
+    if not document_type:
+        return ()
+    path = project_private_rules_root(cwd) / "document_types" / f"{document_type}.json"
+    if not path.exists():
+        return ()
+    return (_route(
+        CleaningRuleRouteKind.DOCUMENT_TYPE,
+        root,
+        path,
+        f"private document type dictionary matched: {document_type}",
+        priority=25,
+        cache_strategy="private_document_type_file",
+    ),)
+
+
 def select_accepted_rule_routes(
     root: Path,
     cwd: Path | None = None,

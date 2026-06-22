@@ -97,6 +97,81 @@ class FeedbackPromotionRound2CoverageTests(unittest.TestCase):
                 [("doc_type", "document_type", 3), ("global_doc", "global", 5)],
             )
 
+    def test_report_dictionary_suggestions_require_threshold_and_skip_rejected_patterns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_dir = root / "rules"
+
+            def accepted(rule_id: str, pattern: str, *, match: str = "literal") -> dict:
+                return {
+                    "schema": "kbprep.rule_proposal.v1",
+                    "id": rule_id,
+                    "status": "accepted",
+                    "action": "discard",
+                    "scope": "document_type",
+                    "match": match,
+                    "pattern": pattern,
+                    "reason": "confirmed report wrapper pollution",
+                    "risk_note": "review before promotion",
+                    "created_from_run": "run",
+                    "requires_confirmation": True,
+                    "owner_confirmation_status": "confirmed",
+                    "examples": [pattern],
+                    "counterexamples": ["案例复盘：ExampleMemberCircle不是目标，留存指标才是判断标准。"],
+                    "document_type": "report",
+                }
+
+            def rejected(rule_id: str, pattern: str, *, match: str = "literal") -> dict:
+                return {
+                    "schema": "kbprep.rule_proposal.v1",
+                    "id": rule_id,
+                    "status": "rejected",
+                    "action": "discard",
+                    "scope": "document_type",
+                    "match": match,
+                    "pattern": pattern,
+                    "reason": "would remove useful method content",
+                    "document_type": "report",
+                }
+
+            _write_jsonl(rules_dir / "accepted_rules.jsonl", [
+                accepted("report-1", "ExampleTrainingCamp"),
+                accepted("report-2", "ExampleAuthor"),
+            ])
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._suggest_dictionary_updates,
+                {"rules_dir": str(rules_dir), "min_feedback_count": 1},
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(envelope["data"]["suggestions"]["suggestions"], [])
+
+            broad_pattern = ".*ExampleMemberCircle.*"
+            _write_jsonl(rules_dir / "accepted_rules.jsonl", [
+                accepted("report-1", "ExampleTrainingCamp"),
+                accepted("report-2", "ExampleAuthor"),
+                accepted("report-3", "ExampleTool"),
+                accepted("report-4", broad_pattern, match="regex"),
+            ])
+            _write_jsonl(rules_dir / "rejected_rules.jsonl", [
+                rejected("report-reject-1", broad_pattern, match="regex"),
+            ])
+
+            code, envelope = _capture_envelope(
+                dictionary_suggestions._suggest_dictionary_updates,
+                {"rules_dir": str(rules_dir), "min_feedback_count": 1},
+            )
+
+            self.assertEqual(code, 0)
+            suggestions = envelope["data"]["suggestions"]["suggestions"]
+            self.assertEqual(len(suggestions), 1)
+            self.assertEqual(suggestions[0]["document_type"], "report")
+            self.assertEqual(suggestions[0]["feedback_scope"], "document_type")
+            self.assertEqual(suggestions[0]["min_feedback_count"], 3)
+            proposed_patterns = [item["pattern"] for item in suggestions[0]["proposed_rules"]]
+            self.assertEqual(proposed_patterns, ["ExampleTrainingCamp", "ExampleAuthor", "ExampleTool"])
+            self.assertNotIn(broad_pattern, proposed_patterns)
+
     def test_promote_dictionary_suggestion_writes_rule_file_and_history(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

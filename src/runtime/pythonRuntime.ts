@@ -85,6 +85,7 @@ export async function ensurePythonRuntime(config?: RuntimeConfig, onProgress?: R
 
   const venvDir = kbprepVenvDir();
   cleanupStaleKbprepRuntime(config);
+  rmSync(kbprepDevVenvReadyMarker(), { force: true });
   mkdirSync(dirname(venvDir), { recursive: true });
   const bootstrap = bootstrapPythonCommand(config);
   const steps = runtimeSetupSteps();
@@ -194,6 +195,10 @@ function kbprepVenvDir(): string {
 
 function kbprepVenvReadyMarker(): string {
   return join(kbprepRootDir(), ".kbprep", "runtime-ready.json");
+}
+
+function kbprepDevVenvReadyMarker(): string {
+  return join(kbprepRootDir(), ".kbprep", "dev-runtime-ready.json");
 }
 
 function isKbprepVenvReady(config?: RuntimeConfig): boolean {

@@ -62,7 +62,7 @@ No public `rules/` file was changed by this audit.
 
 ## Promotion Safety
 
-Dictionary promotion writes to `.kbprep/rules/document_types/<type>.json` by default. Writing the promoted dictionary file to packaged public `rules/` requires both `confirm_dictionary_update=true` and `confirm_public_write=true`; promotion history remains under private `.kbprep/rules/`, including later summary and resolution operations for that public target.
+Dictionary promotion writes to `.kbprep/rules/document_types/<type>.json` by default. Later prepare runs load the matching private document-type dictionary for the current project and record only path/hash evidence in the cleaning policy snapshot. Writing the promoted dictionary file to packaged public `rules/` requires both `confirm_dictionary_update=true` and `confirm_public_write=true`; promotion history remains under private `.kbprep/rules/`, including later summary and resolution operations for that public target.
 
 ## Residual Risk
 

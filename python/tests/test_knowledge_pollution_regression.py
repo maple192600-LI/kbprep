@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from kbprep_worker.classify_blocks import classify_blocks
+from kbprep_worker.clean_rules import apply_clean_rules
 from kbprep_worker.obsidian_kb import apply_curated_obsidian_policy, complete_body_filename
 from kbprep_worker.obsidian_template import load_obsidian_template
 from kbprep_worker.rule_loader import load_cleaning_rules
@@ -30,6 +31,62 @@ class KnowledgePollutionRegressionTests(unittest.TestCase):
         self.assertEqual(classified[0]["status"], "keep")
         self.assertTrue(classified[0].get("protected"))
         self.assertIn(classified[0]["type"], {"case_step", "operation_step"})
+
+    def test_report_wrapper_noise_is_removed_without_losing_business_methods(self) -> None:
+        blocks = [
+            {
+                "block_id": "wrapper_offer",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "ExampleCommunityPrep：和 30000+ 实战派同行一起学习",
+                "heading_path": ["封面"],
+            },
+            {
+                "block_id": "author_heading",
+                "type": "section_heading",
+                "status": "keep",
+                "text": "## @ExampleAuthor：",
+                "heading_path": ["案例"],
+            },
+            {
+                "block_id": "author_intro",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "大家好，我是ExampleAuthor，ExampleTool 创始人，今天分享我的经历。",
+                "heading_path": ["案例"],
+            },
+            {
+                "block_id": "business_method",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "创始人亲自跑一遍业务流程，记录所有节点和操作。",
+                "heading_path": ["方法"],
+            },
+            {
+                "block_id": "community_method",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "案例复盘：社群不是目标，用户留存指标才是判断标准。",
+                "heading_path": ["案例复盘"],
+            },
+            {
+                "block_id": "prompt_method",
+                "type": "paragraph",
+                "status": "keep",
+                "text": "步骤1：用 AI 拆解作者介绍，识别哪些是营销包装。",
+                "heading_path": ["操作步骤"],
+            },
+        ]
+
+        cleaned = apply_clean_rules(blocks, profile="standard", document_type="report")
+        statuses = {block["block_id"]: block["status"] for block in cleaned}
+
+        self.assertEqual(statuses["wrapper_offer"], "discard")
+        self.assertEqual(statuses["author_heading"], "discard")
+        self.assertEqual(statuses["author_intro"], "discard")
+        self.assertEqual(statuses["business_method"], "keep")
+        self.assertEqual(statuses["community_method"], "keep")
+        self.assertEqual(statuses["prompt_method"], "keep")
 
     def test_public_rules_do_not_ship_private_packaging_titles(self):
         with tempfile.TemporaryDirectory() as tmp:

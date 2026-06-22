@@ -1,3 +1,4 @@
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type RuntimeFileState = {
@@ -139,6 +140,18 @@ describe("python runtime full setup orchestration", () => {
       setup_env: { ok: true, data: { device: "cpu", actions_taken: [] } },
     });
     expect(marker.python_project.dependency_spec).toContain("mineru[all]");
+  });
+
+  it("clears stale dev runtime marker when runtime setup rebuilds the shared venv", async () => {
+    const { ensurePythonRuntime, kbprepVenvPythonPath } = await import("./pythonRuntime.js");
+    const kbprepDir = dirname(dirname(dirname(kbprepVenvPythonPath())));
+    const devMarkerPath = join(kbprepDir, "dev-runtime-ready.json");
+    runtimeState.files.set(devMarkerPath, JSON.stringify({ schema: "kbprep.dev_venv.v1" }));
+
+    await ensurePythonRuntime();
+
+    expect([...runtimeState.files.keys()].some((file) => file.endsWith("dev-runtime-ready.json"))).toBe(false);
+    expect([...runtimeState.files.keys()].some((file) => file.endsWith("runtime-ready.json"))).toBe(true);
   });
 
   it("records raw setup output when setup-env emits non-json stdout", async () => {

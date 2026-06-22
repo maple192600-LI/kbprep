@@ -86,6 +86,13 @@ def _route_by_kind(snapshot: dict, kind: str) -> dict:
     raise AssertionError(f"missing route kind: {kind}")
 
 
+def _route_by_source(snapshot: dict, source: str) -> dict:
+    for route in snapshot["policy_inputs"]["rule_routes"]:
+        if route["source"] == source:
+            return route
+    raise AssertionError(f"missing route source: {source}")
+
+
 class CleaningPolicySnapshotTests(unittest.TestCase):
     def test_compiles_schema_inputs_thresholds_and_rule_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -167,6 +174,30 @@ class CleaningPolicySnapshotTests(unittest.TestCase):
         template_route = _route_by_kind(result.snapshot, "profile_template")
         self.assertEqual(Path(template_route["path"]), expected_private_path)
         self.assertEqual(template_route["sha256"], expected_private_sha)
+
+    def test_private_document_type_dictionary_records_path_without_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_root = root / "rules"
+            private_path = root / ".kbprep" / "rules" / "document_types" / "report.json"
+            _write_json(rules_root / "base" / "obvious_noise.json", {"schema": "test.rules"})
+            _write_json(rules_root / "document_types" / "report.json", {"marker": "public"})
+            _write_json(private_path, {"marker": "DO_NOT_LEAK_PRIVATE_DOCUMENT_TYPE_RULE"})
+
+            with _env("KBPREP_RULES_ROOT", str(rules_root)), _cwd(root):
+                result = compile_cleaning_policy_snapshot(
+                    profile="standard",
+                    document_type="report",
+                    source_identity={},
+                )
+            expected_private_sha = _file_sha256(private_path)
+
+        private_route = _route_by_source(result.snapshot, ".kbprep/rules/document_types/report.json")
+        serialized = json.dumps(result.snapshot, ensure_ascii=False)
+        self.assertEqual(Path(private_route["path"]), private_path)
+        self.assertEqual(private_route["kind"], "document_type")
+        self.assertEqual(private_route["sha256"], expected_private_sha)
+        self.assertNotIn("DO_NOT_LEAK_PRIVATE_DOCUMENT_TYPE_RULE", serialized)
 
     def test_accepted_rule_hash_uses_active_rules_for_current_document(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

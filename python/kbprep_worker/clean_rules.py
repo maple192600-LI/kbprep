@@ -14,6 +14,11 @@ from .structure_patterns import has_step_signal
 
 logger = logging.getLogger(__name__)
 
+WRAPPER_HEADING_RISK_TAGS = frozenset({
+    "report_author_byline_heading",
+    "report_source_wrapper_heading",
+})
+
 
 def apply_clean_rules(
     blocks: list[dict],
@@ -55,6 +60,8 @@ def _process_clean_block(block: dict, rules: LoadedCleaningRules) -> list[dict]:
     if block.get("protected"):
         block["status"] = "keep"
         return promo_blocks
+    if _apply_wrapper_heading_rule_if_needed(block, text, block_type, rules):
+        return promo_blocks
     if _apply_promotional_match_if_needed(block, text, block_type, rules):
         return promo_blocks
     if _mark_contextual_cta_review(block, text, block_type, rules):
@@ -79,6 +86,23 @@ def _apply_promotional_match_if_needed(
 ) -> bool:
     matched_rule = _matching_promotional_rule(text, rules)
     if block_type == "section_heading" or not matched_rule:
+        return False
+    _apply_matched_rule(block, matched_rule)
+    return True
+
+
+def _apply_wrapper_heading_rule_if_needed(
+    block: dict,
+    text: str,
+    block_type: object,
+    rules: LoadedCleaningRules,
+) -> bool:
+    if block_type != "section_heading":
+        return False
+    matched_rule = _matching_promotional_rule(text, rules)
+    if matched_rule is None or matched_rule.action == "protect":
+        return False
+    if matched_rule.risk_tag not in WRAPPER_HEADING_RISK_TAGS:
         return False
     _apply_matched_rule(block, matched_rule)
     return True
@@ -154,7 +178,7 @@ def _matching_promotional_rule(line: str, rules: LoadedCleaningRules) -> Cleanin
         if rule.action == "protect" and rule_matches(rule, line):
             return rule
     for rule in rules.promotional_line_rules:
-        if rule.action != "protect" and rule.risk_tag.startswith("user_feedback_") and rule_matches(rule, line):
+        if rule.action != "protect" and _is_confirmed_feedback_rule(rule) and rule_matches(rule, line):
             return rule
     if _is_contextual_promo_knowledge(line, rules):
         return None
@@ -162,6 +186,10 @@ def _matching_promotional_rule(line: str, rules: LoadedCleaningRules) -> Cleanin
         if rule.action != "protect" and rule_matches(rule, line):
             return rule
     return None
+
+
+def _is_confirmed_feedback_rule(rule: CleaningRule) -> bool:
+    return rule.risk_tag.startswith(("user_feedback_", "learned_feedback_"))
 
 
 def _apply_matched_rule(block: dict, matched_rule) -> None:

@@ -47,6 +47,9 @@ Document cleaning safety:
 - accepted patches have evidence
 - rejected patches have warnings
 - strict errors block rendering and publication
+- document-type dictionaries may remove standalone report packaging, author
+  bylines, and source wrapper offers, but useful methods, cases, prompts, and
+  decision criteria must remain protected from broad cleanup rules
 
 Publish safety:
 
