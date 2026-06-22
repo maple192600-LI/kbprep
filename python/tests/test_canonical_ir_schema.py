@@ -384,6 +384,70 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
         self.assertTrue(any(issue.code == "E_CANONICAL_IR_TYPED_NODES_INVALID" for issue in issues))
 
+    def test_validator_accepts_empty_typed_nodes_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
+                coverage={"typed_nodes_available": True},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload(node_count=0, nodes=[])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertEqual(issues, [])
+
+    def test_validator_rejects_invalid_typed_node_text_and_metadata_types(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
+                coverage={"typed_nodes_available": True},
+            )
+            node = {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": None, "metadata": []}
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload(nodes=[node])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        messages = [issue.message for issue in issues]
+        self.assertIn("typed_nodes node text must be non-empty", messages)
+        self.assertIn("typed_nodes node metadata must be an object", messages)
+
+    def test_validator_rejects_typed_node_missing_required_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
+                coverage={"typed_nodes_available": True},
+            )
+            node = {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": "Title"}
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload(nodes=[node])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.message == "typed_nodes node keys must match C1 schema exactly" for issue in issues))
+
     def test_validator_rejects_non_integer_typed_node_count(self):
         invalid_counts = (True, "1", -1)
         for invalid_count in invalid_counts:

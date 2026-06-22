@@ -202,6 +202,43 @@ class ConversionGateTests(unittest.TestCase):
         self.assertTrue(any(error.startswith("E_CANONICAL_IR_TYPED_NODES_INVALID") for error in report["strict_errors"]))
         self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
 
+    def test_pre_clean_conversion_gate_deduplicates_typed_node_failure_actions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Tutorial\n\nRecord acceptance criteria.\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            manifest_path = run_dir / "canonical_ir" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["artifacts"]["typed_nodes"] = "canonical_ir/typed_nodes.json"
+            manifest["coverage"]["typed_nodes_available"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            bad_node = {"node_id": "bad", "ordinal": 2, "type": "unknown", "text": "", "metadata": []}
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "node_count": 1,
+                    "nodes": [bad_node],
+                }),
+                encoding="utf-8",
+            )
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        typed_node_actions = [
+            action for action in report["failure_actions"] if action["code"] == "E_CANONICAL_IR_TYPED_NODES_INVALID"
+        ]
+        typed_node_errors = [
+            error for error in report["strict_errors"] if error.startswith("E_CANONICAL_IR_TYPED_NODES_INVALID")
+        ]
+        self.assertEqual(report["status"], "fail")
+        self.assertGreaterEqual(len(typed_node_errors), 2)
+        self.assertEqual(len(typed_node_actions), 1)
+        self.assertEqual(typed_node_actions[0]["action"], "regenerate_canonical_ir")
+
 
 if __name__ == "__main__":
     unittest.main()

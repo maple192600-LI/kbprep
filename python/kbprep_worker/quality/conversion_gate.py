@@ -169,8 +169,12 @@ def _conversion_report_declares_failure(conversion_report: dict[str, Any]) -> bo
 
 def _failure_actions(quality_issues: list[dict[str, Any]]) -> list[dict[str, str]]:
     actions: list[dict[str, str]] = []
+    seen_codes: set[str] = set()
     for issue in quality_issues:
         code = str(issue.get("code") or "")
+        if code in seen_codes:
+            continue
+        seen_codes.add(code)
         actions.append(_failure_action(code))
     return actions
 
