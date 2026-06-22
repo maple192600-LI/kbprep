@@ -32,6 +32,16 @@ _TABLE_SEPARATOR_CELL_RE = re.compile(r"^\s*:?-{3,}:?\s*$")
 _FIGURE_RE = re.compile(r'^\s*!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)\s*$')
 _INLINE_FORMULA_RE = re.compile(r"^\$(?!\$)(.+?)(?<!\\)\$$")
 _SPEAKER_RE = re.compile(r"^\s*([^:\n：]{1,40})\s*[:：]\s+\S+")
+_SPEAKER_LABEL_RE = re.compile(
+    r"^(?:"
+    r"Speaker\s*[A-Za-z0-9]+|S\d+|[A-Z]|"
+    r"Host|Guest|Interviewer|Interviewee|Moderator|Narrator|Teacher|Student|"
+    r"主持人|嘉宾|讲者|旁白|访谈者|受访者|采访者|讲师|老师|学生|说话人|发言人|问|答"
+    r")$",
+    re.IGNORECASE,
+)
+_SPEAKER_NAME_LABEL_RE = re.compile(r"^[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}$")
+_NON_SPEAKER_LABELS = frozenset({"Note", "Notice", "Warning", "Important", "Tip"})
 
 
 @dataclass(frozen=True)
@@ -45,6 +55,15 @@ class TypedNode:
     line_end: int
 
 
+@dataclass(frozen=True)
+class _ParsedBlock:
+    node_type: str
+    text: str
+    metadata: dict[str, object]
+    line_start: int
+    line_end: int
+
+
 def build_typed_nodes_from_markdown(
     markdown: str,
     *,
@@ -53,13 +72,47 @@ def build_typed_nodes_from_markdown(
     transcript_cue_texts: Sequence[str] | None = None,
 ) -> list[TypedNode]:
     """Build deterministic C1 typed nodes from Markdown blocks."""
-    lines = markdown.splitlines()
+    blocks = _parse_markdown_blocks(markdown.splitlines())
     nodes: list[TypedNode] = []
-    index = 0
     cue_index = 0
     transcript_context = _is_transcript_context(source_type, conversion_route)
     cue_texts = _normalized_transcript_cue_texts(transcript_cue_texts)
-    used_cue_indices: set[int] = set()
+    remaining_candidates = _transcript_candidate_counts(blocks)
+    next_cue_index = 1
+    for block in blocks:
+        node_type = block.node_type
+        metadata = dict(block.metadata)
+        if block.text.strip():
+            if transcript_context and block.node_type == "paragraph":
+                _remove_transcript_candidates(remaining_candidates, block.text)
+                matched_cue_index = _matched_next_transcript_cue_index(
+                    block.text,
+                    cue_texts,
+                    next_cue_index,
+                    remaining_candidates=remaining_candidates,
+                )
+                if matched_cue_index is not None:
+                    next_cue_index = matched_cue_index + 1
+                    node_type = "transcript_cue"
+                    metadata = _transcript_metadata(block.text, matched_cue_index, raw_cue_confirmed=True)
+                elif not cue_texts and _speaker_name(
+                    block.text,
+                    allow_name_label=_allows_name_speaker_labels(conversion_route),
+                ) is not None:
+                    cue_index += 1
+                    node_type = "transcript_cue"
+                    metadata = _transcript_metadata(
+                        block.text,
+                        cue_index,
+                        allow_name_label=_allows_name_speaker_labels(conversion_route),
+                    )
+            nodes.append(_typed_node(len(nodes) + 1, node_type, block.text, metadata, block.line_start, block.line_end))
+    return nodes
+
+
+def _parse_markdown_blocks(lines: list[str]) -> list[_ParsedBlock]:
+    blocks: list[_ParsedBlock] = []
+    index = 0
     while index < len(lines):
         line = lines[index]
         if not line.strip():
@@ -67,19 +120,8 @@ def build_typed_nodes_from_markdown(
             continue
         start_index = index
         node_type, text, metadata, index = _consume_block(lines, index)
-        if text.strip():
-            if transcript_context and node_type == "paragraph":
-                matched_cue_index = _matched_transcript_cue_index(text, cue_texts, used_cue_indices)
-                if matched_cue_index is not None:
-                    used_cue_indices.add(matched_cue_index)
-                    node_type = "transcript_cue"
-                    metadata = _transcript_metadata(text, matched_cue_index)
-                elif not cue_texts and _speaker_name(text) is not None:
-                    cue_index += 1
-                    node_type = "transcript_cue"
-                    metadata = _transcript_metadata(text, cue_index)
-            nodes.append(_typed_node(len(nodes) + 1, node_type, text, metadata, start_index + 1, index))
-    return nodes
+        blocks.append(_ParsedBlock(node_type, text, metadata, start_index + 1, index))
+    return blocks
 
 
 def write_typed_nodes_artifact(
@@ -319,9 +361,15 @@ def _is_transcript_context(source_type: str, conversion_route: str) -> bool:
     return source_type == "subtitle_transcript" or conversion_route in {"media_to_transcript", "media_transcript"}
 
 
-def _transcript_metadata(text: str, cue_index: int) -> dict[str, object]:
+def _transcript_metadata(
+    text: str,
+    cue_index: int,
+    *,
+    raw_cue_confirmed: bool = False,
+    allow_name_label: bool = False,
+) -> dict[str, object]:
     metadata: dict[str, object] = {"cue_index": cue_index}
-    speaker = _speaker_name(text)
+    speaker = _speaker_name(text, require_likely=not raw_cue_confirmed, allow_name_label=allow_name_label)
     if speaker:
         metadata["speaker"] = speaker
     return metadata
@@ -346,32 +394,87 @@ def _normalized_transcript_cue_texts(cue_texts: Sequence[str] | None) -> tuple[s
     return tuple(_normalize_transcript_text(text) for text in cue_texts if _normalize_transcript_text(text))
 
 
-def _matched_transcript_cue_index(text: str, cue_texts: tuple[str, ...], used_indices: set[int]) -> int | None:
-    if not cue_texts:
+def _transcript_candidate_counts(blocks: Sequence[_ParsedBlock]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for block in blocks:
+        if block.node_type == "paragraph":
+            for candidate in _transcript_match_candidates(block.text):
+                counts[candidate] = counts.get(candidate, 0) + 1
+    return counts
+
+
+def _remove_transcript_candidates(counts: dict[str, int], text: str) -> None:
+    for candidate in _transcript_match_candidates(text):
+        remaining = counts.get(candidate, 0) - 1
+        if remaining > 0:
+            counts[candidate] = remaining
+        else:
+            counts.pop(candidate, None)
+
+
+def _matched_next_transcript_cue_index(
+    text: str,
+    cue_texts: tuple[str, ...],
+    next_index: int,
+    *,
+    remaining_candidates: Mapping[str, int],
+) -> int | None:
+    if not cue_texts or next_index < 1 or next_index > len(cue_texts):
         return None
-    candidates = {_normalize_transcript_text(text), _normalize_transcript_text(_strip_speaker_prefix(text))}
-    for index, cue_text in enumerate(cue_texts, start=1):
-        if index not in used_indices and cue_text in candidates:
+    candidates = _transcript_match_candidates(text)
+    if cue_texts[next_index - 1] in candidates:
+        return next_index
+    for index in range(next_index + 1, len(cue_texts) + 1):
+        if cue_texts[index - 1] in candidates:
+            skipped_cues = cue_texts[next_index - 1 : index - 1]
+            if any(remaining_candidates.get(cue_text, 0) > 0 for cue_text in skipped_cues):
+                return None
             return index
     return None
+
+
+def _transcript_match_candidates(text: str) -> frozenset[str]:
+    candidates = {
+        _normalize_transcript_text(text),
+        _normalize_transcript_text(_strip_speaker_prefix(text, require_likely=False)),
+    }
+    return frozenset(candidate for candidate in candidates if candidate)
 
 
 def _normalize_transcript_text(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
-def _strip_speaker_prefix(text: str) -> str:
+def _strip_speaker_prefix(text: str, *, require_likely: bool = True) -> str:
     match = _SPEAKER_RE.match(text)
     if match is None:
+        return text
+    if require_likely and not _is_likely_speaker_label(match.group(1).strip()):
         return text
     return text[match.end() :].strip()
 
 
-def _speaker_name(text: str) -> str | None:
+def _speaker_name(text: str, *, require_likely: bool = True, allow_name_label: bool = False) -> str | None:
     match = _SPEAKER_RE.match(text)
     if match is None:
         return None
-    return match.group(1).strip()
+    speaker = match.group(1).strip()
+    if require_likely and not _is_likely_speaker_label(speaker, allow_name_label=allow_name_label):
+        return None
+    return speaker
+
+
+def _is_likely_speaker_label(label: str, *, allow_name_label: bool = False) -> bool:
+    stripped = label.strip()
+    if _SPEAKER_LABEL_RE.match(stripped):
+        return True
+    if not allow_name_label:
+        return False
+    return stripped not in _NON_SPEAKER_LABELS and bool(_SPEAKER_NAME_LABEL_RE.match(stripped))
+
+
+def _allows_name_speaker_labels(conversion_route: str) -> bool:
+    return conversion_route in {"media_to_transcript", "media_transcript"}
 
 
 def _is_closing_fence(line: str, fence_char: str, fence_len: int) -> bool:

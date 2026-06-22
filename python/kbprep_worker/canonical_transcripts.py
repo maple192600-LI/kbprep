@@ -6,7 +6,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-_TIMING_RE = re.compile(r"^\s*(?P<start>\S+)\s+-->\s+(?P<end>\S+)")
+_TRANSCRIPT_ENCODINGS = ("utf-8-sig", "utf-8", "gbk", "gb2312")
+_TIMING_RE = re.compile(r"^\s*(?P<start>\S+)\s+-->\s+(?P<end>\S+)(?:\s+(?P<settings>.+?))?\s*$")
+_WEBVTT_DIRECTIVES = ("WEBVTT", "NOTE", "STYLE", "REGION")
+_CUE_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 
 
 @dataclass(frozen=True)
@@ -15,15 +18,21 @@ class TranscriptCue:
     start_time: str
     end_time: str
     text: str
+    settings: str = ""
 
 
 def read_transcript_cues(input_path: Path) -> list[TranscriptCue]:
     """Read SRT/WebVTT-style timed cues from a source transcript file."""
     try:
-        text = input_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        raw = input_path.read_bytes()
+    except OSError:
         return []
-    return parse_transcript_cues(text)
+    for encoding in _TRANSCRIPT_ENCODINGS:
+        try:
+            return parse_transcript_cues(raw.decode(encoding))
+        except UnicodeDecodeError:
+            continue
+    return []
 
 
 def parse_transcript_cues(text: str) -> list[TranscriptCue]:
@@ -37,7 +46,7 @@ def parse_transcript_cues(text: str) -> list[TranscriptCue]:
 
 
 def _transcript_blocks(text: str) -> list[list[str]]:
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    normalized = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     blocks: list[list[str]] = []
     for raw_block in re.split(r"\n\s*\n", normalized):
         lines = [line.strip() for line in raw_block.split("\n") if line.strip()]
@@ -56,11 +65,22 @@ def _parse_transcript_block(lines: list[str], fallback_index: int) -> Transcript
             start_time=timing.group("start"),
             end_time=timing.group("end"),
             text=" ".join(lines[index + 1 :]).strip(),
+            settings=(timing.group("settings") or "").strip(),
         )
     return None
 
 
 def _cue_identifier(lines: list[str], timing_index: int, fallback_index: int) -> str:
     if timing_index > 0:
-        return lines[timing_index - 1]
+        candidate = lines[timing_index - 1].strip()
+        if _is_valid_cue_identifier(candidate):
+            return candidate
     return str(fallback_index)
+
+
+def _is_valid_cue_identifier(candidate: str) -> bool:
+    if not candidate or "-->" in candidate or len(candidate) > 120:
+        return False
+    upper = candidate.upper()
+    first_token = upper.split(maxsplit=1)[0]
+    return first_token not in _WEBVTT_DIRECTIVES and _CUE_IDENTIFIER_RE.match(candidate) is not None

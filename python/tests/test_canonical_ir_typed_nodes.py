@@ -124,6 +124,78 @@ Host: Welcome to the lesson.
         self.assertEqual([node.node_type for node in nodes], ["heading", "paragraph", "transcript_cue"])
         self.assertEqual(nodes[2].metadata, {"cue_index": 1, "speaker": "Host"})
 
+    def test_parser_does_not_treat_generic_colon_notice_as_speaker_cue(self) -> None:
+        markdown = "注意: 这是说明\n\nHost: Welcome\n"
+
+        nodes = build_typed_nodes_from_markdown(markdown, source_type="subtitle_transcript")
+
+        self.assertEqual([node.node_type for node in nodes], ["paragraph", "transcript_cue"])
+        self.assertEqual(nodes[0].metadata, {})
+        self.assertEqual(nodes[1].metadata, {"cue_index": 1, "speaker": "Host"})
+
+    def test_parser_allows_common_asr_speaker_labels_without_raw_cues(self) -> None:
+        markdown = "Speaker 1: Welcome\n\n主持人: 欢迎\n\n讲者: 继续\n\n问: 问题\n\n答: 回答\n"
+
+        nodes = build_typed_nodes_from_markdown(markdown, source_type="subtitle_transcript")
+
+        self.assertEqual(
+            [node.node_type for node in nodes],
+            ["transcript_cue", "transcript_cue", "transcript_cue", "transcript_cue", "transcript_cue"],
+        )
+        self.assertEqual(nodes[0].metadata, {"cue_index": 1, "speaker": "Speaker 1"})
+        self.assertEqual(nodes[1].metadata, {"cue_index": 2, "speaker": "主持人"})
+        self.assertEqual(nodes[2].metadata, {"cue_index": 3, "speaker": "讲者"})
+        self.assertEqual(nodes[3].metadata, {"cue_index": 4, "speaker": "问"})
+        self.assertEqual(nodes[4].metadata, {"cue_index": 5, "speaker": "答"})
+
+    def test_parser_preserves_raw_cue_confirmed_name_speaker_metadata(self) -> None:
+        nodes = build_typed_nodes_from_markdown(
+            "Alice: Hello\n",
+            source_type="subtitle_transcript",
+            transcript_cue_texts=["Alice: Hello"],
+        )
+
+        self.assertEqual([node.node_type for node in nodes], ["transcript_cue"])
+        self.assertEqual(nodes[0].metadata, {"cue_index": 1, "speaker": "Alice"})
+
+    def test_parser_allows_name_speakers_for_media_transcript_without_raw_cues(self) -> None:
+        nodes = build_typed_nodes_from_markdown(
+            "Alice: Hello there\n\nBob: Hi",
+            source_type="subtitle_transcript",
+            conversion_route="media_to_transcript",
+        )
+
+        self.assertEqual([node.node_type for node in nodes], ["transcript_cue", "transcript_cue"])
+        self.assertEqual(nodes[0].metadata, {"cue_index": 1, "speaker": "Alice"})
+        self.assertEqual(nodes[1].metadata, {"cue_index": 2, "speaker": "Bob"})
+
+    def test_parser_does_not_match_later_raw_cue_when_converted_text_is_reordered(self) -> None:
+        markdown = "Guest: Second cue\n\nHost: First cue\n"
+
+        nodes = build_typed_nodes_from_markdown(
+            markdown,
+            source_type="subtitle_transcript",
+            transcript_cue_texts=["Host: First cue", "Guest: Second cue"],
+        )
+
+        self.assertEqual([node.node_type for node in nodes], ["paragraph", "transcript_cue"])
+        self.assertEqual(nodes[0].metadata, {})
+        self.assertEqual(nodes[1].metadata, {"cue_index": 1, "speaker": "Host"})
+
+    def test_parser_does_not_skip_later_raw_cue_that_appears_after_reordered_text(self) -> None:
+        markdown = "Host: First cue\n\nHost: Third cue\n\nGuest: Second cue\n"
+
+        nodes = build_typed_nodes_from_markdown(
+            markdown,
+            source_type="subtitle_transcript",
+            transcript_cue_texts=["Host: First cue", "Guest: Second cue", "Host: Third cue"],
+        )
+
+        self.assertEqual([node.node_type for node in nodes], ["transcript_cue", "paragraph", "transcript_cue"])
+        self.assertEqual(nodes[0].metadata, {"cue_index": 1, "speaker": "Host"})
+        self.assertEqual(nodes[1].metadata, {})
+        self.assertEqual(nodes[2].metadata, {"cue_index": 2, "speaker": "Guest"})
+
     def test_writes_typed_nodes_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)

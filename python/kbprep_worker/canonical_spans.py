@@ -35,8 +35,8 @@ SOURCE_SPAN_EVIDENCE_KEYS = frozenset({
     "precision",
 })
 SOURCE_LINE_LOCATION_KEYS = frozenset({"source_line_start", "source_line_end"})
-TRANSCRIPT_TIMING_LOCATION_KEYS = frozenset({"cue_id", "start_time", "end_time"})
-TRANSCRIPT_CUE_LOCATION_KEYS = TRANSCRIPT_TIMING_LOCATION_KEYS | {"cue_index"}
+TRANSCRIPT_TIMING_LOCATION_KEYS = frozenset({"cue_id", "start_time", "end_time", "cue_settings"})
+TRANSCRIPT_CUE_LOCATION_KEYS = TRANSCRIPT_TIMING_LOCATION_KEYS | {"cue_index", "cue_settings"}
 SUPPORTED_PRECISIONS = frozenset({
     "converted_line_range",
     "source_line_range",
@@ -53,6 +53,7 @@ SUPPORTED_SOURCE_KINDS = frozenset({
     "html",
     "epub",
     "structured_data",
+    "notebook",
     "code",
     "youtube",
     "unknown",
@@ -217,7 +218,9 @@ def _source_kind(input_path: Path, source_type: str, converter: str, conversion_
     ext = input_path.suffix.lower()
     if ext in SUBTITLE_EXTENSIONS or _is_transcript_context(source_type, conversion_route):
         return "transcript"
-    if ext in TABLE_TEXT_EXTENSIONS or ext in JSON_EXTENSIONS | NOTEBOOK_EXTENSIONS:
+    if ext in NOTEBOOK_EXTENSIONS:
+        return "notebook"
+    if ext in TABLE_TEXT_EXTENSIONS or ext in JSON_EXTENSIONS:
         return "structured_data"
     if ext in MARKDOWN_EXTENSIONS | PLAIN_TEXT_EXTENSIONS:
         return "markdown_text"
@@ -266,6 +269,8 @@ def _add_transcript_location(location: dict[str, object], node: Any, transcript_
         location["cue_id"] = cue.cue_id
         location["start_time"] = cue.start_time
         location["end_time"] = cue.end_time
+        if cue.settings:
+            location["cue_settings"] = cue.settings
 
 
 def _span_evidence(

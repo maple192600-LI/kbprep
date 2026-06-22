@@ -1,5 +1,7 @@
 # Canonical IR Typed Nodes Implementation Plan
 
+> Supersession note, 2026-06-23: this C1 plan described the pre-SourceSpan slice where `coverage.source_spans_available` stayed false. The later C1b2/C2 SourceSpan work supersedes that statement: current Canonical IR may write `canonical_ir/source_spans.json`, and `coverage.source_spans_available` is true when the artifact validates successfully. Treat the old false-coverage steps below as historical context, not current implementation guidance.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add the first shipped Canonical IR TypedNode artifact so converted Markdown produces auditable structure nodes without changing publication behavior.

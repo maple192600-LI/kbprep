@@ -15,6 +15,7 @@ from .canonical_nodes import (
     TYPED_NODE_KEYS,
     write_typed_nodes_artifact,
 )
+from .canonical_routes import canonical_conversion_route, canonical_converter, dict_or_empty
 from .canonical_spans import (
     validate_source_spans_artifact,
     validate_source_spans_reference,
@@ -145,15 +146,16 @@ def _write_canonical_artifacts(
     converted_path: Path,
     conversion_report: dict[str, Any],
 ) -> CanonicalArtifactState:
-    route_decision = _dict_or_empty(conversion_report.get("route_decision"))
+    route_decision = dict_or_empty(conversion_report.get("route_decision"))
     document_id = _document_id(file_hash, input_path)
-    conversion_route = str(route_decision.get("actual_route") or conversion_report.get("converter") or "")
+    converter = canonical_converter(conversion_report, route_decision)
+    conversion_route = canonical_conversion_route(conversion_report, route_decision)
     typed_path, typed_available = _write_validated_typed_nodes(
         run_dir, document_id, input_path, converted_path, source_type, conversion_route,
     )
     spans_path, spans_available = _write_validated_source_spans(
         run_dir, document_id, input_path, converted_path, typed_path, source_type,
-        str(conversion_report.get("converter") or ""), conversion_route,
+        converter, conversion_route,
     )
     return CanonicalArtifactState(
         document_id=document_id,
@@ -298,10 +300,6 @@ def _read_required_manifest(
     return data
 
 
-def _dict_or_empty(value: object) -> dict[str, Any]:
-    return value if isinstance(value, dict) else {}
-
-
 def _document_id(file_hash: str, input_path: Path) -> str:
     if file_hash:
         return f"doc_{file_hash[:16]}"
@@ -324,8 +322,8 @@ def _conversion_snapshot(
     route_decision: dict[str, Any],
 ) -> dict[str, Any]:
     return {
-        "converter": conversion_report.get("converter"),
-        "actual_route": route_decision.get("actual_route"),
+        "converter": canonical_converter(conversion_report, route_decision),
+        "actual_route": canonical_conversion_route(conversion_report, route_decision),
         "route_decision": route_decision,
         "route_decision_hash": _stable_hash(route_decision),
     }

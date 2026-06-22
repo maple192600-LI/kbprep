@@ -156,6 +156,77 @@ class CanonicalIrSchemaTests(unittest.TestCase):
             self.assertEqual(document_manifest["converted_md"], "converted.md")
             self.assertEqual(validate_canonical_ir_manifests(run_dir, converted_path=converted), [])
 
+    def test_writer_uses_actual_route_for_source_span_conversion_route(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "source.pdf"
+            converted = run_dir / "converted.md"
+            source.write_text("pdf source placeholder", encoding="utf-8")
+            converted.write_text("# Extracted\n", encoding="utf-8")
+            (run_dir / "conversion_report.json").write_text(
+                json.dumps({
+                    "converter": "mineru",
+                    "converted_md": str(converted),
+                    "route_decision": {
+                        "actual_converter": "mineru",
+                        "actual_route": "mineru_ocr",
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (run_dir / "diagnosis_report.json").write_text("{}", encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="pdf_like",
+                file_hash="a" * 64,
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            source_spans = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(source_spans["spans"][0]["evidence"]["converter"], "mineru")
+        self.assertEqual(source_spans["spans"][0]["evidence"]["conversion_route"], "mineru_ocr")
+
+    def test_writer_falls_back_to_actual_converter_before_report_converter_when_route_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "source.txt"
+            converted = run_dir / "converted.md"
+            source.write_text("source text", encoding="utf-8")
+            converted.write_text("source text\n", encoding="utf-8")
+            (run_dir / "conversion_report.json").write_text(
+                json.dumps({
+                    "converter": "legacy_name",
+                    "converted_md": str(converted),
+                    "route_decision": {
+                        "actual_converter": "direct_text",
+                    },
+                }),
+                encoding="utf-8",
+            )
+            (run_dir / "diagnosis_report.json").write_text("{}", encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="markdown_note",
+                file_hash="b" * 64,
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            source_spans = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+            manifest = json.loads((run_dir / "canonical_ir" / "manifest.json").read_text(encoding="utf-8"))
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertEqual(source_spans["spans"][0]["evidence"]["converter"], "direct_text")
+        self.assertEqual(source_spans["spans"][0]["evidence"]["conversion_route"], "direct_text")
+        self.assertEqual(manifest["conversion"]["actual_route"], "direct_text")
+        self.assertEqual(issues, [])
+
     def test_validator_reports_missing_required_canonical_fields(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
@@ -673,8 +744,220 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
             issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
 
-        self.assertTrue(any(issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID" for issue in issues))
-        self.assertTrue(any("precision" in issue.message for issue in issues))
+        self.assertEqual(
+            [issue.message for issue in issues if issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID"],
+            ["source_line_range precision cannot include transcript cue fields"],
+        )
+
+    def test_validator_rejects_transcript_timing_precision_with_source_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("Host: Welcome\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            typed_payload = _typed_nodes_payload(
+                nodes=[{
+                    "node_id": "n_000001",
+                    "ordinal": 1,
+                    "type": "transcript_cue",
+                    "text": "Host: Welcome",
+                    "metadata": {"cue_index": 1, "speaker": "Host"},
+                }],
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(json.dumps(typed_payload), encoding="utf-8")
+            bad_span = {
+                "span_id": "s_000001",
+                "node_id": "n_000001",
+                "source_kind": "transcript",
+                "location": {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "source_line_start": 1,
+                    "source_line_end": 1,
+                    "cue_index": 1,
+                    "cue_id": "1",
+                    "start_time": "00:00:01,000",
+                    "end_time": "00:00:03,000",
+                },
+                "evidence": {
+                    "source_type": "subtitle_transcript",
+                    "converter": "direct_text",
+                    "conversion_route": "direct_text",
+                    "source_kind": "transcript",
+                    "precision": "transcript_cue_timing",
+                },
+            }
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload(spans=[bad_span])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertEqual(
+            [issue.message for issue in issues if issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID"],
+            ["transcript_cue_timing precision cannot include source line range"],
+        )
+
+    def test_validator_rejects_converted_line_precision_with_native_locations(self):
+        cases = [
+            (
+                "source line range requires source_line_range precision",
+                {
+                    "span_id": "s_000001",
+                    "node_id": "n_000001",
+                    "source_kind": "markdown_text",
+                    "location": {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "source_line_start": 1,
+                        "source_line_end": 1,
+                    },
+                    "evidence": {
+                        "source_type": "markdown_note",
+                        "converter": "direct_text",
+                        "conversion_route": "direct_text",
+                        "source_kind": "markdown_text",
+                        "precision": "converted_line_range",
+                    },
+                },
+            ),
+            (
+                "transcript timing requires transcript_cue_timing precision",
+                {
+                    "span_id": "s_000001",
+                    "node_id": "n_000001",
+                    "source_kind": "transcript",
+                    "location": {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "cue_index": 1,
+                        "cue_id": "1",
+                    },
+                    "evidence": {
+                        "source_type": "subtitle_transcript",
+                        "converter": "direct_text",
+                        "conversion_route": "direct_text",
+                        "source_kind": "transcript",
+                        "precision": "converted_line_range",
+                    },
+                },
+            ),
+            (
+                "transcript timing requires transcript_cue_timing precision",
+                {
+                    "span_id": "s_000001",
+                    "node_id": "n_000001",
+                    "source_kind": "transcript",
+                    "location": {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "cue_index": 1,
+                        "start_time": "00:00:01,000",
+                        "end_time": "00:00:03,000",
+                    },
+                    "evidence": {
+                        "source_type": "subtitle_transcript",
+                        "converter": "direct_text",
+                        "conversion_route": "direct_text",
+                        "source_kind": "transcript",
+                        "precision": "converted_line_range",
+                    },
+                },
+            ),
+            (
+                "transcript timing requires transcript_cue_timing precision",
+                {
+                    "span_id": "s_000001",
+                    "node_id": "n_000001",
+                    "source_kind": "transcript",
+                    "location": {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "cue_index": 1,
+                        "cue_settings": "align:start",
+                    },
+                    "evidence": {
+                        "source_type": "subtitle_transcript",
+                        "converter": "direct_text",
+                        "conversion_route": "direct_text",
+                        "source_kind": "transcript",
+                        "precision": "converted_line_range",
+                    },
+                },
+            ),
+        ]
+        for expected_message, bad_span in cases:
+            with self.subTest(expected_message=expected_message):
+                with tempfile.TemporaryDirectory() as tmp:
+                    run_dir = Path(tmp)
+                    converted = run_dir / "converted.md"
+                    converted.write_text("Host: Welcome\n", encoding="utf-8")
+                    _write_valid_manifest_pair(
+                        run_dir,
+                        converted,
+                        artifacts={
+                            "converted_md": "converted.md",
+                            "typed_nodes": "canonical_ir/typed_nodes.json",
+                            "source_spans": "canonical_ir/source_spans.json",
+                        },
+                        coverage={"typed_nodes_available": True, "source_spans_available": True},
+                    )
+                    (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                        json.dumps(_typed_nodes_payload()),
+                        encoding="utf-8",
+                    )
+                    (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                        json.dumps(_source_spans_payload(spans=[bad_span])),
+                        encoding="utf-8",
+                    )
+
+                    issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+                self.assertEqual(
+                    [issue.message for issue in issues if issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID"],
+                    [expected_message],
+                )
+
+    def test_validator_rejects_source_spans_artifact_when_coverage_false(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": False},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload()),
+                encoding="utf-8",
+            )
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload()),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_MANIFEST_INVALID" for issue in issues))
+        self.assertTrue(
+            any("coverage.source_spans_available must be true when artifacts.source_spans exists" in issue.message for issue in issues)
+        )
 
     def test_validator_rejects_source_span_node_mismatch(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -816,11 +1099,12 @@ def _transcript_span_with_conflicting_precision() -> dict[str, object]:
     return {
         "span_id": "s_000001",
         "node_id": "n_000001",
-        "source_kind": "transcript",
+        "source_kind": "markdown_text",
         "location": {
             "converted_line_start": 1,
             "converted_line_end": 1,
             "cue_index": 1,
+            "cue_id": "1",
             "source_line_start": 1,
             "source_line_end": 1,
             "start_time": "00:00:01,000",
@@ -830,7 +1114,7 @@ def _transcript_span_with_conflicting_precision() -> dict[str, object]:
             "source_type": "subtitle_transcript",
             "converter": "direct_text",
             "conversion_route": "direct_text",
-            "source_kind": "transcript",
+            "source_kind": "markdown_text",
             "precision": "source_line_range",
         },
     }
