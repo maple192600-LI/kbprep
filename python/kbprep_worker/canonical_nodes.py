@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic_io import atomic_write_json
+from .canonical_transcripts import read_transcript_cues
 
 CANONICAL_IR_TYPED_NODES_SCHEMA = "kbprep.canonical_ir_typed_nodes.v1"
 SUPPORTED_NODE_TYPES = frozenset({
@@ -20,6 +21,7 @@ SUPPORTED_NODE_TYPES = frozenset({
     "formula",
     "figure",
     "metadata",
+    "transcript_cue",
 })
 TYPED_NODE_KEYS = frozenset({"node_id", "ordinal", "type", "text", "metadata"})
 
@@ -29,6 +31,7 @@ _UNORDERED_LIST_RE = re.compile(r"^\s*[-*+]\s+(.+)$")
 _TABLE_SEPARATOR_CELL_RE = re.compile(r"^\s*:?-{3,}:?\s*$")
 _FIGURE_RE = re.compile(r'^\s*!\[([^\]]*)\]\((\S+?)(?:\s+"([^"]*)")?\)\s*$')
 _INLINE_FORMULA_RE = re.compile(r"^\$(?!\$)(.+?)(?<!\\)\$$")
+_SPEAKER_RE = re.compile(r"^\s*([^:\n：]{1,40})\s*[:：]\s+\S+")
 
 
 @dataclass(frozen=True)
@@ -38,29 +41,72 @@ class TypedNode:
     node_type: str
     text: str
     metadata: Mapping[str, object]
+    line_start: int
+    line_end: int
 
 
-def build_typed_nodes_from_markdown(markdown: str) -> list[TypedNode]:
+def build_typed_nodes_from_markdown(
+    markdown: str,
+    *,
+    source_type: str = "",
+    conversion_route: str = "",
+    transcript_cue_texts: Sequence[str] | None = None,
+) -> list[TypedNode]:
     """Build deterministic C1 typed nodes from Markdown blocks."""
     lines = markdown.splitlines()
     nodes: list[TypedNode] = []
     index = 0
+    cue_index = 0
+    transcript_context = _is_transcript_context(source_type, conversion_route)
+    cue_texts = _normalized_transcript_cue_texts(transcript_cue_texts)
+    used_cue_indices: set[int] = set()
     while index < len(lines):
         line = lines[index]
         if not line.strip():
             index += 1
             continue
+        start_index = index
         node_type, text, metadata, index = _consume_block(lines, index)
         if text.strip():
-            nodes.append(_typed_node(len(nodes) + 1, node_type, text, metadata))
+            if transcript_context and node_type == "paragraph":
+                matched_cue_index = _matched_transcript_cue_index(text, cue_texts, used_cue_indices)
+                if matched_cue_index is not None:
+                    used_cue_indices.add(matched_cue_index)
+                    node_type = "transcript_cue"
+                    metadata = _transcript_metadata(text, matched_cue_index)
+                elif not cue_texts and _speaker_name(text) is not None:
+                    cue_index += 1
+                    node_type = "transcript_cue"
+                    metadata = _transcript_metadata(text, cue_index)
+            nodes.append(_typed_node(len(nodes) + 1, node_type, text, metadata, start_index + 1, index))
     return nodes
 
 
-def write_typed_nodes_artifact(*, run_dir: Path, document_id: str, converted_path: Path) -> Path:
+def write_typed_nodes_artifact(
+    *,
+    run_dir: Path,
+    document_id: str,
+    converted_path: Path,
+    source_type: str = "",
+    conversion_route: str = "",
+    input_path: Path | None = None,
+    transcript_cue_texts: Sequence[str] | None = None,
+) -> Path:
     """Write ``canonical_ir/typed_nodes.json`` for the converted Markdown."""
     artifact_path = run_dir / "canonical_ir" / "typed_nodes.json"
     markdown = converted_path.read_text(encoding="utf-8")
-    nodes = build_typed_nodes_from_markdown(markdown)
+    cue_texts = _artifact_transcript_cue_texts(
+        input_path,
+        source_type,
+        conversion_route,
+        transcript_cue_texts,
+    )
+    nodes = build_typed_nodes_from_markdown(
+        markdown,
+        source_type=source_type,
+        conversion_route=conversion_route,
+        transcript_cue_texts=cue_texts,
+    )
     payload = {
         "schema": CANONICAL_IR_TYPED_NODES_SCHEMA,
         "document_id": document_id,
@@ -269,6 +315,65 @@ def _is_formula_start(line: str) -> bool:
     return _INLINE_FORMULA_RE.match(stripped) is not None
 
 
+def _is_transcript_context(source_type: str, conversion_route: str) -> bool:
+    return source_type == "subtitle_transcript" or conversion_route in {"media_to_transcript", "media_transcript"}
+
+
+def _transcript_metadata(text: str, cue_index: int) -> dict[str, object]:
+    metadata: dict[str, object] = {"cue_index": cue_index}
+    speaker = _speaker_name(text)
+    if speaker:
+        metadata["speaker"] = speaker
+    return metadata
+
+
+def _artifact_transcript_cue_texts(
+    input_path: Path | None,
+    source_type: str,
+    conversion_route: str,
+    transcript_cue_texts: Sequence[str] | None,
+) -> Sequence[str] | None:
+    if transcript_cue_texts is not None:
+        return transcript_cue_texts
+    if input_path is None or not _is_transcript_context(source_type, conversion_route):
+        return None
+    return [cue.text for cue in read_transcript_cues(input_path)]
+
+
+def _normalized_transcript_cue_texts(cue_texts: Sequence[str] | None) -> tuple[str, ...]:
+    if cue_texts is None:
+        return ()
+    return tuple(_normalize_transcript_text(text) for text in cue_texts if _normalize_transcript_text(text))
+
+
+def _matched_transcript_cue_index(text: str, cue_texts: tuple[str, ...], used_indices: set[int]) -> int | None:
+    if not cue_texts:
+        return None
+    candidates = {_normalize_transcript_text(text), _normalize_transcript_text(_strip_speaker_prefix(text))}
+    for index, cue_text in enumerate(cue_texts, start=1):
+        if index not in used_indices and cue_text in candidates:
+            return index
+    return None
+
+
+def _normalize_transcript_text(text: str) -> str:
+    return " ".join(text.split()).strip()
+
+
+def _strip_speaker_prefix(text: str) -> str:
+    match = _SPEAKER_RE.match(text)
+    if match is None:
+        return text
+    return text[match.end() :].strip()
+
+
+def _speaker_name(text: str) -> str | None:
+    match = _SPEAKER_RE.match(text)
+    if match is None:
+        return None
+    return match.group(1).strip()
+
+
 def _is_closing_fence(line: str, fence_char: str, fence_len: int) -> bool:
     leading_spaces = len(line) - len(line.lstrip(" "))
     if leading_spaces > 3:
@@ -290,13 +395,22 @@ def _list_item_text(line: str) -> str | None:
     return None
 
 
-def _typed_node(ordinal: int, node_type: str, text: str, metadata: dict[str, object]) -> TypedNode:
+def _typed_node(
+    ordinal: int,
+    node_type: str,
+    text: str,
+    metadata: dict[str, object],
+    line_start: int,
+    line_end: int,
+) -> TypedNode:
     return TypedNode(
         node_id=f"n_{ordinal:06d}",
         ordinal=ordinal,
         node_type=node_type,
         text=text,
         metadata=metadata,
+        line_start=line_start,
+        line_end=line_end,
     )
 
 

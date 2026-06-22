@@ -82,6 +82,31 @@ def _typed_nodes_payload(**overrides: object) -> dict[str, object]:
     return payload
 
 
+def _source_spans_payload(**overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema": "kbprep.canonical_ir_source_spans.v1",
+        "document_id": "doc_test",
+        "source_artifact": "converted.md",
+        "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+        "span_count": 1,
+        "spans": [{
+            "span_id": "s_000001",
+            "node_id": "n_000001",
+            "source_kind": "markdown_text",
+            "location": {"converted_line_start": 1, "converted_line_end": 1},
+            "evidence": {
+                "source_type": "markdown_note",
+                "converter": "direct_text",
+                "conversion_route": "direct_text",
+                "source_kind": "markdown_text",
+                "precision": "converted_line_range",
+            },
+        }],
+    }
+    payload.update(overrides)
+    return payload
+
+
 class CanonicalIrSchemaTests(unittest.TestCase):
     def test_writer_outputs_manifest_that_passes_shared_validator(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -117,11 +142,16 @@ class CanonicalIrSchemaTests(unittest.TestCase):
             self.assertEqual(canonical_manifest["artifacts"]["conversion_report"], "conversion_report.json")
             self.assertEqual(canonical_manifest["artifacts"]["diagnosis_report"], "diagnosis_report.json")
             self.assertEqual(canonical_manifest["artifacts"]["typed_nodes"], "canonical_ir/typed_nodes.json")
+            self.assertEqual(canonical_manifest["artifacts"]["source_spans"], "canonical_ir/source_spans.json")
             self.assertTrue(canonical_manifest["coverage"]["typed_nodes_available"])
+            self.assertTrue(canonical_manifest["coverage"]["source_spans_available"])
             typed_nodes = json.loads((run_dir / "canonical_ir" / "typed_nodes.json").read_text(encoding="utf-8"))
             self.assertEqual(typed_nodes["schema"], "kbprep.canonical_ir_typed_nodes.v1")
             self.assertEqual(typed_nodes["source_artifact"], "converted.md")
             self.assertEqual(typed_nodes["document_id"], canonical_manifest["document_id"])
+            source_spans = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+            self.assertEqual(source_spans["schema"], "kbprep.canonical_ir_source_spans.v1")
+            self.assertEqual(source_spans["typed_nodes_artifact"], "canonical_ir/typed_nodes.json")
             self.assertEqual(document_manifest["canonical_ir_manifest"], "canonical_ir/manifest.json")
             self.assertEqual(document_manifest["converted_md"], "converted.md")
             self.assertEqual(validate_canonical_ir_manifests(run_dir, converted_path=converted), [])
@@ -491,6 +521,202 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
         self.assertEqual(issues, [])
 
+    def test_validator_accepts_source_spans_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload()),
+                encoding="utf-8",
+            )
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload()),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertEqual(issues, [])
+
+    def test_validator_rejects_source_spans_available_without_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(run_dir, converted, coverage={"source_spans_available": True})
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_MANIFEST_INVALID" for issue in issues))
+        self.assertTrue(any("coverage.source_spans_available requires artifacts.source_spans" in issue.message for issue in issues))
+
+    def test_validator_rejects_source_spans_artifact_path_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"source_spans": "../source_spans.json"},
+                coverage={"source_spans_available": True},
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_MANIFEST_INVALID" for issue in issues))
+
+    def test_validator_rejects_invalid_source_spans_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload()),
+                encoding="utf-8",
+            )
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload(schema="wrong.schema")),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID" for issue in issues))
+
+    def test_validator_rejects_source_span_with_malformed_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload()),
+                encoding="utf-8",
+            )
+            bad_span = {
+                "span_id": "s_000001",
+                "node_id": "n_000001",
+                "source_kind": "markdown_text",
+                "location": {"converted_line_start": 1, "converted_line_end": 1},
+                "evidence": {"foo": "bar"},
+            }
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload(spans=[bad_span])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID" for issue in issues))
+        self.assertTrue(any("source span evidence" in issue.message for issue in issues))
+
+    def test_validator_rejects_source_line_precision_with_transcript_timing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("Host: Welcome\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            typed_payload = _typed_nodes_payload(
+                nodes=[{
+                    "node_id": "n_000001",
+                    "ordinal": 1,
+                    "type": "transcript_cue",
+                    "text": "Host: Welcome",
+                    "metadata": {"cue_index": 1, "speaker": "Host"},
+                }],
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(json.dumps(typed_payload), encoding="utf-8")
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload(spans=[_transcript_span_with_conflicting_precision()])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID" for issue in issues))
+        self.assertTrue(any("precision" in issue.message for issue in issues))
+
+    def test_validator_rejects_source_span_node_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={
+                    "converted_md": "converted.md",
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                coverage={"typed_nodes_available": True, "source_spans_available": True},
+            )
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps(_typed_nodes_payload()),
+                encoding="utf-8",
+            )
+            bad_span = {
+                "span_id": "s_000001",
+                "node_id": "n_999999",
+                "source_kind": "markdown_text",
+                "location": {"converted_line_start": 1, "converted_line_end": 1},
+                "evidence": {
+                    "source_type": "markdown_note",
+                    "converter": "direct_text",
+                    "conversion_route": "direct_text",
+                    "source_kind": "markdown_text",
+                    "precision": "converted_line_range",
+                },
+            }
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps(_source_spans_payload(spans=[bad_span])),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any(issue.code == "E_CANONICAL_IR_SOURCE_SPANS_INVALID" for issue in issues))
+
     def test_validator_rejects_non_integer_typed_node_count(self):
         invalid_counts = (True, "1", -1)
         for invalid_count in invalid_counts:
@@ -585,16 +811,29 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
         self.assertTrue(any(issue.code == "E_CANONICAL_IR_TYPED_NODES_INVALID" for issue in issues))
 
-    def test_validator_rejects_source_spans_claim_for_c1(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            run_dir = Path(tmp)
-            converted = run_dir / "converted.md"
-            converted.write_text("# Safe\n", encoding="utf-8")
-            _write_valid_manifest_pair(run_dir, converted, coverage={"source_spans_available": True})
 
-            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
-
-        self.assertTrue(any(issue.code == "E_CANONICAL_IR_MANIFEST_INVALID" for issue in issues))
+def _transcript_span_with_conflicting_precision() -> dict[str, object]:
+    return {
+        "span_id": "s_000001",
+        "node_id": "n_000001",
+        "source_kind": "transcript",
+        "location": {
+            "converted_line_start": 1,
+            "converted_line_end": 1,
+            "cue_index": 1,
+            "source_line_start": 1,
+            "source_line_end": 1,
+            "start_time": "00:00:01,000",
+            "end_time": "00:00:02,000",
+        },
+        "evidence": {
+            "source_type": "subtitle_transcript",
+            "converter": "direct_text",
+            "conversion_route": "direct_text",
+            "source_kind": "transcript",
+            "precision": "source_line_range",
+        },
+    }
 
 
 if __name__ == "__main__":

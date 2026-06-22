@@ -15,6 +15,11 @@ from .canonical_nodes import (
     TYPED_NODE_KEYS,
     write_typed_nodes_artifact,
 )
+from .canonical_spans import (
+    validate_source_spans_artifact,
+    validate_source_spans_reference,
+    write_source_spans_artifact,
+)
 
 CANONICAL_IR_MANIFEST_SCHEMA = "kbprep.canonical_ir_manifest.v1"
 DOCUMENT_MANIFEST_SCHEMA = "kbprep.document_manifest.v1"
@@ -26,6 +31,16 @@ class CanonicalIrValidationIssue:
     code: str
     message: str
     evidence: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class CanonicalArtifactState:
+    document_id: str
+    route_decision: dict[str, Any]
+    typed_nodes_path: Path
+    typed_nodes_available: bool
+    source_spans_path: Path
+    source_spans_available: bool
 
 
 def write_canonical_ir_manifests(
@@ -45,12 +60,13 @@ def write_canonical_ir_manifests(
     canonical_dir.mkdir(parents=True, exist_ok=True)
     canonical_manifest_path = canonical_dir / "manifest.json"
     document_manifest_path = run_dir / "document_manifest.json"
-    route_decision = _dict_or_empty(conversion_report.get("route_decision"))
-    document_id = _document_id(file_hash, input_path)
-    typed_nodes_path, typed_nodes_available = _write_validated_typed_nodes(
-        run_dir,
-        document_id,
-        converted_path,
+    artifact_state = _write_canonical_artifacts(
+        run_dir=run_dir,
+        input_path=input_path,
+        source_type=source_type,
+        file_hash=file_hash,
+        converted_path=converted_path,
+        conversion_report=conversion_report,
     )
     canonical_manifest = _canonical_manifest_payload(
         run_dir=run_dir,
@@ -58,26 +74,24 @@ def write_canonical_ir_manifests(
         source_type=source_type,
         file_hash=file_hash,
         file_size=file_size,
-        document_id=document_id,
+        document_id=artifact_state.document_id,
         conversion_report=conversion_report,
-        route_decision=route_decision,
-        typed_nodes_path=typed_nodes_path,
-        typed_nodes_available=typed_nodes_available,
+        route_decision=artifact_state.route_decision,
+        typed_nodes_path=artifact_state.typed_nodes_path,
+        typed_nodes_available=artifact_state.typed_nodes_available,
+        source_spans_path=artifact_state.source_spans_path,
+        source_spans_available=artifact_state.source_spans_available,
     )
     _write_json(canonical_manifest_path, canonical_manifest)
 
-    document_manifest = _document_manifest_payload(
+    _write_json(document_manifest_path, _document_manifest_payload(
         run_dir=run_dir,
         canonical_manifest_path=canonical_manifest_path,
         conversion_report_path=conversion_report_path,
         converted_path=converted_path,
         run_id=run_id,
-    )
-    _write_json(document_manifest_path, document_manifest)
-    return {
-        "canonical_ir_manifest": canonical_manifest_path,
-        "document_manifest": document_manifest_path,
-    }
+    ))
+    return {"canonical_ir_manifest": canonical_manifest_path, "document_manifest": document_manifest_path}
 
 
 def validate_canonical_ir_manifests(
@@ -122,11 +136,50 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     atomic_write_json(path, payload, indent=2, trailing_newline=False)
 
 
-def _write_validated_typed_nodes(run_dir: Path, document_id: str, converted_path: Path) -> tuple[Path, bool]:
+def _write_canonical_artifacts(
+    *,
+    run_dir: Path,
+    input_path: Path,
+    source_type: str,
+    file_hash: str,
+    converted_path: Path,
+    conversion_report: dict[str, Any],
+) -> CanonicalArtifactState:
+    route_decision = _dict_or_empty(conversion_report.get("route_decision"))
+    document_id = _document_id(file_hash, input_path)
+    conversion_route = str(route_decision.get("actual_route") or conversion_report.get("converter") or "")
+    typed_path, typed_available = _write_validated_typed_nodes(
+        run_dir, document_id, input_path, converted_path, source_type, conversion_route,
+    )
+    spans_path, spans_available = _write_validated_source_spans(
+        run_dir, document_id, input_path, converted_path, typed_path, source_type,
+        str(conversion_report.get("converter") or ""), conversion_route,
+    )
+    return CanonicalArtifactState(
+        document_id=document_id,
+        route_decision=route_decision,
+        typed_nodes_path=typed_path,
+        typed_nodes_available=typed_available,
+        source_spans_path=spans_path,
+        source_spans_available=spans_available,
+    )
+
+
+def _write_validated_typed_nodes(
+    run_dir: Path,
+    document_id: str,
+    input_path: Path,
+    converted_path: Path,
+    source_type: str,
+    conversion_route: str,
+) -> tuple[Path, bool]:
     typed_nodes_path = write_typed_nodes_artifact(
         run_dir=run_dir,
         document_id=document_id,
         converted_path=converted_path,
+        source_type=source_type,
+        conversion_route=conversion_route,
+        input_path=input_path,
     )
     typed_nodes_available = _typed_nodes_artifact_is_valid(
         run_dir=run_dir,
@@ -135,6 +188,36 @@ def _write_validated_typed_nodes(run_dir: Path, document_id: str, converted_path
         converted_path=converted_path,
     )
     return typed_nodes_path, typed_nodes_available
+
+
+def _write_validated_source_spans(
+    run_dir: Path,
+    document_id: str,
+    input_path: Path,
+    converted_path: Path,
+    typed_nodes_path: Path,
+    source_type: str,
+    converter: str,
+    conversion_route: str,
+) -> tuple[Path, bool]:
+    source_spans_path = write_source_spans_artifact(
+        run_dir=run_dir,
+        document_id=document_id,
+        input_path=input_path,
+        converted_path=converted_path,
+        typed_nodes_path=typed_nodes_path,
+        source_type=source_type,
+        converter=converter,
+        conversion_route=conversion_route,
+    )
+    source_spans_available = _source_spans_artifact_is_valid(
+        run_dir=run_dir,
+        source_spans_path=source_spans_path,
+        typed_nodes_path=typed_nodes_path,
+        document_id=document_id,
+        converted_path=converted_path,
+    )
+    return source_spans_path, source_spans_available
 
 
 def _canonical_manifest_payload(
@@ -149,6 +232,8 @@ def _canonical_manifest_payload(
     route_decision: dict[str, Any],
     typed_nodes_path: Path,
     typed_nodes_available: bool,
+    source_spans_path: Path,
+    source_spans_available: bool,
 ) -> dict[str, Any]:
     conversion_report_path = run_dir / "conversion_report.json"
     diagnosis_report_path = run_dir / "diagnosis_report.json"
@@ -163,8 +248,13 @@ def _canonical_manifest_payload(
             conversion_report_path,
             diagnosis_report_path,
             typed_nodes_path,
+            source_spans_path,
         ),
-        "coverage": _coverage_snapshot(run_dir, typed_nodes_available=typed_nodes_available),
+        "coverage": _coverage_snapshot(
+            run_dir,
+            typed_nodes_available=typed_nodes_available,
+            source_spans_available=source_spans_available,
+        ),
         "status": "partial",
     }
 
@@ -246,6 +336,7 @@ def _artifact_snapshot(
     conversion_report_path: Path,
     diagnosis_report_path: Path,
     typed_nodes_path: Path,
+    source_spans_path: Path,
 ) -> dict[str, str]:
     run_dir = conversion_report_path.parent
     return {
@@ -253,13 +344,19 @@ def _artifact_snapshot(
         "conversion_report": _relative_run_path(run_dir, conversion_report_path),
         "diagnosis_report": _relative_run_path(run_dir, diagnosis_report_path),
         "typed_nodes": _relative_run_path(run_dir, typed_nodes_path),
+        "source_spans": _relative_run_path(run_dir, source_spans_path),
     }
 
 
-def _coverage_snapshot(run_dir: Path, *, typed_nodes_available: bool) -> dict[str, bool]:
+def _coverage_snapshot(
+    run_dir: Path,
+    *,
+    typed_nodes_available: bool,
+    source_spans_available: bool,
+) -> dict[str, bool]:
     return {
         "typed_nodes_available": typed_nodes_available,
-        "source_spans_available": False,
+        "source_spans_available": source_spans_available,
         "assets_available": (run_dir / "images").exists(),
     }
 
@@ -282,14 +379,23 @@ def _validate_canonical_manifest(
     artifacts = _validate_artifact_snapshot(run_dir, manifest.get("artifacts"), converted_path, issues)
     coverage = _validate_coverage_snapshot(manifest.get("coverage"), issues)
     if artifacts is not None and coverage is not None:
+        converted = converted_path or run_dir / "converted.md"
         _validate_typed_nodes_reference(
             run_dir,
             artifacts,
             coverage,
             str(manifest.get("document_id") or ""),
-            converted_path or run_dir / "converted.md",
+            converted,
             issues,
         )
+        for issue in validate_source_spans_reference(
+            run_dir=run_dir,
+            artifacts=artifacts,
+            coverage=coverage,
+            document_id=str(manifest.get("document_id") or ""),
+            converted_path=converted,
+        ):
+            _add_issue(issues, issue.code, issue.message, issue.evidence)
     if manifest.get("status") != "partial":
         _add_issue(
             issues,
@@ -379,13 +485,6 @@ def _validate_coverage_snapshot(value: object, issues: list[CanonicalIrValidatio
                 f"canonical_ir/manifest.json coverage.{field} must be boolean",
                 {field: coverage.get(field)},
             )
-    if coverage.get("source_spans_available") is True:
-        _add_issue(
-            issues,
-            "E_CANONICAL_IR_MANIFEST_INVALID",
-            "canonical_ir/manifest.json coverage.source_spans_available must stay false for C1",
-            {"source_spans_available": coverage.get("source_spans_available")},
-        )
     return coverage
 
 
@@ -398,6 +497,24 @@ def _typed_nodes_artifact_is_valid(
 ) -> bool:
     issues: list[CanonicalIrValidationIssue] = []
     _validate_typed_nodes_artifact(run_dir, typed_nodes_path, document_id, converted_path, issues)
+    return not issues
+
+
+def _source_spans_artifact_is_valid(
+    *,
+    run_dir: Path,
+    source_spans_path: Path,
+    typed_nodes_path: Path,
+    document_id: str,
+    converted_path: Path,
+) -> bool:
+    issues = validate_source_spans_artifact(
+        run_dir=run_dir,
+        source_spans_path=source_spans_path,
+        typed_nodes_path=typed_nodes_path,
+        document_id=document_id,
+        converted_path=converted_path,
+    )
     return not issues
 
 

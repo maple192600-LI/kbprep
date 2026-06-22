@@ -68,6 +68,77 @@ def _write_valid_manifests(run_dir: Path, converted: Path) -> None:
     )
 
 
+def _enable_canonical_artifacts(run_dir: Path) -> None:
+    manifest_path = run_dir / "canonical_ir" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["typed_nodes"] = "canonical_ir/typed_nodes.json"
+    manifest["artifacts"]["source_spans"] = "canonical_ir/source_spans.json"
+    manifest["coverage"]["typed_nodes_available"] = True
+    manifest["coverage"]["source_spans_available"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _write_single_transcript_typed_node(run_dir: Path) -> None:
+    (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+        json.dumps({
+            "schema": "kbprep.canonical_ir_typed_nodes.v1",
+            "document_id": "doc_test",
+            "source_artifact": "converted.md",
+            "node_count": 1,
+            "nodes": [{
+                "node_id": "n_000001",
+                "ordinal": 1,
+                "type": "transcript_cue",
+                "text": "Host: Welcome",
+                "metadata": {"cue_index": 1, "speaker": "Host"},
+            }],
+        }),
+        encoding="utf-8",
+    )
+
+
+def _write_conflicting_precision_source_span(run_dir: Path) -> None:
+    (run_dir / "canonical_ir" / "source_spans.json").write_text(
+        json.dumps({
+            "schema": "kbprep.canonical_ir_source_spans.v1",
+            "document_id": "doc_test",
+            "source_artifact": "converted.md",
+            "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+            "span_count": 1,
+            "spans": [_conflicting_precision_source_span()],
+        }),
+        encoding="utf-8",
+    )
+
+
+def _conflicting_precision_source_span() -> dict[str, object]:
+    return {
+        "span_id": "s_000001",
+        "node_id": "n_000001",
+        "source_kind": "transcript",
+        "location": _conflicting_precision_location(),
+        "evidence": {
+            "source_type": "subtitle_transcript",
+            "converter": "direct_text",
+            "conversion_route": "direct_text",
+            "source_kind": "transcript",
+            "precision": "source_line_range",
+        },
+    }
+
+
+def _conflicting_precision_location() -> dict[str, object]:
+    return {
+        "converted_line_start": 1,
+        "converted_line_end": 1,
+        "cue_index": 1,
+        "source_line_start": 1,
+        "source_line_end": 1,
+        "start_time": "00:00:01,000",
+        "end_time": "00:00:02,000",
+    }
+
+
 class ConversionGateTests(unittest.TestCase):
     def test_pre_clean_conversion_gate_fails_garbled_converted_markdown(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -200,6 +271,66 @@ class ConversionGateTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertEqual(report["blocked_stage"], "cleanup")
         self.assertTrue(any(error.startswith("E_CANONICAL_IR_TYPED_NODES_INVALID") for error in report["strict_errors"]))
+        self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
+
+    def test_pre_clean_conversion_gate_fails_when_source_spans_are_invalid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Tutorial\n\nRecord acceptance criteria.\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            manifest_path = run_dir / "canonical_ir" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["artifacts"]["typed_nodes"] = "canonical_ir/typed_nodes.json"
+            manifest["artifacts"]["source_spans"] = "canonical_ir/source_spans.json"
+            manifest["coverage"]["typed_nodes_available"] = True
+            manifest["coverage"]["source_spans_available"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "node_count": 1,
+                    "nodes": [{
+                        "node_id": "n_000001",
+                        "ordinal": 1,
+                        "type": "heading",
+                        "text": "Tutorial",
+                        "metadata": {"heading_level": 1},
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            (run_dir / "canonical_ir" / "source_spans.json").write_text(
+                json.dumps({"schema": "wrong.schema"}),
+                encoding="utf-8",
+            )
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocked_stage"], "cleanup")
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_SOURCE_SPANS_INVALID") for error in report["strict_errors"]))
+        self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
+
+    def test_pre_clean_conversion_gate_fails_when_source_span_precision_conflicts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("Host: Welcome\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_transcript_typed_node(run_dir)
+            _write_conflicting_precision_source_span(run_dir)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocked_stage"], "cleanup")
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_SOURCE_SPANS_INVALID") for error in report["strict_errors"]))
         self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
 
     def test_pre_clean_conversion_gate_deduplicates_typed_node_failure_actions(self):

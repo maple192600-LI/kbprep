@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | partial | Gate validates manifest evidence and the first typed-node artifact; complete source-span and route-wide IR evidence remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json` artifact exist for heading, paragraph, list, table, code, quote, formula, figure, and metadata; transcript cues, source spans, and full fact-layer usage are not shipped. |
+| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, and source-span evidence; full route-wide IR semantics remain future work. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json` and `source_spans.json` artifacts exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cues; route-native fine-grained spans and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
@@ -119,13 +119,19 @@ Slices:
   `canonical_ir/typed_nodes.json` artifact.
 - **C1b-1** Landed: formula, figure, and metadata typed-node coverage
   for converted Markdown.
-- **C1b-2** Complete remaining typed-node coverage for transcript cue and
-  any route-specific structure required by the protected design.
-- **C2** `SourceSpan` variants per source kind (protected design §6 table).
+- **C1b-2** Landed: transcript cue typed-node coverage for transcript
+  contexts, using raw cue-text matching when available and speaker metadata
+  when detectable.
+- **C2** Landed base SourceSpan artifact: one validated span per typed node,
+  strict evidence schema validation, converted Markdown line ranges for every
+  node, and transcript timing when source cues provide it. Route-native
+  precision such as PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX
+  cells, and YouTube cue ids remains a converter-specific refinement before
+  Phase C can be considered fully implemented.
 - **C3** `TransformationLedger` append-only record.
 - **C4** Complete coverage reporting: keep `typed_nodes_available` true only
-  for validated typed-node artifacts, and flip `source_spans_available` only
-  after SourceSpan coverage exists.
+  for validated typed-node artifacts, and keep `source_spans_available` true
+  only for validated source-span artifacts.
 - **C5** Conversion quality gate reads complete typed-node and source-span
   evidence instead of relying on rendered Markdown.
 

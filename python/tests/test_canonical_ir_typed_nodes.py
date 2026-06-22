@@ -93,6 +93,37 @@ $$
         self.assertIn("![not a figure](image.png)", nodes[0].text)
         self.assertIn("not_formula()", nodes[0].text)
 
+    def test_parser_builds_transcript_cue_nodes_in_transcript_context(self) -> None:
+        markdown = """# Transcript
+
+Host: Welcome to the lesson.
+
+Guest: Set threshold to 0.8 and record the failure reason.
+"""
+
+        nodes = build_typed_nodes_from_markdown(markdown, source_type="subtitle_transcript")
+
+        self.assertEqual([node.node_type for node in nodes], ["heading", "transcript_cue", "transcript_cue"])
+        self.assertEqual(nodes[1].metadata, {"cue_index": 1, "speaker": "Host"})
+        self.assertEqual(nodes[2].metadata, {"cue_index": 2, "speaker": "Guest"})
+
+    def test_parser_keeps_transcript_intro_without_matching_cue_evidence(self) -> None:
+        markdown = """# Transcript
+
+This note was added by the converter before timed cues.
+
+Host: Welcome to the lesson.
+"""
+
+        nodes = build_typed_nodes_from_markdown(
+            markdown,
+            source_type="subtitle_transcript",
+            transcript_cue_texts=["Host: Welcome to the lesson."],
+        )
+
+        self.assertEqual([node.node_type for node in nodes], ["heading", "paragraph", "transcript_cue"])
+        self.assertEqual(nodes[2].metadata, {"cue_index": 1, "speaker": "Host"})
+
     def test_writes_typed_nodes_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)
