@@ -173,6 +173,6 @@ Ask a review subagent to check contract completeness, private-content leakage ri
 
 Every accepted review finding must have a targeted fix and a rerun of the focused test plus any affected check.
 
-- [ ] **Step 4: Commit, push, and integrate only after checks pass**
+- [x] **Step 4: Commit, push, and integrate only after checks pass**
 
 Create a focused commit on `codex/phase-d1-cleaning-policy-snapshot-contract`, push it, and merge only when local checks and remote CI are green.
