@@ -100,4 +100,4 @@ Reviewer must check artifact safety, cache compatibility, D5/D6 boundary discipl
 
 - [x] **Step 4: Fix review findings**
 
-- [ ] **Step 5: Merge, push, verify CI, and clean the D4 worktree**
+- [x] **Step 5: Merge, push, verify CI, and clean the D4 worktree**
