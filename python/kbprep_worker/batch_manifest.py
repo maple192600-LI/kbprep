@@ -155,6 +155,20 @@ def _parent_status(items: list[dict[str, Any]]) -> str:
     return "completed"
 
 
+def batch_parent_status(
+    inventory: dict[str, Any],
+    results: list[dict[str, Any]],
+    failures: list[dict[str, Any]],
+) -> str:
+    """Return the batch parent job status from child results (core design §16/§17).
+
+    Public mirror of the status written into batch_manifest.json so emitters
+    (e.g. the batch success envelope) can publish the same status without
+    re-reading the manifest file.
+    """
+    return _parent_status(_manifest_items(inventory, results, failures))
+
+
 def _summary(
     inventory: dict[str, Any],
     results: list[dict[str, Any]],

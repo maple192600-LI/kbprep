@@ -211,8 +211,8 @@ Slices:
   _emit_success` passes the resolved status into the published envelope.
 - **E2** Landed: the quality runner already classifies findings as
   `strict_errors` (blocking) vs `warnings` (non-blocking); the success publish
-  path now maps the warnings into the envelope `status`. `envelope.ok` defaults
-  to `completed` so non-job commands stay valid under the required schema
+  path now maps the warnings into the envelope `status`. `envelope.ok(status=...)`
+  defaults to `completed` so non-job commands stay valid under the required schema
   field, while `WorkerEnvelopeSchema` (TypeScript) marks `status` required.
 
 Acceptance: a single-source run that passes hard gates with a soft warning
