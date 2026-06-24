@@ -21,6 +21,7 @@ def render(
     profile: str = "standard",
     source_title: str | None = None,
     render_obsidian: bool = True,
+    clean_view: dict | None = None,
 ) -> None:
     """
     Render output files from classified blocks.
@@ -29,21 +30,55 @@ def render(
     - evidence/: blocks with status=evidence
     """
     run_p = Path(run_dir)
+    render_blocks = _blocks_from_clean_view(blocks, clean_view)
 
-    keep_blocks = [b for b in blocks if b.get("status") == "keep"]
-    discard_blocks = [b for b in blocks if b.get("status") == "discard"]
-    evidence_blocks = [b for b in blocks if b.get("status") == "evidence"]
-    review_blocks = [b for b in blocks if b.get("status") == "review"]
+    keep_blocks = [b for b in render_blocks if b.get("status") == "keep"]
+    discard_blocks = [b for b in render_blocks if b.get("status") == "discard"]
+    evidence_blocks = [b for b in render_blocks if b.get("status") == "evidence"]
+    review_blocks = [b for b in render_blocks if b.get("status") == "review"]
 
     _render_cleaned_md(keep_blocks, run_p)
     _render_discarded_md(discard_blocks, run_p)
     _render_evidence_md(evidence_blocks, run_p)
     _render_review_md(review_blocks, run_p)
     _render_parts(keep_blocks, run_p)
-    _render_obsidian_if_requested(blocks, run_dir, source_title, source_hash, run_id, profile, render_obsidian, run_p)
+    _render_obsidian_if_requested(render_blocks, run_dir, source_title, source_hash, run_id, profile, render_obsidian, run_p)
 
     logger.info("Rendered: cleaned=%d blocks, discarded=%d, evidence=%d, review=%d",
                 len(keep_blocks), len(discard_blocks), len(evidence_blocks), len(review_blocks))
+
+
+def _blocks_from_clean_view(blocks: list[dict], clean_view: dict | None) -> list[dict]:
+    if not clean_view or clean_view.get("schema") != "kbprep.clean_view.v1":
+        return blocks
+    entries = clean_view.get("entries")
+    if not isinstance(entries, list):
+        return blocks
+    by_id = {str(block.get("block_id") or ""): block for block in blocks}
+    rendered = []
+    for entry in entries:
+        block = _block_for_clean_view_entry(entry, by_id)
+        if block is None:
+            return blocks
+        rendered.append(block)
+    return rendered if _clean_view_covers_blocks(rendered, blocks) else blocks
+
+
+def _block_for_clean_view_entry(entry: object, by_id: dict[str, dict]) -> dict | None:
+    if not isinstance(entry, dict):
+        return None
+    block = by_id.get(str(entry.get("block_id") or ""))
+    if block is None:
+        return None
+    rendered = dict(block)
+    rendered["status"] = str(entry.get("status") or block.get("status") or "")
+    return rendered
+
+
+def _clean_view_covers_blocks(rendered: list[dict], blocks: list[dict]) -> bool:
+    rendered_ids = [str(block.get("block_id") or "") for block in rendered]
+    block_ids = [str(block.get("block_id") or "") for block in blocks]
+    return len(rendered_ids) == len(block_ids) and set(rendered_ids) == set(block_ids)
 
 
 def _render_cleaned_md(keep_blocks: list[dict], run_p: Path) -> None:

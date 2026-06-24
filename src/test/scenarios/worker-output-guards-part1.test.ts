@@ -58,6 +58,10 @@ describe("kbprep worker pipeline - output guards part 1", () => {
       expect(converted).toContain("![结果图](images/result.png)");
       expect(converted).not.toContain("images/images/result.png");
       expect(cleaned).toContain("threshold=0.8");
+      expect(existsSync(result.data.outputs.clean_view)).toBe(true);
+      const cleanView = JSON.parse(readFileSync(result.data.outputs.clean_view, "utf8"));
+      expect(cleanView.schema).toBe("kbprep.clean_view.v1");
+      expect(JSON.stringify(cleanView)).not.toContain("threshold=0.8");
       expect(existsSync(path.join(result.data.run_dir, "images", "assets", "step.png"))).toBe(true);
       expect(existsSync(path.join(outputRoot, "images", "assets", "step.png"))).toBe(true);
       expect(existsSync(path.join(outputRoot, "images", "assets", "chart.png"))).toBe(true);
@@ -275,8 +279,13 @@ describe("kbprep worker pipeline - output guards part 1", () => {
           "gates = {gate['name']: gate for gate in quality['quality_gates']}",
           "assert gates['cleanup_safety']['status'] == 'pass', gates",
           "gate_summary = json.loads((run_dir / 'cleaning_patch_gate.json').read_text(encoding='utf-8'))",
+          "clean_view = json.loads((run_dir / 'clean_view.json').read_text(encoding='utf-8'))",
+          "clean_view_text = json.dumps(clean_view, ensure_ascii=False)",
           "assert gate_summary['rejected_patch_count'] == 2, gate_summary",
           "assert gate_summary['rejected_reason_counts']['protected_structure_change'] == 2, gate_summary",
+          "assert clean_view['schema'] == 'kbprep.clean_view.v1', clean_view",
+          "assert 'threshold=0.8' not in clean_view_text, clean_view_text",
+          "assert 'Companion video included' not in clean_view_text, clean_view_text",
           "rejected_text = (run_dir / 'rejected_patches.jsonl').read_text(encoding='utf-8')",
           "rejected_records = [json.loads(line) for line in rejected_text.splitlines() if line.strip()]",
           "assert len(rejected_records) == 2, rejected_records",

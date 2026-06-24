@@ -110,8 +110,7 @@ def run(data: dict) -> None:
         if not state.force and _publish_cached_run_if_available(state):
             return
         _stage_apply_cleaning_rules(state)
-        _stage_classify_images(state)
-        _stage_apply_obsidian_policy(state)
+        _stage_post_cleaning(state)
         _stage_review_pack(state)
         _stage_render_outputs(state)
         _stage_split(state)
@@ -209,7 +208,12 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
         state.plugin_version,
         state.runtime_cache_key,
         policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
-        required_artifacts=("cleaning_patches.jsonl", "cleaning_patch_gate.json", "rejected_patches.jsonl"),
+        required_artifacts=(
+            "cleaning_patches.jsonl",
+            "cleaning_patch_gate.json",
+            "rejected_patches.jsonl",
+            "clean_view.json",
+        ),
     )
     if not existing:
         return False
@@ -453,35 +457,10 @@ def _stage_apply_cleaning_rules(state: PipelineState) -> None:
     _stderr_log("info", "clean_rules", "Cleaning rules applied")
 
 
-def _stage_classify_images(state: PipelineState) -> None:
-    state.require_stage_fields("image_clean", "run_dir", "blocks_path")
-    run_dir = state.require_path("image_clean", "run_dir")
-    blocks_path = state.require_path("image_clean", "blocks_path")
-    _stderr_log("info", "image_clean", "Classifying images")
-    try:
-        from .. import images as img_mod
-        state.blocks = img_mod.classify_images(
-            state.blocks, str(run_dir), profile=state.profile, document_type=state.document_type,
-        )
-        _write_blocks(blocks_path, state.blocks)
-        _stderr_log("info", "image_clean", "Image classification complete")
-    except Exception as e:
-        _stderr_log("warn", "image_clean", str(e))
-        state.warnings.append(f"Image classification failed: {e}")
+def _stage_post_cleaning(state: PipelineState) -> None:
+    from .post_cleaning_stage import run_post_cleaning_stages
 
-
-def _stage_apply_obsidian_policy(state: PipelineState) -> None:
-    state.require_stage_fields("obsidian_policy", "blocks_path")
-    blocks_path = state.require_path("obsidian_policy", "blocks_path")
-    if state.profile in {"obsidian_kb", "curated_obsidian_kb"}:
-        _stderr_log("info", state.profile, "Applying Obsidian knowledge-base policy")
-        from .. import obsidian_kb as obsidian_mod
-        state.blocks = obsidian_mod.apply_curated_obsidian_policy(
-            state.blocks,
-            template_name=obsidian_mod.template_for_profile(state.profile),
-        )
-        _write_blocks(blocks_path, state.blocks)
-        _stderr_log("info", state.profile, "Obsidian policy applied")
+    run_post_cleaning_stages(state)
 
 
 def _stage_review_pack(state: PipelineState) -> None:
@@ -514,6 +493,7 @@ def _stage_render_outputs(state: PipelineState) -> None:
         profile=state.profile,
         source_title=_source_title_for_render(state.input_p, converted_path),
         render_obsidian=False,
+        clean_view=_read_clean_view(run_dir),
     )
     _stderr_log("info", "render_outputs", "Output files rendered")
 
@@ -730,6 +710,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "cleaning_patches": str(run_dir / "cleaning_patches.jsonl"),
         "cleaning_patch_gate": str(run_dir / "cleaning_patch_gate.json"),
         "rejected_patches": str(run_dir / "rejected_patches.jsonl"),
+        "clean_view": str(run_dir / "clean_view.json"),
         "cleaned_md": str(run_dir / "cleaned.md"),
         "discarded_md": str(run_dir / "discarded.md"),
         "review_needed_md": str(run_dir / "review_needed.md"),
@@ -747,6 +728,12 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "obsidian_complete": str(obsidian_complete) if obsidian_complete else None,
         "review_pack": str(run_dir / "review_pack.json") if (run_dir / "review_pack.json").exists() else None,
     }
+
+
+def _read_clean_view(run_dir: Path) -> dict[str, Any]:
+    from .post_cleaning_stage import read_clean_view_artifact
+
+    return read_clean_view_artifact(run_dir)
 
 
 def _handle_pipeline_error(state: PipelineState, error: PipelineError) -> None:

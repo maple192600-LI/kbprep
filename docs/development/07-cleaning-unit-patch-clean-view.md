@@ -34,9 +34,14 @@ snapshot hash, safe before/after metadata, text-changed status, and location
 hints. Rejected unsafe patches are restored in memory before the current
 renderer runs.
 
-Patch generation, the first patch quality gate, and rejected patch reporting
-are shipped. Clean View assembly and the final document cleaning gate remain
-Phase D target work.
+Patch generation, the first patch quality gate, rejected patch reporting, and
+Clean View assembly are shipped. The worker writes a content-safe
+`clean_view.json` artifact after cleanup, image classification, and
+Obsidian-profile policy application. The artifact records the renderable
+document order from `canonical_ir/typed_nodes.json` plus accepted
+`cleaning_patches.jsonl` patch identity without copying source text or patch
+before/after text. The final document cleaning gate remains Phase D target
+work.
 
 ## Phase D Acceptance Target
 
@@ -46,9 +51,9 @@ Phase D target work.
 - Clean View can be rendered into Markdown and assets.
 - Warnings identify rejected patches without blocking safe changes.
 
-Current status: patch generation, the first patch quality gate, and rejected
-patch reporting are shipped. Clean View rendering and rejected-patch warnings
-remain D5-D6 work.
+Current status: patch generation, the first patch quality gate, rejected patch
+reporting, and Clean View assembly/rendering are shipped. Final
+DocumentCleaningGate warnings remain D6 work.
 
 ## Risk And Rollback
 

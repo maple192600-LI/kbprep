@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlparse
 from ..atomic_io import atomic_write_json
 from ..audit import AuditContext
 from ..audit import generate_audit_md as _generate_audit_from_context
+from ..clean_view import validate_clean_view_artifact
 from ..cleaning_patch_gate import count_rejected_patches_artifact, validate_cleaning_patch_gate_artifact
 from ..cleaning_patches import validate_cleaning_patches_artifact
 from ..converter_capabilities import get_capability_for_extension
@@ -565,6 +566,8 @@ def _required_artifact_exists(run_dir: Path, artifact: str) -> bool:
         return validate_cleaning_patch_gate_artifact(path)
     if artifact == "rejected_patches.jsonl":
         return _rejected_patch_artifact_matches_gate(run_dir)
+    if artifact == "clean_view.json":
+        return validate_clean_view_artifact(path)
     return path.exists()
 
 
