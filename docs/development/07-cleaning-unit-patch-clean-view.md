@@ -28,12 +28,15 @@ The patch artifact is intentionally content-safe: it does not copy source text,
 source-text hashes, private rule file paths, private rule patterns, private
 rule reasons, or heading text into the JSONL records. `cleaning_patch_gate.json`
 records a summary of accepted and rejected patch counts and safe rejection
-reason codes. Rejected unsafe patches are restored in memory before the current
+reason codes. `rejected_patches.jsonl` records one content-safe rejected patch
+entry per rejected patch, including reason code, patch identity, policy
+snapshot hash, safe before/after metadata, text-changed status, and location
+hints. Rejected unsafe patches are restored in memory before the current
 renderer runs.
 
-Patch generation and the first patch quality gate are shipped. Full rejected
-patch reporting, Clean View assembly, and the final document cleaning gate
-remain Phase D target work.
+Patch generation, the first patch quality gate, and rejected patch reporting
+are shipped. Clean View assembly and the final document cleaning gate remain
+Phase D target work.
 
 ## Phase D Acceptance Target
 
@@ -43,9 +46,9 @@ remain Phase D target work.
 - Clean View can be rendered into Markdown and assets.
 - Warnings identify rejected patches without blocking safe changes.
 
-Current status: patch generation and the first patch quality gate are shipped.
-The complete rejected-patch report, Clean View rendering, and rejected-patch
-warnings remain D4-D6 work.
+Current status: patch generation, the first patch quality gate, and rejected
+patch reporting are shipped. Clean View rendering and rejected-patch warnings
+remain D5-D6 work.
 
 ## Risk And Rollback
 

@@ -7,17 +7,35 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .cleaning_patches import CLEANING_PATCH_SCHEMA
+from .atomic_io import atomic_write_text
+from .cleaning_patches import CLEANING_PATCH_SCHEMA, FORBIDDEN_ARTIFACT_KEYS, PATCH_FIELDS, sanitize_rule_source
 
 PROTECTED_BLOCK_TYPES = frozenset({"code", "table", "image", "formula"})
 PROMO_SPLIT_TAG = "promo_line_removed"
 PATCH_GATE_SCHEMA = "kbprep.cleaning_patch_gate.v1"
+REJECTED_PATCH_SCHEMA = "kbprep.rejected_cleaning_patch.v1"
 PATCH_GATE_SUMMARY_KEYS = frozenset({
     "schema",
     "accepted_patch_count",
     "rejected_patch_count",
     "rejected_reason_counts",
 })
+REJECTED_PATCH_KEYS = frozenset({
+    "schema",
+    "patch_id",
+    "block_id",
+    "parent_block_id",
+    "change_type",
+    "rule_id",
+    "rule_source",
+    "reason_code",
+    "policy_snapshot_hash",
+    "before",
+    "after",
+    "text_changed",
+    "location",
+})
+REJECTED_PATCH_LOCATION_KEYS = frozenset({"line_start", "line_end", "page_start", "page_end"})
 
 
 @dataclass(frozen=True)
@@ -181,12 +199,19 @@ def _restore_rejected_blocks(
 
 def _rejected_patch_record(patch: dict, reason_code: str) -> dict[str, Any]:
     return {
+        "schema": REJECTED_PATCH_SCHEMA,
         "patch_id": str(patch.get("patch_id") or ""),
         "block_id": _block_id(patch),
         "parent_block_id": str(patch.get("parent_block_id") or ""),
         "change_type": str(patch.get("change_type") or ""),
         "rule_id": str(patch.get("rule_id") or ""),
+        "rule_source": sanitize_rule_source(patch.get("rule_source")),
         "reason_code": reason_code,
+        "policy_snapshot_hash": str(patch.get("policy_snapshot_hash") or ""),
+        "before": _safe_patch_fields(patch.get("before", {})),
+        "after": _safe_patch_fields(patch.get("after", {})),
+        "text_changed": bool(patch.get("text_changed")),
+        "location": _safe_location(patch.get("location", {})),
     }
 
 
@@ -220,6 +245,31 @@ def validate_cleaning_patch_gate_artifact(path: Path) -> bool:
     )
 
 
+def write_rejected_patches(path: Path, rejected_patches: list[dict[str, Any]]) -> None:
+    """Write rejected patch evidence as content-safe JSONL."""
+    lines = [json.dumps(patch, ensure_ascii=False, sort_keys=True) for patch in rejected_patches]
+    atomic_write_text(path, "\n".join(lines) + ("\n" if lines else ""))
+
+
+def count_rejected_patches_artifact(path: Path) -> int | None:
+    """Return the number of valid rejected patch records, or None if invalid."""
+    if not path.exists():
+        return None
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        records = [json.loads(line) for line in lines]
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not all(_valid_rejected_patch_record(record) for record in records):
+        return None
+    return len(records)
+
+
+def validate_rejected_patches_artifact(path: Path) -> bool:
+    """Return true only for current-schema, content-safe rejected patch JSONL."""
+    return count_rejected_patches_artifact(path) is not None
+
+
 def _non_negative_int(value: Any) -> bool:
     return isinstance(value, int) and value >= 0
 
@@ -236,5 +286,84 @@ def _rule_id_allowed(rule_id: str, active_rule_ids: set[str]) -> bool:
     return bool(rule_id and rule_id in active_rule_ids)
 
 
+def _valid_rejected_patch_record(record: Any) -> bool:
+    if not isinstance(record, dict) or set(record) != REJECTED_PATCH_KEYS:
+        return False
+    if record.get("schema") != REJECTED_PATCH_SCHEMA:
+        return False
+    if _contains_forbidden_artifact_key(record):
+        return False
+    if record.get("rule_source") != sanitize_rule_source(record.get("rule_source")):
+        return False
+    return (
+        _valid_safe_fields(record.get("before"))
+        and _valid_safe_fields(record.get("after"))
+        and _valid_location(record.get("location"))
+    )
+
+
+def _valid_safe_fields(fields: Any) -> bool:
+    if not isinstance(fields, dict):
+        return False
+    source = fields.get("cleaning_rule_source")
+    if source is not None and source != sanitize_rule_source(source):
+        return False
+    return set(fields).issubset(PATCH_FIELDS)
+
+
+def _contains_forbidden_artifact_key(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(
+            str(key) in FORBIDDEN_ARTIFACT_KEYS or _contains_forbidden_artifact_key(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_forbidden_artifact_key(item) for item in value)
+    return False
+
+
+def _valid_location(location: Any) -> bool:
+    if not isinstance(location, dict) or set(location) != REJECTED_PATCH_LOCATION_KEYS:
+        return False
+    return all(_valid_location_value(value) for value in location.values())
+
+
+def _valid_location_value(value: Any) -> bool:
+    return value is None or type(value) is int
+
+
+def _safe_patch_fields(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {field: _safe_patch_field(field, value.get(field)) for field in PATCH_FIELDS if field in value}
+
+
+def _safe_patch_field(field: str, value: Any) -> Any:
+    if field == "cleaning_rule_source":
+        return sanitize_rule_source(value)
+    return _json_safe(value)
+
+
+def _safe_location(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        "line_start": value.get("line_start"),
+        "line_end": value.get("line_end"),
+        "page_start": value.get("page_start"),
+        "page_end": value.get("page_end"),
+    }
+
+
 def _block_id(value: dict) -> str:
     return str(value.get("block_id") or "").strip()
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    return str(value)

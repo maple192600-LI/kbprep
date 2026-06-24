@@ -209,7 +209,7 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
         state.plugin_version,
         state.runtime_cache_key,
         policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
-        required_artifacts=("cleaning_patches.jsonl", "cleaning_patch_gate.json"),
+        required_artifacts=("cleaning_patches.jsonl", "cleaning_patch_gate.json", "rejected_patches.jsonl"),
     )
     if not existing:
         return False
@@ -729,6 +729,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "blocks_jsonl": str(run_dir / "blocks.jsonl"),
         "cleaning_patches": str(run_dir / "cleaning_patches.jsonl"),
         "cleaning_patch_gate": str(run_dir / "cleaning_patch_gate.json"),
+        "rejected_patches": str(run_dir / "rejected_patches.jsonl"),
         "cleaned_md": str(run_dir / "cleaned.md"),
         "discarded_md": str(run_dir / "discarded.md"),
         "review_needed_md": str(run_dir / "review_needed.md"),

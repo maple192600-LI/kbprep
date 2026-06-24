@@ -119,10 +119,13 @@ def _safe_field(field: str, value: Any) -> Any:
     return _json_safe(value)
 
 
-def _safe_rule_source(value: Any) -> str:
+def sanitize_rule_source(value: Any) -> str:
+    """Return a public/private-safe rule-source label for artifacts."""
     source = str(value or "").replace("\\", "/").strip()
     if not source:
         return ""
+    if source in {"private_rules", "external_rules"}:
+        return source
     lower_source = source.lower()
     if lower_source.startswith("rules/"):
         return source
@@ -131,6 +134,10 @@ def _safe_rule_source(value: Any) -> str:
     if source.startswith(("/", "//", "~")) or ":" in source:
         return "private_rules"
     return "external_rules"
+
+
+def _safe_rule_source(value: Any) -> str:
+    return sanitize_rule_source(value)
 
 
 def _valid_patch_record(record: Any) -> bool:

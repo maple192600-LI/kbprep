@@ -31,7 +31,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, and pre-clean gate use of complete typed-node/source-span text evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans, renderer regeneration, and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
-| patch_clean_view | partial | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates, rejected patch reports, Clean View assembly, and final document cleaning gate remain target work. |
+| patch_clean_view | partial | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly and final document cleaning gate remain target work. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
@@ -179,7 +179,11 @@ Slices:
   to `cleaning_patches.jsonl`, and writes a safe `cleaning_patch_gate.json`
   summary. The gate checks target node existence, active policy rule ids,
   protected structure changes, whole-section deletion, and evidence presence.
-- **D4** `rejected_patches.jsonl` for every rejected patch.
+- **D4** Landed: `rejected_patches.jsonl` records one content-safe rejected
+  patch entry for every patch rejected by `patch_quality_gate`, including
+  reason code, patch identity, safe before/after metadata, policy snapshot
+  hash, text-changed status, and location hints. Cache reuse requires a valid
+  rejected report, so older D3 runs rerun instead of bypassing D4 evidence.
 - **D5** `CleanViewAssembler` rebuilds the document from Canonical IR plus
   accepted patches in original order.
 - **D6** `DocumentCleaningGate` over the assembled Clean View.

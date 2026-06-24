@@ -91,13 +91,14 @@ class CoreProcessingPathTests(unittest.TestCase):
             snapshot_path = Path(data["outputs"]["cleaning_policy_snapshot"])
             patches_path = Path(data["outputs"]["cleaning_patches"])
             gate_path = Path(data["outputs"]["cleaning_patch_gate"])
+            rejected_path = Path(data["outputs"]["rejected_patches"])
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
             gate_summary = json.loads(gate_path.read_text(encoding="utf-8"))
             metadata = json.loads((Path(data["run_dir"]) / "run_metadata.json").read_text(encoding="utf-8"))
             self.assertTrue(patches_path.exists())
             self.assertTrue(gate_path.exists())
+            self.assertTrue(rejected_path.exists())
             self.assertEqual(gate_summary["schema"], "kbprep.cleaning_patch_gate.v1")
-            self.assertNotIn("rejected_patches", data["outputs"])
             self.assertEqual(quality_report["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
             self.assertEqual(metadata["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
             self.assertEqual(
@@ -175,6 +176,64 @@ class CoreProcessingPathTests(unittest.TestCase):
             self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
             self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "cleaning_patch_gate.json").exists())
 
+    def test_prepare_cache_reuse_requires_rejected_patches_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            first_run_dir = Path(first_envelope["data"]["run_dir"])
+            (first_run_dir / "rejected_patches.jsonl").unlink()
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "rejected_patches.jsonl").exists())
+
+    def test_prepare_cache_reuse_requires_rejected_patch_count_to_match_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            def unsafe_clean(blocks, **kwargs):
+                for block in blocks:
+                    if "步骤1" in block.get("text", ""):
+                        block["status"] = "discard"
+                        block["type"] = "marketing_cta"
+                        block["cleaning_rule_id"] = "rule.unknown"
+                return blocks
+
+            with patch("kbprep_worker.stages.cleaning_stage.clean_rules.apply_clean_rules", side_effect=unsafe_clean):
+                first_code, first_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+                )
+                first_run_dir = Path(first_envelope["data"]["run_dir"])
+                gate_summary = json.loads((first_run_dir / "cleaning_patch_gate.json").read_text(encoding="utf-8"))
+                (first_run_dir / "rejected_patches.jsonl").write_text("", encoding="utf-8")
+                second_code, second_envelope = _capture_envelope(
+                    pipeline_core.run,
+                    {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+                )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertEqual(gate_summary["rejected_patch_count"], 1)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+
     def test_prepare_cache_reuse_rejects_unsafe_cleaning_patch_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -192,6 +251,46 @@ class CoreProcessingPathTests(unittest.TestCase):
                     "schema": "old",
                     "rule_source": "C:/Users/Example/.kbprep/rules/accepted.jsonl",
                     "before_text_sha256": "x",
+                }),
+                encoding="utf-8",
+            )
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+
+    def test_prepare_cache_reuse_rejects_unsafe_rejected_patches_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            first_run_dir = Path(first_envelope["data"]["run_dir"])
+            (first_run_dir / "rejected_patches.jsonl").write_text(
+                json.dumps({
+                    "schema": "kbprep.rejected_cleaning_patch.v1",
+                    "patch_id": "p1",
+                    "block_id": "b1",
+                    "parent_block_id": "",
+                    "change_type": "status_update",
+                    "rule_id": "rule.cta",
+                    "rule_source": "rules/base/obvious_noise.json",
+                    "reason_code": "protected_structure_change",
+                    "policy_snapshot_hash": "policy-1",
+                    "before": {"status": "keep"},
+                    "after": {"status": "discard", "text": "DO_NOT_LEAK"},
+                    "text_changed": False,
+                    "location": {},
                 }),
                 encoding="utf-8",
             )

@@ -3,7 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from kbprep_worker.cleaning_patch_gate import apply_patch_quality_gate, validate_cleaning_patch_gate_artifact
+from kbprep_worker.cleaning_patch_gate import (
+    apply_patch_quality_gate,
+    validate_cleaning_patch_gate_artifact,
+    validate_rejected_patches_artifact,
+    write_rejected_patches,
+)
 from kbprep_worker.cleaning_patches import build_cleaning_patches
 
 
@@ -234,6 +239,95 @@ class CleaningPatchGateTests(unittest.TestCase):
         result = apply_patch_quality_gate(before, after, patches, _policy("rule.cta"))
 
         self.assertNotIn("DO_NOT_LEAK", json.dumps(result.rejected_patches, ensure_ascii=False))
+
+    def test_write_rejected_patches_writes_safe_jsonl(self) -> None:
+        before = [{"block_id": "b1", "status": "keep", "type": "paragraph", "text": "DO_NOT_LEAK"}]
+        after = [{
+            "block_id": "b1",
+            "status": "discard",
+            "type": "marketing_cta",
+            "text": "DO_NOT_LEAK",
+            "cleaning_rule_id": "rule.unknown",
+            "cleaning_rule_source": "C:/Users/Example/.kbprep/rules/accepted.jsonl",
+        }]
+        patches = build_cleaning_patches(before, after, "policy-1")
+        result = apply_patch_quality_gate(before, after, patches, _policy("rule.cta"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rejected_patches.jsonl"
+            write_rejected_patches(path, result.rejected_patches)
+            serialized = path.read_text(encoding="utf-8")
+            records = [json.loads(line) for line in serialized.splitlines()]
+
+            self.assertEqual(records[0]["schema"], "kbprep.rejected_cleaning_patch.v1")
+            self.assertEqual(records[0]["reason_code"], "rule_not_in_policy_snapshot")
+            self.assertEqual(records[0]["policy_snapshot_hash"], "policy-1")
+            self.assertEqual(records[0]["rule_source"], "private_rules")
+            self.assertNotIn("DO_NOT_LEAK", serialized)
+            self.assertNotIn("C:/Users/Example", serialized)
+            self.assertTrue(validate_rejected_patches_artifact(path))
+
+    def test_validate_rejected_patches_artifact_rejects_old_or_leaky_records(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rejected_patches.jsonl"
+            path.write_text("", encoding="utf-8")
+            self.assertTrue(validate_rejected_patches_artifact(path))
+
+            path.write_text(json.dumps({"schema": "old"}) + "\n", encoding="utf-8")
+            self.assertFalse(validate_rejected_patches_artifact(path))
+
+            path.write_text(
+                json.dumps({
+                    "schema": "kbprep.rejected_cleaning_patch.v1",
+                    "patch_id": "p1",
+                    "block_id": "b1",
+                    "parent_block_id": "",
+                    "change_type": "status_update",
+                    "rule_id": "rule.cta",
+                    "rule_source": "C:/Users/Example/.kbprep/rules/accepted.jsonl",
+                    "reason_code": "protected_structure_change",
+                    "policy_snapshot_hash": "policy-1",
+                    "before": {"status": "keep"},
+                    "after": {"status": "discard", "text": "DO_NOT_LEAK"},
+                    "text_changed": False,
+                    "location": {},
+                })
+                + "\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(validate_rejected_patches_artifact(path))
+
+    def test_validate_rejected_patches_artifact_rejects_leaky_location(self) -> None:
+        before = [{"block_id": "b1", "status": "keep", "type": "paragraph", "text": "DO_NOT_LEAK"}]
+        after = [{"block_id": "b1", "status": "discard", "type": "marketing_cta", "text": "DO_NOT_LEAK"}]
+        patches = build_cleaning_patches(before, after, "policy-1")
+        result = apply_patch_quality_gate(before, after, patches, _policy("rule.cta"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "rejected_patches.jsonl"
+            write_rejected_patches(path, result.rejected_patches)
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["location"]["note"] = "DO_NOT_LEAK"
+            path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            self.assertFalse(validate_rejected_patches_artifact(path))
+
+            record["location"] = {
+                "line_start": "DO_NOT_LEAK",
+                "line_end": None,
+                "page_start": None,
+                "page_end": None,
+            }
+            path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            self.assertFalse(validate_rejected_patches_artifact(path))
+
+            record["location"] = {
+                "line_start": True,
+                "line_end": None,
+                "page_start": None,
+                "page_end": None,
+            }
+            path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+            self.assertFalse(validate_rejected_patches_artifact(path))
 
     def test_validate_cleaning_patch_gate_artifact_rejects_old_or_invalid_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

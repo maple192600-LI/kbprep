@@ -13,7 +13,7 @@ from urllib.parse import unquote, urlparse
 from ..atomic_io import atomic_write_json
 from ..audit import AuditContext
 from ..audit import generate_audit_md as _generate_audit_from_context
-from ..cleaning_patch_gate import validate_cleaning_patch_gate_artifact
+from ..cleaning_patch_gate import count_rejected_patches_artifact, validate_cleaning_patch_gate_artifact
 from ..cleaning_patches import validate_cleaning_patches_artifact
 from ..converter_capabilities import get_capability_for_extension
 from ..converter_registry import ConversionRoute
@@ -563,7 +563,21 @@ def _required_artifact_exists(run_dir: Path, artifact: str) -> bool:
         return validate_cleaning_patches_artifact(path)
     if artifact == "cleaning_patch_gate.json":
         return validate_cleaning_patch_gate_artifact(path)
+    if artifact == "rejected_patches.jsonl":
+        return _rejected_patch_artifact_matches_gate(run_dir)
     return path.exists()
+
+
+def _rejected_patch_artifact_matches_gate(run_dir: Path) -> bool:
+    gate_path = run_dir / "cleaning_patch_gate.json"
+    rejected_path = run_dir / "rejected_patches.jsonl"
+    try:
+        gate = json.loads(gate_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    expected_count = gate.get("rejected_patch_count")
+    actual_count = count_rejected_patches_artifact(rejected_path)
+    return isinstance(expected_count, int) and actual_count == expected_count
 
 
 def _prepare_metadata_payload(
