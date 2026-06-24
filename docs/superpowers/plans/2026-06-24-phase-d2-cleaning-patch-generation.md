@@ -123,4 +123,6 @@ Reviewer must check patch contract completeness, private-content leakage, backwa
 
 Review closure: subagent review found and rechecked rule-source leakage, source-text hash leakage, cache artifact absence, unsafe cache artifact reuse, and D2 documentation scope. Final re-review reported no remaining Critical, Important, or Minor findings.
 
-- [ ] **Step 5: Merge, push, verify CI, and clean the D2 worktree**
+- [x] **Step 5: Merge, push, verify CI, and clean the D2 worktree**
+
+Integration closure: D2 fast-forward merged to `main`, pushed to GitHub, and main CI run `28096228394` completed successfully.
