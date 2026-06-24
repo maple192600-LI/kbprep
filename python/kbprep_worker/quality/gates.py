@@ -20,12 +20,14 @@ ERROR_CODE_TO_GATE = {
     "E_CTA_RESIDUE": "cleanup_safety",
     "E_QR_RESIDUE": "cleanup_safety",
     "E_DISCARD_RATIO_EXCEEDED": "cleanup_safety",
+    "E_DOCUMENT_CLEANING_GATE_FAILED": "cleanup_safety",
     "E_TEXT_COVERAGE_LOW": "cleanup_safety",
     "E_DETAIL_BLOCK_DISCARDED": "cleanup_safety",
     "E_BROKEN_CODE_BLOCK": "splitting_integrity",
     "E_OUTPUT_RETENTION_MISSING": "export_readiness",
     "E_QA_FAILED": "cleanup_safety",
     "W_QA": "cleanup_safety",
+    "W_REJECTED_CLEANING_PATCHES": "cleanup_safety",
 }
 
 def _build_quality_gates(strict_errors: list[str], warnings: list[str], report: dict) -> tuple[list[dict], list[dict]]:

@@ -213,6 +213,7 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
             "cleaning_patch_gate.json",
             "rejected_patches.jsonl",
             "clean_view.json",
+            "document_cleaning_gate.json",
         ),
     )
     if not existing:
@@ -711,6 +712,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "cleaning_patch_gate": str(run_dir / "cleaning_patch_gate.json"),
         "rejected_patches": str(run_dir / "rejected_patches.jsonl"),
         "clean_view": str(run_dir / "clean_view.json"),
+        "document_cleaning_gate": str(run_dir / "document_cleaning_gate.json"),
         "cleaned_md": str(run_dir / "cleaned.md"),
         "discarded_md": str(run_dir / "discarded.md"),
         "review_needed_md": str(run_dir / "review_needed.md"),

@@ -1,6 +1,7 @@
 """Assemble content-safe Clean View artifacts from Canonical IR and patches."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -237,10 +238,19 @@ def _parent_block_id(block: dict, patches: list[dict[str, Any]]) -> str:
 def _rule_ids(patches: list[dict[str, Any]]) -> list[str]:
     ids: list[str] = []
     for patch in patches:
-        rule_id = str(patch.get("rule_id") or "")
+        rule_id = _safe_reference_id(str(patch.get("rule_id") or ""))
         if rule_id and rule_id not in ids:
             ids.append(rule_id)
     return ids
+
+
+def _safe_reference_id(value: str) -> str:
+    if _safe_id(value):
+        return value
+    if not value:
+        return ""
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+    return f"rule_{digest}"
 
 
 def _safe_location(block: dict) -> dict[str, Any]:

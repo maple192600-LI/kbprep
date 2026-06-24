@@ -93,16 +93,21 @@ class CoreProcessingPathTests(unittest.TestCase):
             gate_path = Path(data["outputs"]["cleaning_patch_gate"])
             rejected_path = Path(data["outputs"]["rejected_patches"])
             clean_view_path = Path(data["outputs"]["clean_view"])
+            document_gate_path = Path(data["outputs"]["document_cleaning_gate"])
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
             gate_summary = json.loads(gate_path.read_text(encoding="utf-8"))
             clean_view = json.loads(clean_view_path.read_text(encoding="utf-8"))
+            document_gate = json.loads(document_gate_path.read_text(encoding="utf-8"))
             metadata = json.loads((Path(data["run_dir"]) / "run_metadata.json").read_text(encoding="utf-8"))
             self.assertTrue(patches_path.exists())
             self.assertTrue(gate_path.exists())
             self.assertTrue(rejected_path.exists())
             self.assertTrue(clean_view_path.exists())
+            self.assertTrue(document_gate_path.exists())
             self.assertEqual(gate_summary["schema"], "kbprep.cleaning_patch_gate.v1")
             self.assertEqual(clean_view["schema"], "kbprep.clean_view.v1")
+            self.assertEqual(document_gate["schema"], "kbprep.document_cleaning_gate.v1")
+            self.assertEqual(quality_report["document_cleaning_gate"]["status"], "pass")
             self.assertIn("threshold=0.8", final_md.read_text(encoding="utf-8"))
             self.assertEqual(quality_report["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
             self.assertEqual(metadata["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
@@ -228,6 +233,58 @@ class CoreProcessingPathTests(unittest.TestCase):
             self.assertFalse(second_envelope["data"].get("skipped", False))
             self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
             self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "clean_view.json").exists())
+
+    def test_prepare_cache_reuse_requires_document_cleaning_gate_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            first_run_dir = Path(first_envelope["data"]["run_dir"])
+            (first_run_dir / "document_cleaning_gate.json").unlink()
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "document_cleaning_gate.json").exists())
+
+    def test_prepare_cache_reuse_rejects_blocking_document_cleaning_gate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            first_run_dir = Path(first_envelope["data"]["run_dir"])
+            gate_path = first_run_dir / "document_cleaning_gate.json"
+            document_gate = json.loads(gate_path.read_text(encoding="utf-8"))
+            document_gate["status"] = "fail"
+            document_gate["blocks_publication"] = True
+            gate_path.write_text(json.dumps(document_gate, ensure_ascii=False), encoding="utf-8")
+
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
 
     def test_prepare_cache_reuse_requires_rejected_patch_count_to_match_gate(self):
         with tempfile.TemporaryDirectory() as tmp:

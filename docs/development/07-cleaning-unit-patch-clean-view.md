@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Make cleanup auditable through internal cleaning units, guarded patches, and complete Clean View assembly.
+Make cleanup auditable through internal cleaning units, guarded patches, complete Clean View assembly, and a final document cleaning gate.
 
 ## Flowchart Mapping
 
-This stage supports internal unit planning, patch creation, patch quality gate, rejected patch reporting, and Clean View assembly in the flowchart contract.
+This stage supports internal unit planning, patch creation, patch quality gate, rejected patch reporting, Clean View assembly, and the final document cleaning gate in the flowchart contract.
 
 ## Contract
 
@@ -15,6 +15,8 @@ This stage supports internal unit planning, patch creation, patch quality gate, 
 - Unsafe patches are rejected and the original text is preserved.
 - Clean View is assembled from Canonical IR plus accepted patches.
 - Clean View assembly must not summarize, invent, or rewrite source content.
+- DocumentCleaningGate validates the assembled Clean View before publication.
+- Rejected patch evidence becomes a warning, not a blocker, when the final document is otherwise safe.
 
 ## Current Shipped Surface
 
@@ -34,14 +36,19 @@ snapshot hash, safe before/after metadata, text-changed status, and location
 hints. Rejected unsafe patches are restored in memory before the current
 renderer runs.
 
-Patch generation, the first patch quality gate, rejected patch reporting, and
-Clean View assembly are shipped. The worker writes a content-safe
+Patch generation, the first patch quality gate, rejected patch reporting,
+Clean View assembly, and DocumentCleaningGate are shipped. The worker writes a content-safe
 `clean_view.json` artifact after cleanup, image classification, and
 Obsidian-profile policy application. The artifact records the renderable
 document order from `canonical_ir/typed_nodes.json` plus accepted
 `cleaning_patches.jsonl` patch identity without copying source text or patch
-before/after text. The final document cleaning gate remains Phase D target
-work.
+before/after text.
+
+The final document cleaning gate writes `document_cleaning_gate.json` after
+rendering. It validates that Clean View is present, valid, and covers every
+block id; confirms `cleaned.md` exists; and turns rejected patch evidence into
+content-safe warning counts and reason codes. It does not copy source text,
+patch before/after text, rule patterns, private paths, or heading text.
 
 ## Phase D Acceptance Target
 
@@ -51,9 +58,9 @@ work.
 - Clean View can be rendered into Markdown and assets.
 - Warnings identify rejected patches without blocking safe changes.
 
-Current status: patch generation, the first patch quality gate, rejected patch
-reporting, and Clean View assembly/rendering are shipped. Final
-DocumentCleaningGate warnings remain D6 work.
+Current status: Phase D is shipped. Patch generation, the first patch quality
+gate, rejected patch reporting, Clean View assembly/rendering, and
+DocumentCleaningGate warnings are implemented.
 
 ## Risk And Rollback
 

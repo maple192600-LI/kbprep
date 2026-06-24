@@ -73,6 +73,7 @@ def run_quality_check(
     chunk_chars = _check_splitting_quality(run_p, strict_errors, quality_issues, warnings)
     coverage_data = _check_text_coverage(blocks, source_type, strict_errors, quality_issues, warnings)
     retention_data = _check_retention(block_stats["image_blocks"], blocks, run_p, strict_errors, quality_issues)
+    document_cleaning_gate = _check_document_cleaning_gate(blocks, run_p, strict_errors, quality_issues, warnings)
     quality_loop = _finalize_quality_loop(
         strict_errors,
         quality_issues,
@@ -86,7 +87,7 @@ def run_quality_check(
     report = _build_quality_report(
         context, blocks, block_stats, cleaning_stats, coverage_data, retention_data,
         source_text_layer, source_integrity, structure_integrity, conversion_gate_report, quality_loop,
-        chunk_chars, quality_issues, strict_errors, warnings,
+        document_cleaning_gate, chunk_chars, quality_issues, strict_errors, warnings,
     )
     _attach_quality_gate_outputs(report, quality_loop, run_p, strict_errors, warnings)
     return report
@@ -438,6 +439,29 @@ def _check_retention(
     return {"image_stats": image_stats, "detail_stats": detail_stats, "output_stats": output_stats}
 
 
+def _check_document_cleaning_gate(
+    blocks: list[dict],
+    run_p: Path,
+    strict_errors: list[str],
+    quality_issues: list[dict[str, Any]],
+    warnings: list[str],
+) -> dict[str, Any]:
+    from ..document_cleaning_gate import run_document_cleaning_gate, write_document_cleaning_gate
+
+    gate = run_document_cleaning_gate(run_dir=run_p, blocks=blocks)
+    write_document_cleaning_gate(run_p / "document_cleaning_gate.json", gate)
+    for error in gate.get("strict_errors", []):
+        _append_quality_issue(
+            strict_errors,
+            quality_issues,
+            _quality_issue_code(error),
+            "cleanup_safety",
+            _quality_issue_message(error),
+        )
+    warnings.extend(str(warning) for warning in gate.get("warnings", []))
+    return gate
+
+
 def _check_image_retention(image_blocks: list[dict], run_p: Path, strict_errors: list[str], quality_issues: list[dict[str, Any]]) -> dict:
     image_stats = image_retention_stats(image_blocks, run_p)
     if image_stats["missing_file_count"] >= CONVERSION_THRESHOLDS["missing_image_file_strict"]:
@@ -507,6 +531,7 @@ def _build_quality_report(
     structure_integrity: dict,
     conversion_gate_report: dict,
     quality_loop: dict,
+    document_cleaning_gate: dict,
     chunk_chars: list[int],
     quality_issues: list[dict[str, Any]],
     strict_errors: list[str],
@@ -522,6 +547,7 @@ def _build_quality_report(
         structure_integrity,
         conversion_gate_report,
         quality_loop,
+        document_cleaning_gate,
     ))
     report.update(_quality_report_runtime(chunk_chars, quality_issues, strict_errors, warnings))
     if context["review_applied_at"] is not None:
@@ -592,9 +618,11 @@ def _quality_report_artifacts(
     structure_integrity: dict,
     conversion_gate_report: dict,
     quality_loop: dict,
+    document_cleaning_gate: dict,
 ) -> dict:
     return {
         "conversion_quality_gate": conversion_gate_report,
+        "document_cleaning_gate": document_cleaning_gate,
         "detail_retention": retention_data["detail_stats"],
         "source_text_layer": source_text_layer,
         "source_conversion_integrity": source_integrity,
@@ -733,6 +761,15 @@ def _append_quality_issue(
     if evidence:
         issue["evidence"] = evidence
     quality_issues.append(issue)
+
+
+def _quality_issue_code(message: str) -> str:
+    return str(message or "").split(":", 1)[0].strip() or "E_QA_FAILED"
+
+
+def _quality_issue_message(message: str) -> str:
+    parts = str(message or "").split(":", 1)
+    return parts[1].strip() if len(parts) == 2 else str(message or "")
 
 def _block_ids(blocks: list[dict]) -> list[str]:
     return [str(block.get("block_id") or "") for block in blocks if block.get("block_id")]

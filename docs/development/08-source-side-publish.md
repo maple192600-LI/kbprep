@@ -26,7 +26,9 @@ Markdown source output:
 
 Failed runs do not update source-side outputs or `latest_outputs`.
 
-Every publish decision writes `publish_report.json`:
+Every publish decision is preceded by `document_cleaning_gate.json`, which
+validates the assembled Clean View and records rejected patch warnings without
+copying source text. Every publish decision writes `publish_report.json`:
 
 - successful runs copy it to `output_root` and reference it from `latest_outputs`
 - blocked runs keep it in the run directory with the strict errors that stopped publication
@@ -34,7 +36,7 @@ Every publish decision writes `publish_report.json`:
 
 ## Acceptance
 
-- Publish gate checks final Markdown, assets, quality report, and old-output safety.
+- Publish gate checks final Markdown, assets, quality report, DocumentCleaningGate, and old-output safety.
 - Atomic publication either completes fully or leaves the previous successful deliverable intact.
 - Publish reports are available for both successful and blocked publish decisions.
 - Cleanup can remove process artifacts without deleting final deliverables or private rules.

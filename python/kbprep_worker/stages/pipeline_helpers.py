@@ -20,6 +20,7 @@ from ..converter_capabilities import get_capability_for_extension
 from ..converter_registry import ConversionRoute
 from ..converters.direct import read_direct_source as _read_direct_source_impl
 from ..converters.html import html_to_markdown as _html_to_markdown
+from ..document_cleaning_gate import document_cleaning_gate_allows_publication
 from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
 from ..supported_formats import IMAGE_EXTENSIONS
 from .pipeline_state import PipelineError
@@ -568,6 +569,8 @@ def _required_artifact_exists(run_dir: Path, artifact: str) -> bool:
         return _rejected_patch_artifact_matches_gate(run_dir)
     if artifact == "clean_view.json":
         return validate_clean_view_artifact(path)
+    if artifact == "document_cleaning_gate.json":
+        return document_cleaning_gate_allows_publication(path)
     return path.exists()
 
 

@@ -42,9 +42,9 @@ private rule bodies, private dictionary values, accepted-rule patterns, or
 source text into the run artifact.
 
 The policy snapshot contract is shipped for the current cleanup rule semantics.
-The remaining Phase D target is to make cleanup itself patch-based:
+Phase D now uses the snapshot as the policy input for patch-based cleanup:
 CleaningPatch generation, patch rejection evidence, Clean View assembly, and
-the DocumentCleaningGate.
+the DocumentCleaningGate are shipped in the current worker path.
 
 ## Acceptance
 

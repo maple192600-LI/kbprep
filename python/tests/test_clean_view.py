@@ -69,6 +69,22 @@ class CleanViewTests(unittest.TestCase):
         self.assertEqual(derived["parent_block_id"], "b_000001")
         self.assertEqual(derived["patch_ids"], ["p-derived"])
 
+    def test_sanitizes_non_token_rule_ids_without_leaking_rule_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            blocks = [_block("b_000001", "Useful method.", "paragraph", "discard", 1, 1)]
+            patches = [_patch("p1", "b_000001", "status_update", "discard")]
+            patches[0]["rule_id"] = "learned-course-加入训练营领取资料"
+
+            payload = assemble_clean_view(run_dir=run_dir, blocks=blocks, accepted_patches=patches)
+            clean_view_path = run_dir / "clean_view.json"
+            write_clean_view(clean_view_path, payload)
+
+            self.assertEqual(len(payload["entries"][0]["rule_ids"]), 1)
+            self.assertTrue(payload["entries"][0]["rule_ids"][0].startswith("rule_"))
+            self.assertNotIn("加入训练营", json.dumps(payload, ensure_ascii=False))
+            self.assertTrue(validate_clean_view_artifact(clean_view_path))
+
     def test_validator_rejects_leaky_or_malformed_clean_view(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "clean_view.json"
