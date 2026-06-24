@@ -14,6 +14,10 @@ If the protected Markdown design and HTML flowchart conflict, the protected Mark
 
 ## Required Checks
 
+Use layered checks during development so quality stays high without forcing
+every edit through the slowest gate. Targeted checks prove the current edit;
+release-level checks prove merge readiness.
+
 Documentation and governance changes:
 
 ```bash
@@ -33,6 +37,27 @@ Runtime pipeline changes:
 ```bash
 npm run dev:full-check
 ```
+
+Phase D implementation loop:
+
+```bash
+node scripts/python-venv.mjs -m unittest <target-test-module> -v
+npm run python:ruff
+npm run python:typecheck
+```
+
+Phase D merge readiness:
+
+```bash
+npm run python:test
+npm run dev:full-check
+git diff --check
+```
+
+If parallel branches are active, the branch merged second must first
+synchronize with the latest `main`, rerun its targeted checks, then rerun the
+merge-readiness gate. Do not promote `cleaning_policy_snapshot` or
+`patch_clean_view` status based only on targeted checks.
 
 ## One-Sentence Feedback Behavior
 

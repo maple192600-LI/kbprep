@@ -74,6 +74,19 @@ When a task has a natural completion step that is technically necessary to deliv
 
 Do not ask the owner to choose routine engineering mechanics. Ask or stop only when the next action crosses a real permission boundary: merging into the main branch, releasing, changing production configuration, deleting real data, changing credentials or permissions, creating cost, or making a hard-to-rollback system-level change. If a routine completion step fails, investigate the cause and either fix it or report the concrete blocker and impact.
 
+## Phase D Development Throughput Protocol
+
+For Phase D work (`CleaningPolicySnapshot`, `CleaningPatch`, patch gate, rejected patch reports, Clean View, and document cleaning gate), optimize for parallel throughput without lowering the final acceptance bar.
+
+- Start every Phase D slice from the current `main` in a clean isolated worktree and a focused `codex/` branch.
+- Split independent Phase D slices by file ownership and product contract. Do not combine infrastructure formatting, policy snapshot work, patch generation, Clean View assembly, and feedback/rerun changes in one branch unless they are required for one testable outcome.
+- During implementation, run targeted project-environment checks first: the new or affected unittest, then the smallest relevant lint/type/check command. Do not run `npm run dev:full-check` after every small edit.
+- Reserve `npm run dev:full-check` for release-level acceptance before merge, after targeted tests pass and review issues are fixed.
+- Use reviewer subagents at contract boundaries: policy snapshot schema/compiler completion, patch safety rules, Clean View assembly, document cleaning gate, source-side publication changes, and capability/status promotion. Small typo/doc consistency fixes do not need a full two-review loop unless they change claims or acceptance rules.
+- Parallel branches may proceed when their file domains and contracts do not overlap. The branch merged second must synchronize with latest `main` and rerun its affected checks plus the final required gate.
+- A Phase D capability may move from `partial` or `design_only` only after named tests, status docs, and release-level checks prove the shipped behavior.
+- Keep a short execution log in each Phase D plan: branch, baseline commit, targeted checks, review result, final gate, merge commit or PR.
+
 ## Full Issue Closure Rule
 
 When any issue, failing check, bug, contradiction, false success, documentation drift, or implementation gap is discovered while working on this project, treat it as part of the current quality closure until proven otherwise. Do not leave known problems as silent residue, optional follow-up, or vague "remaining work."
@@ -119,6 +132,13 @@ If the owner points out that a prior plan was incomplete, the agent must not onl
 ## Verification
 
 After each implementation change, verify the affected demo path. Prefer existing commands when relevant:
+
+Use layered verification for speed:
+
+1. Inner loop: run only the test or check that proves the current edit.
+2. Slice loop: run the affected package checks for the changed surface, such as Python unittest plus `python:ruff` and `python:typecheck`, or TypeScript build plus relevant Vitest coverage.
+3. Merge loop: run the required final gate (`dev:check` or `dev:full-check`) once the branch is ready for merge.
+4. Main loop: after pushing merged work to `main`, confirm remote CI when available.
 
 ## Main Commands
 

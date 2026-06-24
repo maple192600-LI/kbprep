@@ -150,6 +150,16 @@ Milestone M3. Goal: deterministic cleanup runs from a recorded snapshot,
 produces guarded patches, rejects unsafe patches, and assembles a complete
 Clean View.
 
+Execution model: Phase D should run as parallel, focused slices when ownership
+does not overlap. Each slice starts from current `main` in a clean worktree,
+uses targeted project-environment tests during implementation, and saves
+`npm run dev:full-check` for merge readiness. The branch merged second must
+synchronize with latest `main` and rerun its affected checks plus the final
+gate. Reviewer subagents are required for schema/compiler completion, patch
+safety, Clean View assembly, document cleaning gates, publication behavior, and
+capability promotion; small claim or typo corrections use governance checks
+unless they change acceptance semantics.
+
 Slices:
 
 - **D1** `CleaningPolicySnapshot` schema and compiler (rule set hash, dictionary
