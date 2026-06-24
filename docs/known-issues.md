@@ -4,7 +4,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 
 ## Current Target Gaps
 
-- Canonical IR is documented as the target fact layer, and the worker now writes validated `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, and manifest coverage-report evidence with core text, formula, figure, metadata, transcript cue nodes, and conversion-phase ledger evidence, but every route-specific structure has not fully moved to that contract.
+- Canonical IR is documented as the target fact layer, and the worker now writes validated `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, and manifest coverage-report evidence with core text, formula, figure, metadata, transcript cue nodes, conversion-phase ledger evidence, and pre-clean gate use of complete typed-node/source-span text evidence. Every route-specific structure has not fully moved to that contract.
 - SourceSpan artifact coverage exists for typed nodes, converted Markdown line ranges, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available, but route-native precision such as PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cells, and YouTube cue ids still needs converter-specific evidence.
 - CleaningPolicySnapshot now records the first policy input/hash artifact, but full reproducibility coverage still needs implementation.
 - CleaningPatch and Clean View are target contracts; current cleanup artifacts are not fully migrated.

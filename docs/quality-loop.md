@@ -83,6 +83,9 @@ Run artifacts should also preserve conversion reports, discarded content, reject
 Canonical IR artifacts. It shows whether typed nodes, source spans, and the
 TransformationLedger are validated, and it lists the route-native precision and
 future IR gaps that remain open.
+When typed-node and source-span coverage is complete, the pre-clean conversion
+gate records `text_quality_source: "canonical_ir"` and evaluates text quality
+from typed-node text before converter-provided or rendered Markdown fallback.
 
 ## Export Rule
 

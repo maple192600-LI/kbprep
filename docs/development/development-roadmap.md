@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, and C4 coverage-report claims; full route-wide IR semantics remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, and embedded coverage report evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans and full fact-layer usage are not shipped. |
+| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, C4 coverage-report claims, and C5 complete-IR text-quality evidence when available; full route-wide IR semantics remain future work. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, and pre-clean gate use of complete typed-node/source-span text evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans, renderer regeneration, and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
@@ -133,12 +133,15 @@ Slices:
   `source_spans_available`, and `transformation_ledger_available` tied to
   validated artifacts, and embeds `coverage.report` with counts, ratios,
   precision summaries, and remaining target gaps.
-- **C5** Conversion quality gate reads complete typed-node and source-span
-  evidence instead of relying on rendered Markdown.
+- **C5** Landed: the pre-clean conversion quality gate prefers complete
+  typed-node and source-span Canonical IR text evidence when `coverage.report`
+  proves full node/span coverage, and falls back to converter-provided quality
+  or rendered Markdown only when complete IR evidence is unavailable.
 
-Acceptance: `canonical_ir_contract` moves from partial to implemented;
-`canonical_ir.py` is no longer "minimal"; renderable Markdown can be
-regenerated from IR plus accepted changes.
+Phase C remains partial until route-native spans, relationships, assets,
+annotations, universal fact-layer use, and Markdown regeneration from IR plus
+accepted changes are implemented with named evidence. Only then can
+`canonical_ir_contract` move from partial to implemented.
 
 ### Phase D — CleaningPolicySnapshot, CleaningPatch, Clean View
 

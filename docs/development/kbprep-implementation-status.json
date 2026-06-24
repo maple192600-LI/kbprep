@@ -35,9 +35,10 @@
       "id": "conversion_quality_gate",
       "label": "Conversion quality gate",
       "status": "partial",
-      "scope": "Current code has conversion quality checks, manifest checks, and validation for Canonical IR typed-node, source-span, claimed transformation-ledger, and coverage-report evidence; the target gate must still read complete route-wide IR semantics across every route.",
+      "scope": "Current code has conversion quality checks, manifest checks, validation for Canonical IR typed-node, source-span, claimed transformation-ledger, and coverage-report evidence, and pre-clean gate use of complete typed-node/source-span text quality evidence when coverage is complete; the target gate must still read complete route-wide IR semantics across every route.",
       "evidence": [
         "docs/development/04-conversion-quality-gate.md",
+        "python/kbprep_worker/canonical_gate_evidence.py",
         "python/kbprep_worker/quality/conversion_gate.py",
         "python/kbprep_worker/canonical_coverage.py",
         "python/kbprep_worker/canonical_ledger.py",
@@ -54,9 +55,10 @@
       "id": "canonical_ir_contract",
       "label": "Canonical IR contract",
       "status": "partial",
-      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The manifest embeds a coverage report with typed-node counts, source-span counts, coverage ratios, precision summaries, TransformationLedger status, and remaining target gaps. Full route-native span precision, relationship evidence, assets, annotations, Markdown regeneration, and universal fact-layer usage are not shipped.",
+      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The manifest embeds a coverage report with typed-node counts, source-span counts, coverage ratios, precision summaries, TransformationLedger status, and remaining target gaps. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete. Full route-native span precision, relationship evidence, assets, annotations, Markdown regeneration, and universal fact-layer usage are not shipped.",
       "evidence": [
         "docs/development/02-canonical-ir-contract.md",
+        "python/kbprep_worker/canonical_gate_evidence.py",
         "python/kbprep_worker/canonical_nodes.py",
         "python/kbprep_worker/canonical_spans.py",
         "python/kbprep_worker/canonical_ledger.py",

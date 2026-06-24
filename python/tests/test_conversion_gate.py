@@ -99,7 +99,13 @@ def _write_single_transcript_typed_node(run_dir: Path) -> None:
 
 
 def _write_single_heading_canonical_artifacts(run_dir: Path) -> None:
-    (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+    _write_heading_canonical_artifacts_at(run_dir, "canonical_ir", "Tutorial")
+
+
+def _write_heading_canonical_artifacts_at(run_dir: Path, artifact_dir: str, heading_text: str) -> None:
+    target_dir = run_dir / artifact_dir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    (target_dir / "typed_nodes.json").write_text(
         json.dumps({
             "schema": "kbprep.canonical_ir_typed_nodes.v1",
             "document_id": "doc_test",
@@ -109,18 +115,18 @@ def _write_single_heading_canonical_artifacts(run_dir: Path) -> None:
                 "node_id": "n_000001",
                 "ordinal": 1,
                 "type": "heading",
-                "text": "Tutorial",
+                "text": heading_text,
                 "metadata": {"heading_level": 1},
             }],
         }),
         encoding="utf-8",
     )
-    (run_dir / "canonical_ir" / "source_spans.json").write_text(
+    (target_dir / "source_spans.json").write_text(
         json.dumps({
             "schema": "kbprep.canonical_ir_source_spans.v1",
             "document_id": "doc_test",
             "source_artifact": "converted.md",
-            "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+            "typed_nodes_artifact": f"{artifact_dir}/typed_nodes.json",
             "span_count": 1,
             "spans": [_heading_source_span()],
         }),
@@ -148,6 +154,15 @@ def _add_coverage_report(run_dir: Path, source_ratio: float = 1.0) -> None:
     manifest_path = run_dir / "canonical_ir" / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["coverage"]["report"] = _coverage_report(source_ratio)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _point_coverage_report_to_artifacts(run_dir: Path, artifact_dir: str) -> None:
+    manifest_path = run_dir / "canonical_ir" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    report = manifest["coverage"]["report"]
+    report["typed_nodes"]["artifact"] = f"{artifact_dir}/typed_nodes.json"
+    report["source_spans"]["artifact"] = f"{artifact_dir}/source_spans.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
 
@@ -273,6 +288,121 @@ class ConversionGateTests(unittest.TestCase):
         self.assertTrue(any(action["code"].startswith("E_CONVERTED_TEXT_") for action in report["failure_actions"]))
         self.assertTrue(any(error.startswith("E_CONVERTED_TEXT_") for error in report["strict_errors"]))
         self.assertTrue(all(issue["gate"] == "pre_clean_conversion" for issue in report["quality_issues"]))
+
+    def test_pre_clean_conversion_gate_uses_complete_canonical_ir_text_quality_before_rendered_markdown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("鐩綍 閮ㄧ讲 鏂规 " * 80, encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _add_coverage_report(run_dir)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["text_quality_source"], "canonical_ir")
+        self.assertTrue(report["canonical_ir_gate_evidence"]["complete"])
+        self.assertEqual(report["strict_errors"], [])
+
+    def test_pre_clean_conversion_gate_prefers_complete_canonical_ir_over_report_text_quality(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("鐩綍 閮ㄧ讲 鏂规 " * 80, encoding="utf-8")
+            _write_conversion_report(
+                run_dir,
+                converted,
+                mineru_artifacts={
+                    "post_convert_text_quality": {
+                        "total_chars": 100,
+                        "garbled_ratio": 0.8,
+                        "unreadable_text_ratio": 0.8,
+                        "mojibake_ratio": 0.0,
+                    },
+                },
+            )
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _add_coverage_report(run_dir)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "pass")
+        self.assertEqual(report["text_quality_source"], "canonical_ir")
+        self.assertTrue(report["canonical_ir_gate_evidence"]["complete"])
+        self.assertEqual(report["strict_errors"], [])
+
+    def test_pre_clean_conversion_gate_falls_back_to_rendered_markdown_when_ir_coverage_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("鐩綍 閮ㄧ讲 鏂规 " * 80, encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _add_coverage_report(run_dir, source_ratio=0.0)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertNotEqual(report["text_quality_source"], "canonical_ir")
+        self.assertFalse(report["canonical_ir_gate_evidence"]["complete"])
+        self.assertTrue(
+            any(error.startswith("E_CANONICAL_IR_COVERAGE_REPORT_INVALID") for error in report["strict_errors"])
+        )
+
+    def test_pre_clean_conversion_gate_rejects_coverage_report_artifact_spoofing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("鐩綍 閮ㄧ讲 鏂规 " * 80, encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_heading_canonical_artifacts_at(run_dir, "canonical_ir", "鐩綍 閮ㄧ讲 鏂规")
+            _write_heading_canonical_artifacts_at(run_dir, "spoof", "Tutorial")
+            _add_coverage_report(run_dir)
+            _point_coverage_report_to_artifacts(run_dir, "spoof")
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertNotEqual(report["text_quality_source"], "canonical_ir")
+        self.assertFalse(report["canonical_ir_gate_evidence"]["complete"])
+        self.assertTrue(any(
+            error.startswith("E_CANONICAL_IR_COVERAGE_REPORT_INVALID")
+            for error in report["strict_errors"]
+        ))
+
+    def test_pre_clean_conversion_gate_does_not_mark_noncanonical_manifest_artifacts_complete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("鐩綍 閮ㄧ讲 鏂规 " * 80, encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            manifest_path = run_dir / "canonical_ir" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["artifacts"]["typed_nodes"] = "spoof/typed_nodes.json"
+            manifest["artifacts"]["source_spans"] = "spoof/source_spans.json"
+            manifest["coverage"]["typed_nodes_available"] = True
+            manifest["coverage"]["source_spans_available"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            _write_heading_canonical_artifacts_at(run_dir, "spoof", "Tutorial")
+            _add_coverage_report(run_dir)
+            _point_coverage_report_to_artifacts(run_dir, "spoof")
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertNotEqual(report["text_quality_source"], "canonical_ir")
+        self.assertFalse(report["canonical_ir_gate_evidence"]["complete"])
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_MANIFEST_INVALID") for error in report["strict_errors"]))
 
     def test_pre_clean_conversion_gate_passes_readable_converted_markdown(self):
         with tempfile.TemporaryDirectory() as tmp:

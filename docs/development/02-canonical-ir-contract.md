@@ -30,14 +30,17 @@ source-span counts, coverage ratio, span precision summaries,
 TransformationLedger availability, and remaining target gaps. The conversion
 gate rejects available-artifact claims when this coverage report is missing or
 incomplete.
+When the coverage report proves complete typed-node and source-span coverage,
+the pre-clean conversion gate can evaluate text quality from typed-node text
+before falling back to converter-provided quality or rendered `converted.md`.
 Route-native fine-grained spans such as PDF bounding boxes, DOCX run ranges,
 PPTX shape ids, XLSX cells, and YouTube cue ids still depend on converters
 emitting that evidence. The TransformationLedger currently records ordered
 conversion-phase evidence for route decisions, converted Markdown, typed nodes,
 and source spans, and the pre-clean conversion gate validates it when the
 manifest claims the artifact. Relationship evidence, assets, annotations,
-route-native fine-grained spans, gate use of full IR semantics, and Markdown
-regeneration from IR plus accepted changes are still target work.
+route-native fine-grained spans, full route-wide gate use of IR semantics, and
+Markdown regeneration from IR plus accepted changes are still target work.
 
 ## Contract
 

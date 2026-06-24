@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..atomic_io import atomic_write_json
+from ..canonical_gate_evidence import build_canonical_ir_gate_evidence
 from ..canonical_ir import validate_canonical_ir_manifests
 from ..diagnose import analyze_text_quality
 from .conversion_integrity import converted_text_quality as report_converted_text_quality
@@ -17,12 +18,14 @@ def run_pre_clean_conversion_gate(run_dir: Path, diagnosis: dict[str, Any]) -> d
     run_p = Path(run_dir)
     conversion_report_path, diagnosis_report_path, conversion_report, strict_errors, quality_issues = _read_gate_evidence(run_p)
     converted_path = Path(str(conversion_report.get("converted_md") or run_p / "converted.md"))
-    quality = _converted_quality(conversion_report, converted_path)
+    canonical_ir_gate_evidence = build_canonical_ir_gate_evidence(run_p)
+    quality = _converted_quality(conversion_report, converted_path, canonical_ir_gate_evidence)
     text_errors, text_issues = _quality_failures(quality, converted_path)
     strict_errors.extend(text_errors)
     quality_issues.extend(text_issues)
     manifest_evidence = _canonical_ir_manifest_evidence(run_p, converted_path)
     _append_manifest_issues(strict_errors, quality_issues, manifest_evidence)
+    _append_canonical_gate_evidence_issues(strict_errors, quality_issues, canonical_ir_gate_evidence)
     status = "fail" if strict_errors else "pass"
     report = {
         "schema": "kbprep.conversion_quality_report.v1",
@@ -42,6 +45,8 @@ def run_pre_clean_conversion_gate(run_dir: Path, diagnosis: dict[str, Any]) -> d
         "evidence": _evidence_summary(conversion_report_path, diagnosis_report_path, converted_path),
         "diagnosis_text_quality": diagnosis.get("text_quality", {}) if isinstance(diagnosis, dict) else {},
         "converted_text_quality": quality,
+        "text_quality_source": str(quality.get("quality_source") or "converted_md"),
+        "canonical_ir_gate_evidence": canonical_ir_gate_evidence,
         "strict_errors": strict_errors,
         "quality_issues": quality_issues,
         "failure_actions": _failure_actions(quality_issues),
@@ -241,14 +246,35 @@ def _append_manifest_issues(
         )
 
 
-def _converted_quality(conversion_report: dict[str, Any], converted_path: Path) -> dict[str, Any]:
+def _converted_quality(
+    conversion_report: dict[str, Any],
+    converted_path: Path,
+    canonical_ir_gate_evidence: dict[str, Any],
+) -> dict[str, Any]:
+    if canonical_ir_gate_evidence.get("complete"):
+        text_quality = _dict_or_empty(canonical_ir_gate_evidence.get("text_quality"))
+        if text_quality:
+            return {
+                **text_quality,
+                "quality_source": "canonical_ir",
+                "canonical_ir_artifacts": _canonical_ir_quality_artifacts(canonical_ir_gate_evidence),
+            }
     from_report = report_converted_text_quality(conversion_report)
     if from_report:
-        return from_report
+        return {**from_report, "quality_source": "conversion_report"}
     if not converted_path.exists():
-        return {"total_chars": 0, "missing": True}
+        return {"total_chars": 0, "missing": True, "quality_source": "converted_md"}
     text = converted_path.read_text(encoding="utf-8", errors="replace")
-    return analyze_text_quality(text)
+    return {**analyze_text_quality(text), "quality_source": "converted_md"}
+
+
+def _canonical_ir_quality_artifacts(canonical_ir_gate_evidence: dict[str, Any]) -> dict[str, Any]:
+    typed_nodes = _dict_or_empty(canonical_ir_gate_evidence.get("typed_nodes"))
+    source_spans = _dict_or_empty(canonical_ir_gate_evidence.get("source_spans"))
+    return {
+        "typed_nodes": typed_nodes.get("artifact"),
+        "source_spans": source_spans.get("artifact"),
+    }
 
 
 def _quality_failures(quality: dict[str, Any], converted_path: Path) -> tuple[list[str], list[dict[str, Any]]]:
@@ -275,9 +301,48 @@ def _quality_failures(quality: dict[str, Any], converted_path: Path) -> tuple[li
                 quality_issues,
                 code,
                 f"{label} {value:.2%} exceeds strict threshold before cleanup",
-                evidence={"converted_md": str(converted_path), key: round(value, 4), "threshold": threshold},
+                evidence=_quality_failure_evidence(quality, converted_path, key, value, threshold),
             )
     return strict_errors, quality_issues
+
+
+def _quality_failure_evidence(
+    quality: dict[str, Any],
+    converted_path: Path,
+    key: str,
+    value: float,
+    threshold: float,
+) -> dict[str, Any]:
+    evidence: dict[str, Any] = {
+        "converted_md": str(converted_path),
+        "quality_source": str(quality.get("quality_source") or "converted_md"),
+        key: round(value, 4),
+        "threshold": threshold,
+    }
+    canonical_artifacts = _dict_or_empty(quality.get("canonical_ir_artifacts"))
+    if canonical_artifacts:
+        evidence["canonical_ir_artifacts"] = canonical_artifacts
+    return evidence
+
+
+def _append_canonical_gate_evidence_issues(
+    strict_errors: list[str],
+    quality_issues: list[dict[str, Any]],
+    canonical_ir_gate_evidence: dict[str, Any],
+) -> None:
+    issues = canonical_ir_gate_evidence.get("issues")
+    if not isinstance(issues, list):
+        return
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        _append_issue(
+            strict_errors,
+            quality_issues,
+            str(issue.get("code") or "E_CANONICAL_IR_COVERAGE_REPORT_INVALID"),
+            str(issue.get("message") or "Canonical IR gate evidence is inconsistent"),
+            evidence=_dict_or_none(issue.get("evidence")),
+        )
 
 
 def _append_issue(
