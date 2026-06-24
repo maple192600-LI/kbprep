@@ -31,9 +31,13 @@ def ok(
     data: dict[str, Any] | None = None,
     metrics: dict[str, Any] | None = None,
     warnings: list[str] | None = None,
-    status: str | None = None,
+    status: str = "completed",
 ) -> dict:
-    """Write a success envelope to stdout."""
+    """Write a success envelope to stdout.
+
+    status defaults to ``completed``; prepare's success path overrides it to
+    ``completed_with_warnings`` when non-blocking warnings exist (Phase E).
+    """
     envelope: dict[str, Any] = {
         "ok": True,
         "status": status,
