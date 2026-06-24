@@ -106,4 +106,4 @@ Reviewer must check restoration correctness, D4/D5 boundary discipline, private-
 
 - [x] **Step 4: Fix review findings**
 
-- [ ] **Step 5: Merge, push, verify CI, and clean the D3 worktree**
+- [x] **Step 5: Merge, push, verify CI, and clean the D3 worktree**
