@@ -204,14 +204,20 @@ as the general job status (currently only the batch parent uses it).
 
 Slices:
 
-- **E1** Single-source job status machine supports `completed_with_warnings`
-  when hard gates pass but non-blocking warnings exist.
-- **E2** Each quality gate classifies its findings as blocking (failed) or
-  non-blocking (warning) and the publisher maps warnings to the status.
+- **E1** Landed: the single-source job status machine now emits
+  `completed_with_warnings` when hard gates pass but non-blocking warnings
+  remain. `envelope.status_from_findings` maps strict errors / warnings to
+  `failed` / `completed_with_warnings` / `completed`, and `pipeline_core.
+  _emit_success` passes the resolved status into the published envelope.
+- **E2** Landed: the quality runner already classifies findings as
+  `strict_errors` (blocking) vs `warnings` (non-blocking); the success publish
+  path now maps the warnings into the envelope `status`. `envelope.ok` defaults
+  to `completed` so non-job commands stay valid under the required schema
+  field, while `WorkerEnvelopeSchema` (TypeScript) marks `status` required.
 
 Acceptance: a single-source run that passes hard gates with a soft warning
 publishes with status `completed_with_warnings`; tests cover the boundary
-against both `completed` and `failed`.
+against both `completed` and `failed`. Phase E is closed.
 
 ### Phase F — Optional Media And YouTube Routes
 
