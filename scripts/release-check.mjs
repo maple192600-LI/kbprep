@@ -8,6 +8,8 @@ const steps = [
   ["Verify dependency lock dry-run", npm, ["ci", "--dry-run"]],
   ["Reject whitespace errors", "git", ["diff", "--check"]],
   ["Build untracked runtime files", "custom", ["build-dist-check"]],
+  ["Check Prettier formatting", npm, ["run", "format:check"]],
+  ["Lint TypeScript", npm, ["run", "lint:check"]],
   ["Type-check TypeScript", npx, ["tsc", "-p", "tsconfig.json", "--noEmit"]],
   ["Run TypeScript integration tests", npm, ["test"]],
   ["Run TypeScript coverage", npm, ["run", "test:coverage"]],

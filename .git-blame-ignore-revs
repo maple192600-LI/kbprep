@@ -1,0 +1,7 @@
+# Commits that git blame should skip (pure formatting / generated, no logic).
+# Activate locally once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub web blame reads this file automatically (no config needed).
+
+# style: format TypeScript sources with Prettier (64 files,排版 only)
+579b2c759f5850b47e6f002f0edde6c9fab8f8f2
