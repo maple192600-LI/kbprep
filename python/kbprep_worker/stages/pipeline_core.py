@@ -11,7 +11,7 @@ from typing import Any
 from .. import __version__
 from ..atomic_io import atomic_write_json, atomic_write_text
 from ..cleaning_policy_snapshot import write_cleaning_policy_snapshot
-from ..envelope import fail, ok
+from ..envelope import fail, ok, status_from_findings
 from ..fs_safety import is_safe_input_path, is_safe_output_root
 from ..prepare_artifacts import (
     apply_artifact_policy as _apply_artifact_policy,
@@ -686,6 +686,7 @@ def _fail_quality_gate(state: PipelineState, run_outputs: dict[str, Any]) -> Non
 
 def _emit_success(state: PipelineState, run_dir: Path, run_outputs: dict[str, Any]) -> None:
     chunks_dir = run_dir / "chunks"
+    status = status_from_findings(state.strict_errors, state.warnings)
     ok(data={
         "run_id": state.run_id,
         "run_dir": str(run_dir),
@@ -694,7 +695,8 @@ def _emit_success(state: PipelineState, run_dir: Path, run_outputs: dict[str, An
         "chunk_count": len(list(chunks_dir.glob("*.md"))) if chunks_dir.exists() else 0,
         "warnings": state.warnings,
         "strict_errors": state.strict_errors,
-    }, warnings=state.warnings)
+        "status": status,
+    }, warnings=state.warnings, status=status)
 
 
 def _run_outputs(state: PipelineState) -> dict[str, Any]:
