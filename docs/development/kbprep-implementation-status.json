@@ -108,10 +108,14 @@
     {
       "id": "patch_clean_view",
       "label": "CleaningPatch and Clean View",
-      "status": "design_only",
-      "scope": "The target patch and Clean View model is defined, but current cleanup artifacts have not fully moved to that contract.",
+      "status": "partial",
+      "scope": "The worker writes cleaning_patches.jsonl for cleanup-stage block changes with block ids, change type, before/after safe metadata, rule ids, policy snapshot hash, source location hints, and text-changed status. Existing rendered outputs remain stable. Patch rejection gates, rejected patch reports, Clean View assembly, and the final document cleaning gate are not shipped.",
       "evidence": [
-        "docs/development/07-cleaning-unit-patch-clean-view.md"
+        "docs/development/07-cleaning-unit-patch-clean-view.md",
+        "python/kbprep_worker/cleaning_patches.py",
+        "python/kbprep_worker/stages/pipeline_core.py",
+        "python/tests/test_cleaning_patches.py",
+        "python/tests/test_core_processing_paths.py"
       ],
       "prohibitedClaims": [
         "every shipped cleanup change is a guarded CleaningPatch"

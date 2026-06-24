@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlparse
 from ..atomic_io import atomic_write_json
 from ..audit import AuditContext
 from ..audit import generate_audit_md as _generate_audit_from_context
+from ..cleaning_patches import validate_cleaning_patches_artifact
 from ..converter_capabilities import get_capability_for_extension
 from ..converter_registry import ConversionRoute
 from ..converters.direct import read_direct_source as _read_direct_source_impl
@@ -516,6 +517,7 @@ def _find_existing_run(
     plugin_version: str,
     runtime_cache_key: str,
     policy_snapshot_hash: str | None = None,
+    required_artifacts: tuple[str, ...] = (),
 ) -> dict | None:
     runs_dir = root_p / "runs"
     if not runs_dir.exists():
@@ -536,6 +538,7 @@ def _find_existing_run(
                     report.get("plugin_version") == plugin_version and
                     report.get("runtime_cache_key") == runtime_cache_key and
                     _policy_snapshot_matches(report, policy_snapshot_hash) and
+                    _required_artifacts_exist(run_dir, required_artifacts) and
                     not report.get("strict_errors")):
                     return {"run_id": run_dir.name, "run_dir": str(run_dir)}
             except Exception:
@@ -547,6 +550,17 @@ def _policy_snapshot_matches(report: dict, policy_snapshot_hash: str | None) -> 
     if policy_snapshot_hash is None:
         return True
     return report.get("cleaning_policy_snapshot_hash") == policy_snapshot_hash
+
+
+def _required_artifacts_exist(run_dir: Path, required_artifacts: tuple[str, ...]) -> bool:
+    return all(_required_artifact_exists(run_dir, artifact) for artifact in required_artifacts)
+
+
+def _required_artifact_exists(run_dir: Path, artifact: str) -> bool:
+    path = run_dir / artifact
+    if artifact == "cleaning_patches.jsonl":
+        return validate_cleaning_patches_artifact(path)
+    return path.exists()
 
 
 def _prepare_metadata_payload(

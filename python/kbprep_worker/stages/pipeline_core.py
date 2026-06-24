@@ -1,10 +1,6 @@
 """
 prepare - single-file pipeline.
 
-Pipeline: env_check -> initialize_run_or_skip_cache -> diagnose -> convert -> normalize
--> blockify -> classify_blocks -> clean_rules -> image_clean
--> render intermediate outputs -> split -> quality_check -> export after pass
-
 Each stage failure is tracked. If any stage fails, subsequent stages are skipped.
 """
 import hashlib
@@ -217,6 +213,7 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
         state.plugin_version,
         state.runtime_cache_key,
         policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
+        required_artifacts=("cleaning_patches.jsonl",),
     )
     if not existing:
         return False
@@ -441,12 +438,15 @@ def _stage_cleaning_policy_snapshot(state: PipelineState) -> None:
 
 
 def _stage_apply_cleaning_rules(state: PipelineState) -> None:
-    state.require_stage_fields("clean_rules", "blocks_path")
+    state.require_stage_fields("clean_rules", "blocks_path", "run_dir")
     blocks_path = state.require_path("clean_rules", "blocks_path")
+    run_dir = state.require_path("clean_rules", "run_dir")
     _stderr_log("info", "clean_rules", "Applying cleaning rules")
-    from .. import clean_rules as clean_mod
-    state.blocks = clean_mod.apply_clean_rules(
-        state.blocks,
+    from .cleaning_stage import apply_cleaning_rules_stage
+    state.blocks = apply_cleaning_rules_stage(
+        blocks=state.blocks,
+        run_dir=run_dir,
+        policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
         profile=state.profile,
         document_type=state.document_type,
         source_identity=json.dumps(state.source_identity, ensure_ascii=False, sort_keys=True),
@@ -729,6 +729,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "normalized_md": str(run_dir / "normalized.md"),
         "diagnosis_report": str(run_dir / "diagnosis_report.json"),
         "blocks_jsonl": str(run_dir / "blocks.jsonl"),
+        "cleaning_patches": str(run_dir / "cleaning_patches.jsonl"),
         "cleaned_md": str(run_dir / "cleaned.md"),
         "discarded_md": str(run_dir / "discarded.md"),
         "review_needed_md": str(run_dir / "review_needed.md"),
