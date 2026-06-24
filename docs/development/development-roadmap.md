@@ -174,9 +174,11 @@ Slices:
   status without copying source text, source-text hashes, private rule paths,
   or private rule content. Existing rendered outputs stay stable until D5
   assembles Clean View.
-- **D3** Patch gate (protected design §12 checks: node exists, rule in
-  snapshot, protection hit, table/code/formula/link/image integrity, no
-  whole-section deletion, evidence present).
+- **D3** Landed: `patch_quality_gate` rejects unsafe candidate patches before
+  rendering, restores rejected changes in memory, writes accepted patch records
+  to `cleaning_patches.jsonl`, and writes a safe `cleaning_patch_gate.json`
+  summary. The gate checks target node existence, active policy rule ids,
+  protected structure changes, whole-section deletion, and evidence presence.
 - **D4** `rejected_patches.jsonl` for every rejected patch.
 - **D5** `CleanViewAssembler` rebuilds the document from Canonical IR plus
   accepted patches in original order.

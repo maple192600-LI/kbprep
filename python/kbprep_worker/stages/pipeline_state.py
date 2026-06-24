@@ -97,6 +97,7 @@ class PipelineState:
     document_type: str = "unknown"
     document_type_detection: dict[str, Any] = field(default_factory=dict)
     cleaning_policy_snapshot_hash: str = ""
+    cleaning_policy_snapshot: dict[str, Any] = field(default_factory=dict)
     file_hash: str = ""
     file_size: int = 0
     plugin_version: str = "unknown"

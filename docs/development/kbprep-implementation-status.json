@@ -109,16 +109,19 @@
       "id": "patch_clean_view",
       "label": "CleaningPatch and Clean View",
       "status": "partial",
-      "scope": "The worker writes cleaning_patches.jsonl for cleanup-stage block changes with block ids, change type, before/after safe metadata, rule ids, policy snapshot hash, source location hints, and text-changed status. Existing rendered outputs remain stable. Patch rejection gates, rejected patch reports, Clean View assembly, and the final document cleaning gate are not shipped.",
+      "scope": "The worker writes accepted cleaning_patches.jsonl records for cleanup-stage block changes with block ids, change type, before/after safe metadata, rule ids, policy snapshot hash, source location hints, and text-changed status. The patch_quality_gate rejects unsafe candidate patches before rendering, restores rejected changes in memory, and writes a safe cleaning_patch_gate.json summary. Full rejected patch reports, Clean View assembly, and the final document cleaning gate are not shipped.",
       "evidence": [
         "docs/development/07-cleaning-unit-patch-clean-view.md",
+        "python/kbprep_worker/cleaning_patch_gate.py",
         "python/kbprep_worker/cleaning_patches.py",
         "python/kbprep_worker/stages/pipeline_core.py",
+        "python/tests/test_cleaning_patch_gate.py",
         "python/tests/test_cleaning_patches.py",
         "python/tests/test_core_processing_paths.py"
       ],
       "prohibitedClaims": [
-        "every shipped cleanup change is a guarded CleaningPatch"
+        "Clean View assembly is shipped",
+        "rejected_patches.jsonl is shipped"
       ]
     },
     {

@@ -90,9 +90,14 @@ class CoreProcessingPathTests(unittest.TestCase):
             self.assertIn("conversion_quality_gate", quality_report)
             snapshot_path = Path(data["outputs"]["cleaning_policy_snapshot"])
             patches_path = Path(data["outputs"]["cleaning_patches"])
+            gate_path = Path(data["outputs"]["cleaning_patch_gate"])
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            gate_summary = json.loads(gate_path.read_text(encoding="utf-8"))
             metadata = json.loads((Path(data["run_dir"]) / "run_metadata.json").read_text(encoding="utf-8"))
             self.assertTrue(patches_path.exists())
+            self.assertTrue(gate_path.exists())
+            self.assertEqual(gate_summary["schema"], "kbprep.cleaning_patch_gate.v1")
+            self.assertNotIn("rejected_patches", data["outputs"])
             self.assertEqual(quality_report["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
             self.assertEqual(metadata["cleaning_policy_snapshot_hash"], snapshot["snapshot_hash"])
             self.assertEqual(
@@ -145,6 +150,30 @@ class CoreProcessingPathTests(unittest.TestCase):
             self.assertFalse(second_envelope["data"].get("skipped", False))
             self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
             self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "cleaning_patches.jsonl").exists())
+
+    def test_prepare_cache_reuse_requires_cleaning_patch_gate_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text("# 操作教程\n\n步骤1：保留这个方法内容。\n", encoding="utf-8")
+            output_root = root / "out"
+
+            first_code, first_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "force": True, "profile": "standard"},
+            )
+            first_run_dir = Path(first_envelope["data"]["run_dir"])
+            (first_run_dir / "cleaning_patch_gate.json").unlink()
+            second_code, second_envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(output_root), "profile": "standard"},
+            )
+
+            self.assertEqual(first_code, 0)
+            self.assertEqual(second_code, 0)
+            self.assertFalse(second_envelope["data"].get("skipped", False))
+            self.assertNotEqual(second_envelope["data"]["run_id"], first_envelope["data"]["run_id"])
+            self.assertTrue((Path(second_envelope["data"]["run_dir"]) / "cleaning_patch_gate.json").exists())
 
     def test_prepare_cache_reuse_rejects_unsafe_cleaning_patch_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:

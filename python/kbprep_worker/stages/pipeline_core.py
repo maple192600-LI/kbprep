@@ -1,8 +1,4 @@
-"""
-prepare - single-file pipeline.
-
-Each stage failure is tracked. If any stage fails, subsequent stages are skipped.
-"""
+"""prepare - single-file pipeline with tracked stage failures."""
 import hashlib
 import json
 import logging
@@ -213,7 +209,7 @@ def _publish_cached_run_if_available(state: PipelineState) -> bool:
         state.plugin_version,
         state.runtime_cache_key,
         policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
-        required_artifacts=("cleaning_patches.jsonl",),
+        required_artifacts=("cleaning_patches.jsonl", "cleaning_patch_gate.json"),
     )
     if not existing:
         return False
@@ -426,6 +422,7 @@ def _stage_cleaning_policy_snapshot(state: PipelineState) -> None:
     if result.path is None:
         raise PipelineError("E_INTERNAL", "cleaning policy snapshot path was not written")
     state.cleaning_policy_snapshot_hash = result.snapshot_hash
+    state.cleaning_policy_snapshot = result.snapshot
     state.cleaning_policy_snapshot_path = result.path
     _update_run_metadata(run_dir, {
         "cleaning_policy_snapshot_hash": result.snapshot_hash,
@@ -447,6 +444,7 @@ def _stage_apply_cleaning_rules(state: PipelineState) -> None:
         blocks=state.blocks,
         run_dir=run_dir,
         policy_snapshot_hash=state.cleaning_policy_snapshot_hash,
+        compiled_policy=state.cleaning_policy_snapshot.get("compiled_policy", {}),
         profile=state.profile,
         document_type=state.document_type,
         source_identity=json.dumps(state.source_identity, ensure_ascii=False, sort_keys=True),
@@ -730,6 +728,7 @@ def _run_outputs(state: PipelineState) -> dict[str, Any]:
         "diagnosis_report": str(run_dir / "diagnosis_report.json"),
         "blocks_jsonl": str(run_dir / "blocks.jsonl"),
         "cleaning_patches": str(run_dir / "cleaning_patches.jsonl"),
+        "cleaning_patch_gate": str(run_dir / "cleaning_patch_gate.json"),
         "cleaned_md": str(run_dir / "cleaned.md"),
         "discarded_md": str(run_dir / "discarded.md"),
         "review_needed_md": str(run_dir / "review_needed.md"),
