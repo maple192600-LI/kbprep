@@ -78,10 +78,11 @@ const WorkerDataSchemas = {
   cleanup: CleanupDataSchema,
   prepare_batch: PrepareBatchDataSchema,
 } as const;
-const WorkerEnvelopeSchema = Type.Union([
+export const WorkerEnvelopeSchema = Type.Union([
   Type.Object(
     {
       ok: Type.Literal(true),
+      status: Type.Union([Type.Literal("completed"), Type.Literal("completed_with_warnings")]),
       data: Type.Optional(EnvelopeRecordSchema),
       metrics: Type.Optional(EnvelopeRecordSchema),
       warnings: Type.Optional(Type.Array(Type.String())),
@@ -91,6 +92,7 @@ const WorkerEnvelopeSchema = Type.Union([
   Type.Object(
     {
       ok: Type.Literal(false),
+      status: Type.Literal("failed"),
       error: Type.Object(
         {
           code: Type.String(),
