@@ -1,4 +1,4 @@
-"""Minimal Canonical IR manifest writer."""
+"""Canonical IR manifest and artifact writer."""
 
 from __future__ import annotations
 
@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from .atomic_io import atomic_write_json
+from .canonical_ledger import (
+    validate_transformation_ledger_reference,
+    write_transformation_ledger_artifact,
+)
 from .canonical_nodes import (
-    CANONICAL_IR_TYPED_NODES_SCHEMA,
-    SUPPORTED_NODE_TYPES,
-    TYPED_NODE_KEYS,
+    validate_typed_nodes_artifact,
     write_typed_nodes_artifact,
 )
 from .canonical_routes import canonical_conversion_route, canonical_converter, dict_or_empty
@@ -24,7 +26,6 @@ from .canonical_spans import (
 
 CANONICAL_IR_MANIFEST_SCHEMA = "kbprep.canonical_ir_manifest.v1"
 DOCUMENT_MANIFEST_SCHEMA = "kbprep.document_manifest.v1"
-TYPED_NODES_INVALID_CODE = "E_CANONICAL_IR_TYPED_NODES_INVALID"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,8 @@ class CanonicalArtifactState:
     typed_nodes_available: bool
     source_spans_path: Path
     source_spans_available: bool
+    transformation_ledger_path: Path
+    transformation_ledger_available: bool
 
 
 def write_canonical_ir_manifests(
@@ -60,7 +63,6 @@ def write_canonical_ir_manifests(
     canonical_dir = run_dir / "canonical_ir"
     canonical_dir.mkdir(parents=True, exist_ok=True)
     canonical_manifest_path = canonical_dir / "manifest.json"
-    document_manifest_path = run_dir / "document_manifest.json"
     artifact_state = _write_canonical_artifacts(
         run_dir=run_dir,
         input_path=input_path,
@@ -68,6 +70,7 @@ def write_canonical_ir_manifests(
         file_hash=file_hash,
         converted_path=converted_path,
         conversion_report=conversion_report,
+        run_id=run_id,
     )
     canonical_manifest = _canonical_manifest_payload(
         run_dir=run_dir,
@@ -82,9 +85,29 @@ def write_canonical_ir_manifests(
         typed_nodes_available=artifact_state.typed_nodes_available,
         source_spans_path=artifact_state.source_spans_path,
         source_spans_available=artifact_state.source_spans_available,
+        transformation_ledger_path=artifact_state.transformation_ledger_path,
+        transformation_ledger_available=artifact_state.transformation_ledger_available,
     )
     _write_json(canonical_manifest_path, canonical_manifest)
+    return _write_document_manifest(
+        run_dir=run_dir,
+        canonical_manifest_path=canonical_manifest_path,
+        document_manifest_path=run_dir / "document_manifest.json",
+        conversion_report_path=conversion_report_path,
+        converted_path=converted_path,
+        run_id=run_id,
+    )
 
+
+def _write_document_manifest(
+    *,
+    run_dir: Path,
+    canonical_manifest_path: Path,
+    document_manifest_path: Path,
+    conversion_report_path: Path,
+    converted_path: Path,
+    run_id: str,
+) -> dict[str, Path]:
     _write_json(document_manifest_path, _document_manifest_payload(
         run_dir=run_dir,
         canonical_manifest_path=canonical_manifest_path,
@@ -145,6 +168,7 @@ def _write_canonical_artifacts(
     file_hash: str,
     converted_path: Path,
     conversion_report: dict[str, Any],
+    run_id: str,
 ) -> CanonicalArtifactState:
     route_decision = dict_or_empty(conversion_report.get("route_decision"))
     document_id = _document_id(file_hash, input_path)
@@ -157,6 +181,18 @@ def _write_canonical_artifacts(
         run_dir, document_id, input_path, converted_path, typed_path, source_type,
         converter, conversion_route,
     )
+    conversion = _conversion_snapshot(conversion_report, route_decision)
+    ledger_path, ledger_available = _write_validated_transformation_ledger(
+        run_dir=run_dir,
+        document_id=document_id,
+        run_id=run_id,
+        converted_path=converted_path,
+        typed_nodes_path=typed_path,
+        typed_nodes_available=typed_available,
+        source_spans_path=spans_path,
+        source_spans_available=spans_available,
+        conversion=conversion,
+    )
     return CanonicalArtifactState(
         document_id=document_id,
         route_decision=route_decision,
@@ -164,6 +200,8 @@ def _write_canonical_artifacts(
         typed_nodes_available=typed_available,
         source_spans_path=spans_path,
         source_spans_available=spans_available,
+        transformation_ledger_path=ledger_path,
+        transformation_ledger_available=ledger_available,
     )
 
 
@@ -222,6 +260,43 @@ def _write_validated_source_spans(
     return source_spans_path, source_spans_available
 
 
+def _write_validated_transformation_ledger(
+    *,
+    run_dir: Path,
+    document_id: str,
+    run_id: str,
+    converted_path: Path,
+    typed_nodes_path: Path,
+    typed_nodes_available: bool,
+    source_spans_path: Path,
+    source_spans_available: bool,
+    conversion: dict[str, Any],
+) -> tuple[Path, bool]:
+    ledger_path = write_transformation_ledger_artifact(
+        run_dir=run_dir,
+        document_id=document_id,
+        run_id=run_id,
+        converted_path=converted_path,
+        typed_nodes_path=typed_nodes_path,
+        typed_nodes_available=typed_nodes_available,
+        source_spans_path=source_spans_path,
+        source_spans_available=source_spans_available,
+        conversion=conversion,
+    )
+    issues = validate_transformation_ledger_reference(
+        run_dir=run_dir,
+        artifacts={
+            "typed_nodes": _relative_run_path(run_dir, typed_nodes_path),
+            "source_spans": _relative_run_path(run_dir, source_spans_path),
+            "transformation_ledger": _relative_run_path(run_dir, ledger_path),
+        },
+        coverage={"transformation_ledger_available": True},
+        document_id=document_id,
+        converted_path=converted_path,
+    )
+    return ledger_path, not issues
+
+
 def _canonical_manifest_payload(
     *,
     run_dir: Path,
@@ -236,6 +311,8 @@ def _canonical_manifest_payload(
     typed_nodes_available: bool,
     source_spans_path: Path,
     source_spans_available: bool,
+    transformation_ledger_path: Path,
+    transformation_ledger_available: bool,
 ) -> dict[str, Any]:
     conversion_report_path = run_dir / "conversion_report.json"
     diagnosis_report_path = run_dir / "diagnosis_report.json"
@@ -251,11 +328,13 @@ def _canonical_manifest_payload(
             diagnosis_report_path,
             typed_nodes_path,
             source_spans_path,
+            transformation_ledger_path,
         ),
         "coverage": _coverage_snapshot(
             run_dir,
             typed_nodes_available=typed_nodes_available,
             source_spans_available=source_spans_available,
+            transformation_ledger_available=transformation_ledger_available,
         ),
         "status": "partial",
     }
@@ -335,6 +414,7 @@ def _artifact_snapshot(
     diagnosis_report_path: Path,
     typed_nodes_path: Path,
     source_spans_path: Path,
+    transformation_ledger_path: Path,
 ) -> dict[str, str]:
     run_dir = conversion_report_path.parent
     return {
@@ -343,6 +423,7 @@ def _artifact_snapshot(
         "diagnosis_report": _relative_run_path(run_dir, diagnosis_report_path),
         "typed_nodes": _relative_run_path(run_dir, typed_nodes_path),
         "source_spans": _relative_run_path(run_dir, source_spans_path),
+        "transformation_ledger": _relative_run_path(run_dir, transformation_ledger_path),
     }
 
 
@@ -351,10 +432,12 @@ def _coverage_snapshot(
     *,
     typed_nodes_available: bool,
     source_spans_available: bool,
+    transformation_ledger_available: bool,
 ) -> dict[str, bool]:
     return {
         "typed_nodes_available": typed_nodes_available,
         "source_spans_available": source_spans_available,
+        "transformation_ledger_available": transformation_ledger_available,
         "assets_available": (run_dir / "images").exists(),
     }
 
@@ -394,6 +477,14 @@ def _validate_canonical_manifest(
             converted_path=converted,
         ):
             _add_issue(issues, issue.code, issue.message, issue.evidence)
+        for ledger_issue in validate_transformation_ledger_reference(
+            run_dir=run_dir,
+            artifacts=artifacts,
+            coverage=coverage,
+            document_id=str(manifest.get("document_id") or ""),
+            converted_path=converted,
+        ):
+            _add_issue(issues, ledger_issue.code, ledger_issue.message, ledger_issue.evidence)
     if manifest.get("status") != "partial":
         _add_issue(
             issues,
@@ -475,13 +566,18 @@ def _validate_coverage_snapshot(value: object, issues: list[CanonicalIrValidatio
     coverage = _require_mapping(value, "coverage", "E_CANONICAL_IR_MANIFEST_INVALID", issues)
     if coverage is None:
         return None
-    for field in ("typed_nodes_available", "source_spans_available", "assets_available"):
-        if not isinstance(coverage.get(field), bool):
+    required_fields = ("typed_nodes_available", "source_spans_available", "assets_available")
+    for field in required_fields + ("transformation_ledger_available",):
+        if field in required_fields or field in coverage:
+            value = coverage.get(field)
+        else:
+            continue
+        if not isinstance(value, bool):
             _add_issue(
                 issues,
                 "E_CANONICAL_IR_MANIFEST_INVALID",
                 f"canonical_ir/manifest.json coverage.{field} must be boolean",
-                {field: coverage.get(field)},
+                {field: value},
             )
     return coverage
 
@@ -493,8 +589,12 @@ def _typed_nodes_artifact_is_valid(
     document_id: str,
     converted_path: Path,
 ) -> bool:
-    issues: list[CanonicalIrValidationIssue] = []
-    _validate_typed_nodes_artifact(run_dir, typed_nodes_path, document_id, converted_path, issues)
+    issues = validate_typed_nodes_artifact(
+        run_dir=run_dir,
+        typed_nodes_path=typed_nodes_path,
+        document_id=document_id,
+        converted_path=converted_path,
+    )
     return not issues
 
 
@@ -552,146 +652,13 @@ def _validate_typed_nodes_reference(
             "coverage.typed_nodes_available must be true when artifacts.typed_nodes exists",
             {"typed_nodes_available": coverage.get("typed_nodes_available")},
         )
-    _validate_typed_nodes_artifact(run_dir, resolved, document_id, converted_path, issues)
-
-
-def _validate_typed_nodes_artifact(
-    run_dir: Path,
-    typed_nodes_path: Path,
-    document_id: str,
-    converted_path: Path,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    payload = _read_required_manifest(
-        typed_nodes_path,
-        missing_code=TYPED_NODES_INVALID_CODE,
-        invalid_code=TYPED_NODES_INVALID_CODE,
-        label="canonical_ir/typed_nodes.json",
-        issues=issues,
-    )
-    if payload is None:
-        return
-    _validate_typed_nodes_header(run_dir, payload, document_id, converted_path, issues)
-    nodes = payload.get("nodes")
-    if not isinstance(nodes, list):
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes.nodes must be a list", {"nodes": nodes})
-        return
-    _validate_typed_nodes_count(payload.get("node_count"), len(nodes), issues)
-    for position, node in enumerate(nodes, start=1):
-        _validate_typed_node(node, position, issues)
-
-
-def _validate_typed_nodes_header(
-    run_dir: Path,
-    payload: dict[str, Any],
-    document_id: str,
-    converted_path: Path,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    if payload.get("schema") != CANONICAL_IR_TYPED_NODES_SCHEMA:
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes schema is invalid", {"schema": payload.get("schema")})
-    if payload.get("document_id") != document_id:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes.document_id must match canonical manifest",
-            {"document_id": payload.get("document_id"), "expected": document_id},
-        )
-    _validate_typed_nodes_source_artifact(run_dir, payload.get("source_artifact"), converted_path, issues)
-
-
-def _validate_typed_nodes_count(
-    node_count: object,
-    actual_count: int,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    if not isinstance(node_count, int) or isinstance(node_count, bool) or node_count < 0:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes.node_count must be a non-negative integer",
-            {"node_count": node_count},
-        )
-        return
-    if node_count != actual_count:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes.node_count must equal len(nodes)",
-            {"node_count": node_count, "actual_count": actual_count},
-        )
-
-
-def _validate_typed_nodes_source_artifact(
-    run_dir: Path,
-    raw_value: object,
-    converted_path: Path,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    resolved = _resolve_run_reference(run_dir, raw_value, "source_artifact", TYPED_NODES_INVALID_CODE, issues)
-    if resolved is None:
-        return
-    expected_source = run_dir / "converted.md"
-    if resolved != expected_source.resolve():
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes.source_artifact must reference converted.md",
-            {"source_artifact": raw_value, "expected": _relative_run_path(run_dir, expected_source)},
-        )
-    if resolved != converted_path.resolve():
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes.source_artifact must match the validated converted artifact",
-            {"source_artifact": raw_value, "converted_path": _relative_run_path(run_dir, converted_path)},
-        )
-
-
-def _validate_typed_node(
-    node: object,
-    position: int,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    if not isinstance(node, dict):
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes node must be an object", {"position": position})
-        return
-    if set(node) != TYPED_NODE_KEYS:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes node keys must match C1 schema exactly",
-            {"position": position, "keys": sorted(node)},
-        )
-    _validate_typed_node_identity(node, position, issues)
-    if node.get("type") not in SUPPORTED_NODE_TYPES:
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes node type is unsupported", {"type": node.get("type")})
-    if not isinstance(node.get("text"), str) or not node.get("text", "").strip():
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes node text must be non-empty", {"position": position})
-    if not isinstance(node.get("metadata"), dict):
-        _add_issue(issues, TYPED_NODES_INVALID_CODE, "typed_nodes node metadata must be an object", {"position": position})
-
-
-def _validate_typed_node_identity(
-    node: dict[str, Any],
-    position: int,
-    issues: list[CanonicalIrValidationIssue],
-) -> None:
-    expected_id = f"n_{position:06d}"
-    if node.get("node_id") != expected_id:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes node_id must be deterministic and contiguous",
-            {"position": position, "node_id": node.get("node_id"), "expected": expected_id},
-        )
-    if node.get("ordinal") != position:
-        _add_issue(
-            issues,
-            TYPED_NODES_INVALID_CODE,
-            "typed_nodes ordinal must be contiguous",
-            {"position": position, "ordinal": node.get("ordinal")},
-        )
+    for issue in validate_typed_nodes_artifact(
+        run_dir=run_dir,
+        typed_nodes_path=resolved,
+        document_id=document_id,
+        converted_path=converted_path,
+    ):
+        _add_issue(issues, issue.code, issue.message, issue.evidence)
 
 
 def _require_schema(

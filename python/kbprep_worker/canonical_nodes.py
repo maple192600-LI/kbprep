@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .atomic_io import atomic_write_json
 from .canonical_transcripts import read_transcript_cues
 
 CANONICAL_IR_TYPED_NODES_SCHEMA = "kbprep.canonical_ir_typed_nodes.v1"
+TYPED_NODES_INVALID_CODE = "E_CANONICAL_IR_TYPED_NODES_INVALID"
 SUPPORTED_NODE_TYPES = frozenset({
     "heading",
     "paragraph",
@@ -53,6 +56,13 @@ class TypedNode:
     metadata: Mapping[str, object]
     line_start: int
     line_end: int
+
+
+@dataclass(frozen=True)
+class TypedNodeValidationIssue:
+    code: str
+    message: str
+    evidence: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -158,6 +168,29 @@ def write_typed_nodes_artifact(
     }
     atomic_write_json(artifact_path, payload, indent=2, trailing_newline=False)
     return artifact_path
+
+
+def validate_typed_nodes_artifact(
+    *,
+    run_dir: Path,
+    typed_nodes_path: Path,
+    document_id: str,
+    converted_path: Path,
+) -> list[TypedNodeValidationIssue]:
+    """Validate ``canonical_ir/typed_nodes.json`` against the C1 schema."""
+    issues: list[TypedNodeValidationIssue] = []
+    payload = _read_required_json(typed_nodes_path, "canonical_ir/typed_nodes.json", issues)
+    if payload is None:
+        return issues
+    _validate_typed_nodes_header(run_dir, payload, document_id, converted_path, issues)
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list):
+        _add_issue(issues, "typed_nodes.nodes must be a list", {"nodes": nodes})
+        return issues
+    _validate_typed_nodes_count(payload.get("node_count"), len(nodes), issues)
+    for position, node in enumerate(nodes, start=1):
+        _validate_typed_node(node, position, issues)
+    return issues
 
 
 def _consume_block(lines: list[str], index: int) -> tuple[str, str, dict[str, object], int]:
@@ -525,3 +558,154 @@ def _typed_node_to_dict(node: TypedNode) -> dict[str, object]:
         "text": node.text,
         "metadata": dict(node.metadata),
     }
+
+
+def _read_required_json(
+    path: Path,
+    label: str,
+    issues: list[TypedNodeValidationIssue],
+) -> dict[str, Any] | None:
+    if not path.exists():
+        _add_issue(issues, f"{label} is missing", {label: str(path)})
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _add_issue(issues, f"{label} is not readable JSON", {label: str(path), "error": str(exc)})
+        return None
+    if isinstance(data, dict):
+        return data
+    _add_issue(issues, f"{label} must be a JSON object", {label: str(path)})
+    return None
+
+
+def _validate_typed_nodes_header(
+    run_dir: Path,
+    payload: dict[str, Any],
+    document_id: str,
+    converted_path: Path,
+    issues: list[TypedNodeValidationIssue],
+) -> None:
+    if payload.get("schema") != CANONICAL_IR_TYPED_NODES_SCHEMA:
+        _add_issue(issues, "typed_nodes schema is invalid", {"schema": payload.get("schema")})
+    if payload.get("document_id") != document_id:
+        _add_issue(issues, "typed_nodes.document_id must match canonical manifest", {
+            "document_id": payload.get("document_id"),
+            "expected": document_id,
+        })
+    _validate_typed_nodes_source_artifact(run_dir, payload.get("source_artifact"), converted_path, issues)
+
+
+def _validate_typed_nodes_count(
+    node_count: object,
+    actual_count: int,
+    issues: list[TypedNodeValidationIssue],
+) -> None:
+    if not isinstance(node_count, int) or isinstance(node_count, bool) or node_count < 0:
+        _add_issue(issues, "typed_nodes.node_count must be a non-negative integer", {"node_count": node_count})
+        return
+    if node_count != actual_count:
+        _add_issue(issues, "typed_nodes.node_count must equal len(nodes)", {
+            "node_count": node_count,
+            "actual_count": actual_count,
+        })
+
+
+def _validate_typed_nodes_source_artifact(
+    run_dir: Path,
+    raw_value: object,
+    converted_path: Path,
+    issues: list[TypedNodeValidationIssue],
+) -> None:
+    resolved = _resolve_run_reference(run_dir, raw_value, "source_artifact", issues)
+    if resolved is None:
+        return
+    expected_source = run_dir / "converted.md"
+    if resolved != expected_source.resolve():
+        _add_issue(issues, "typed_nodes.source_artifact must reference converted.md", {
+            "source_artifact": raw_value,
+            "expected": _relative_run_path(run_dir, expected_source),
+        })
+    if resolved != converted_path.resolve():
+        _add_issue(issues, "typed_nodes.source_artifact must match the validated converted artifact", {
+            "source_artifact": raw_value,
+            "converted_path": _relative_run_path(run_dir, converted_path),
+        })
+
+
+def _validate_typed_node(
+    node: object,
+    position: int,
+    issues: list[TypedNodeValidationIssue],
+) -> None:
+    if not isinstance(node, dict):
+        _add_issue(issues, "typed_nodes node must be an object", {"position": position})
+        return
+    if set(node) != TYPED_NODE_KEYS:
+        _add_issue(issues, "typed_nodes node keys must match C1 schema exactly", {"position": position, "keys": sorted(node)})
+    _validate_typed_node_identity(node, position, issues)
+    if node.get("type") not in SUPPORTED_NODE_TYPES:
+        _add_issue(issues, "typed_nodes node type is unsupported", {"type": node.get("type")})
+    if not isinstance(node.get("text"), str) or not node.get("text", "").strip():
+        _add_issue(issues, "typed_nodes node text must be non-empty", {"position": position})
+    if not isinstance(node.get("metadata"), dict):
+        _add_issue(issues, "typed_nodes node metadata must be an object", {"position": position})
+
+
+def _validate_typed_node_identity(
+    node: dict[str, Any],
+    position: int,
+    issues: list[TypedNodeValidationIssue],
+) -> None:
+    expected_id = f"n_{position:06d}"
+    if node.get("node_id") != expected_id:
+        _add_issue(issues, "typed_nodes node_id must be deterministic and contiguous", {
+            "position": position,
+            "node_id": node.get("node_id"),
+            "expected": expected_id,
+        })
+    if node.get("ordinal") != position:
+        _add_issue(issues, "typed_nodes ordinal must be contiguous", {"position": position, "ordinal": node.get("ordinal")})
+
+
+def _resolve_run_reference(
+    run_dir: Path,
+    raw_value: object,
+    field: str,
+    issues: list[TypedNodeValidationIssue],
+) -> Path | None:
+    if not isinstance(raw_value, str) or not raw_value:
+        _add_issue(issues, f"manifest field {field} must be a relative path string", {field: raw_value})
+        return None
+    rel_path = Path(raw_value)
+    if rel_path.is_absolute() or ".." in rel_path.parts:
+        _add_issue(issues, f"manifest field {field} must stay inside the run directory", {field: raw_value})
+        return None
+    resolved = (run_dir / rel_path).resolve()
+    if not _is_relative_to(resolved, run_dir.resolve()):
+        _add_issue(issues, f"manifest field {field} escapes the run directory", {field: raw_value})
+        return None
+    return resolved
+
+
+def _relative_run_path(run_dir: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(run_dir.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _add_issue(
+    issues: list[TypedNodeValidationIssue],
+    message: str,
+    evidence: dict[str, Any],
+) -> None:
+    issues.append(TypedNodeValidationIssue(code=TYPED_NODES_INVALID_CODE, message=message, evidence=evidence))
