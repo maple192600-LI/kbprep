@@ -178,6 +178,9 @@ These rules are enforced by the Stop Hook in `.codex/hooks.json`. Violations cau
 - Python: `ruff check` must pass with rules E, F, W, I, N, UP enabled (configured in `python/pyproject.toml`).
 - Python: `mypy` must pass with config in `python/pyproject.toml`.
 - TypeScript: `tsc --noEmit` must pass.
+- TypeScript: `npm run format:check` (Prettier, `printWidth` 140) and `npm run lint:check` (ESLint: `typescript-eslint` recommended + `eslint-plugin-unused-imports`) must pass. Auto-format with `npm run format`.
+- Unused imports/locals are enforced by `eslint-plugin-unused-imports` and `tsconfig` `noUnusedLocals`; prefix intentionally-unused identifiers with `_`.
+- `git blame` skips the Prettier reformat commit after running `git config blame.ignoreRevsFile .git-blame-ignore-revs` once per clone (GitHub web blame reads it automatically).
 - The Stop Hook runs `npm run dev:check`, `npm run python:ruff`, and `npm run python:typecheck` automatically. `dev:check` must include `npm test`.
 
 ### Testing
@@ -219,6 +222,8 @@ These rules are enforced by the Stop Hook in `.codex/hooks.json`. Violations cau
 | Python and TypeScript error codes stay synced | Stop Hook | `npm run python:test-contract` |
 | Python lint rules E/F/W/I/N/UP pass | Stop Hook | `npm run python:ruff` |
 | Python worker type checks pass | Stop Hook | `npm run python:typecheck` |
+| TypeScript sources stay Prettier-formatted | `release:check` | `npm run format:check` |
+| TypeScript passes ESLint (no unused imports/vars) | `release:check` | `npm run lint:check` |
 | TypeScript compiles and integration tests stay green | `dev:check` | `npm run build`, `npm test` |
 | Hardcoded cleanup terms stay out of worker logic | `pack:check` | `scripts/checks/cleaning-hardcodes.mjs` |
 | HTML parsing does not use regex when a parser is available | `pack:check` | `scripts/checks/forbidden-patterns.mjs` |
