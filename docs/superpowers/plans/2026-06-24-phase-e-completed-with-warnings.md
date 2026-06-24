@@ -302,7 +302,7 @@ describe("WorkerEnvelopeSchema status (Phase E)", () => {
 
 - [ ] **Step 2: 跑测试确认失败**
 
-Run: `npx vitest run src/test/scenarios/worker-job-status.test.ts`
+Run: `npm test -- src/test/scenarios/worker-job-status.test.ts`
 Expected: FAIL（schema 无 status 字段，且 WorkerEnvelopeSchema 可能未 export）
 
 - [ ] **Step 3: 修改 WorkerEnvelopeSchema 加 status + export**
@@ -346,7 +346,7 @@ export const WorkerEnvelopeSchema = Type.Union([
 
 - [ ] **Step 4: 跑 TS 测试确认通过**
 
-Run: `npx vitest run src/test/scenarios/worker-job-status.test.ts`
+Run: `npm test -- src/test/scenarios/worker-job-status.test.ts`
 Expected: PASS（4 个用例）
 
 - [ ] **Step 5: eslint + tsc + commit**
