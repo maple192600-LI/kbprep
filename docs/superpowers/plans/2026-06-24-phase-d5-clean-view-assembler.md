@@ -177,4 +177,4 @@ Reviewer must check D5/D6 boundary discipline, Clean View ordering, artifact saf
 
 - [x] **Step 4: Fix review findings and re-review**
 
-- [ ] **Step 5: Commit, push, merge, verify CI, and remove the D5 worktree without physical residue**
+- [x] **Step 5: Commit, push, merge, verify CI, and remove the D5 worktree without physical residue**
