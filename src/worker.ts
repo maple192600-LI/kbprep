@@ -324,20 +324,6 @@ function hasOwnDataOk(data: unknown): boolean {
     && Object.prototype.hasOwnProperty.call(data, "ok");
 }
 
-interface TimeoutMarker extends Error {
-  __kbprep_timeout: true;
-}
-
-function createTimeoutError(ms: number): TimeoutMarker {
-  const err = new Error(`Worker timed out after ${ms}ms`) as TimeoutMarker;
-  err.__kbprep_timeout = true;
-  return err;
-}
-
-function isTimeoutError(err: unknown): err is TimeoutMarker {
-  return err instanceof Error && "__kbprep_timeout" in err;
-}
-
 function isAbortError(err: unknown): boolean {
   return err instanceof Error && err.name === "AbortError";
 }

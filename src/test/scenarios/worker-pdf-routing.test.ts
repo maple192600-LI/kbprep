@@ -1,21 +1,10 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 import {
-  makeEpubFixture,
   makeImageOnlyPdf,
-  makeLandscapeImagePdf,
-  makeLandscapeTextPdf,
-  makeOfficeFixtures,
-  normalizeMarkdownText,
-  parseEnvelope,
-  repoRoot,
   runPython,
-  runPythonJson,
-  runWorker,
-  runWorkerRawInput,
 } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - PDF routing", () => {

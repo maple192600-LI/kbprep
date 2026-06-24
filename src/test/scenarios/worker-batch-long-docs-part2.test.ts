@@ -1,23 +1,15 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  makeEpubFixture,
   makeGarbledTextLayerPdf,
   makeImageOnlyPdf,
   makeLandscapeImagePdf,
   makeLandscapeTextPdf,
-  makeOfficeFixtures,
   makeTextLayerPdf,
   normalizeMarkdownText,
-  parseEnvelope,
-  repoRoot,
-  runPython,
-  runPythonJson,
   runWorker,
-  runWorkerRawInput,
 } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - batch and long documents part 2", () => {

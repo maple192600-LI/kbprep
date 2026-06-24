@@ -1,0 +1,18 @@
+# 构建产物 / 本地环境 / 缓存
+dist/
+.kbprep/
+coverage/
+.coverage
+node_modules/
+
+# Python 源码不归 Prettier 管
+python/
+
+# 本项目 Prettier 只管 .ts/.mjs；以下类型显式忽略，防止 `prettier .` 误触
+*.md
+*.json
+*.html
+*.yml
+*.yaml
+*.css
+package-lock.json
