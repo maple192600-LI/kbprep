@@ -21,6 +21,7 @@ describe("worker command data schemas", () => {
   it("rejects prepare envelopes missing run_dir", () => {
     const envelope = JSON.stringify({
       ok: true,
+      status: "completed",
       data: {
         run_id: "run-1",
         latest_outputs: {},
@@ -38,6 +39,7 @@ describe("worker command data schemas", () => {
   it("rejects diagnose envelopes with malformed command data", () => {
     const envelope = JSON.stringify({
       ok: true,
+      status: "completed",
       data: {
         input_file: 42,
         recommended_pipeline: "direct",
@@ -55,6 +57,7 @@ describe("worker command data schemas", () => {
   it("accepts prepare envelopes with required output contract", () => {
     const envelope = JSON.stringify({
       ok: true,
+      status: "completed",
       data: {
         run_id: "run-1",
         run_dir: "C:/tmp/run-1",
@@ -72,6 +75,7 @@ describe("worker command data schemas", () => {
   it("rejects success command data that duplicates the envelope ok field", () => {
     const envelope = JSON.stringify({
       ok: true,
+      status: "completed",
       data: {
         ok: true,
         run_id: "run-1",
@@ -97,6 +101,7 @@ describe("worker command data schemas", () => {
   it("rejects cleanup envelopes with non-object data", () => {
     const envelope = JSON.stringify({
       ok: true,
+      status: "completed",
       data: "cleaned",
     });
 
