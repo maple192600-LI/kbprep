@@ -75,6 +75,25 @@ def _accepted_source_rule(rule_id: str, source_pattern: str, pattern: str) -> di
     return rule
 
 
+def _section_hash_fixture(rule_pattern: str, dictionary_value: str, protection_pattern: str) -> dict:
+    return {
+        "schema": "kbprep.cleaning_rules.v1",
+        "rules": [{
+            "type": "promotional_line",
+            "id": "base.discard.cta",
+            "action": "discard",
+            "match": "literal",
+            "pattern": rule_pattern,
+            "reason": "generic",
+            "risk_tag": "marketing",
+        }],
+        "keyword_sets": {
+            "cta_keywords": [dictionary_value],
+            "protected_patterns": [{"label": "formula", "pattern": protection_pattern}],
+        },
+    }
+
+
 def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -274,6 +293,146 @@ class CleaningPolicySnapshotTests(unittest.TestCase):
         self.assertNotEqual(second.snapshot_hash, third.snapshot_hash)
         accepted_route = _route_by_kind(third.snapshot, "accepted_user")
         self.assertEqual(accepted_route["active_rule_count"], 1)
+
+    def test_compiled_policy_records_ids_hashes_and_preferences_without_private_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_root = root / "rules"
+            user_rules = root / "user-rules"
+            private_path = root / ".kbprep" / "rules" / "document_types" / "course.json"
+            accepted_path = user_rules / "accepted_rules.jsonl"
+            _write_json(rules_root / "base" / "obvious_noise.json", {
+                "schema": "kbprep.cleaning_rules.v1",
+                "rules": [{
+                    "type": "promotional_line",
+                    "id": "base.discard.cta",
+                    "action": "discard",
+                    "match": "literal",
+                    "pattern": "generic cta",
+                    "reason": "generic",
+                    "risk_tag": "marketing",
+                }],
+                "keyword_sets": {
+                    "cta_keywords": ["cta"],
+                    "protected_patterns": [{"label": "formula", "pattern": "E=mc2"}],
+                },
+            })
+            _write_json(rules_root / "document_types" / "course.json", {
+                "schema": "kbprep.cleaning_rules.v1",
+                "rules": [],
+                "keyword_sets": {"knowledge_terms": ["lesson"]},
+            })
+            _write_json(private_path, {
+                "schema": "kbprep.cleaning_rules.v1",
+                "rules": [],
+                "keyword_sets": {"marketing_wrapper_line_patterns": ["DO_NOT_LEAK_PRIVATE_PATTERN"]},
+            })
+            _write_lines(accepted_path, [_accepted_rule("course-accepted", "course", "private accepted pattern")])
+
+            with (
+                _env("KBPREP_RULES_ROOT", str(rules_root)),
+                _env("KBPREP_USER_RULES_DIR", str(user_rules)),
+                _cwd(root),
+            ):
+                result = compile_cleaning_policy_snapshot(
+                    profile="standard",
+                    document_type="course",
+                    source_identity={"source_name": "lesson.md"},
+                )
+
+        policy = result.snapshot["compiled_policy"]
+        self.assertEqual(policy["schema"], "kbprep.compiled_cleaning_policy.v1")
+        self.assertIn("base.discard.cta", policy["active_rule_ids"])
+        self.assertIn("accepted-course-accepted", policy["active_rule_ids"])
+        self.assertIn("cta_keywords", policy["active_dictionary_ids"])
+        self.assertIn("protected_patterns:formula", policy["active_protection_ids"])
+        self.assertEqual(policy["disabled_rule_ids"], [])
+        self.assertEqual(policy["conflict_resolutions"], [])
+        self.assertEqual(policy["preferences"]["profile"], "standard")
+        self.assertEqual(policy["preferences"]["document_type"], "course")
+        self.assertEqual(len(policy["rule_set_hash"]), 64)
+        self.assertEqual(len(policy["dictionary_hash"]), 64)
+        self.assertEqual(len(policy["protection_hash"]), 64)
+        serialized = json.dumps(result.snapshot, ensure_ascii=False)
+        self.assertNotIn("DO_NOT_LEAK_PRIVATE_PATTERN", serialized)
+        self.assertNotIn("private accepted pattern", serialized)
+
+    def test_compiled_policy_section_hashes_change_only_for_their_section(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_root = root / "rules"
+            base_path = rules_root / "base" / "obvious_noise.json"
+            first_payload = _section_hash_fixture("rule-v1", "dictionary-v1", "protection-v1")
+            _write_json(base_path, first_payload)
+
+            with _env("KBPREP_RULES_ROOT", str(rules_root)), _cwd(root):
+                first = compile_cleaning_policy_snapshot(profile="standard", document_type="", source_identity={})
+                _write_json(base_path, _section_hash_fixture("rule-v2", "dictionary-v1", "protection-v1"))
+                rule_changed = compile_cleaning_policy_snapshot(profile="standard", document_type="", source_identity={})
+                _write_json(base_path, _section_hash_fixture("rule-v2", "dictionary-v2", "protection-v1"))
+                dictionary_changed = compile_cleaning_policy_snapshot(profile="standard", document_type="", source_identity={})
+                _write_json(base_path, _section_hash_fixture("rule-v2", "dictionary-v2", "protection-v2"))
+                protection_changed = compile_cleaning_policy_snapshot(profile="standard", document_type="", source_identity={})
+
+        first_policy = first.snapshot["compiled_policy"]
+        rule_policy = rule_changed.snapshot["compiled_policy"]
+        dictionary_policy = dictionary_changed.snapshot["compiled_policy"]
+        protection_policy = protection_changed.snapshot["compiled_policy"]
+        self.assertNotEqual(first_policy["rule_set_hash"], rule_policy["rule_set_hash"])
+        self.assertEqual(first_policy["dictionary_hash"], rule_policy["dictionary_hash"])
+        self.assertEqual(first_policy["protection_hash"], rule_policy["protection_hash"])
+        self.assertNotEqual(rule_policy["dictionary_hash"], dictionary_policy["dictionary_hash"])
+        self.assertEqual(rule_policy["protection_hash"], dictionary_policy["protection_hash"])
+        self.assertNotEqual(dictionary_policy["protection_hash"], protection_policy["protection_hash"])
+
+    def test_compiled_policy_records_disabled_rules_and_conflict_resolutions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rules_root = root / "rules"
+            _write_json(rules_root / "base" / "obvious_noise.json", {
+                "schema": "kbprep.cleaning_rules.v1",
+                "rules": [
+                    {
+                        "type": "promotional_line",
+                        "id": "base.discard.enabled",
+                        "action": "discard",
+                        "match": "literal",
+                        "pattern": "enabled",
+                        "reason": "enabled",
+                        "risk_tag": "marketing",
+                    },
+                    {
+                        "type": "promotional_line",
+                        "id": "base.discard.disabled",
+                        "action": "discard",
+                        "match": "literal",
+                        "pattern": "disabled",
+                        "reason": "disabled",
+                        "risk_tag": "marketing",
+                        "enabled": False,
+                    },
+                ],
+                "keyword_sets": {},
+                "conflict_resolutions": [{
+                    "winner_rule_id": "base.protect.body",
+                    "loser_rule_id": "base.discard.enabled",
+                    "resolution": "protection_wins",
+                    "pattern": "DO_NOT_LEAK_CONFLICT_PATTERN",
+                }],
+            })
+
+            with _env("KBPREP_RULES_ROOT", str(rules_root)), _cwd(root):
+                result = compile_cleaning_policy_snapshot(profile="standard", document_type="", source_identity={})
+
+        policy = result.snapshot["compiled_policy"]
+        self.assertIn("base.discard.disabled", policy["disabled_rule_ids"])
+        self.assertEqual(policy["conflict_resolutions"], [{
+            "loser_rule_id": "base.discard.enabled",
+            "resolution": "protection_wins",
+            "winner_rule_id": "base.protect.body",
+        }])
+        self.assertNotIn("base.discard.disabled", policy["active_rule_ids"])
+        self.assertNotIn("DO_NOT_LEAK_CONFLICT_PATTERN", json.dumps(result.snapshot, ensure_ascii=False))
 
     def test_rule_content_change_changes_snapshot_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

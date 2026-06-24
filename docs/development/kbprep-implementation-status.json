@@ -91,8 +91,8 @@
     {
       "id": "cleaning_policy_snapshot",
       "label": "CleaningPolicySnapshot",
-      "status": "partial",
-      "scope": "The worker writes a partial cleaning_policy_snapshot.json with selected policy input routes, active file paths and SHA-256 hashes, filtered accepted-rule fingerprints, threshold summary, and quality/run metadata references. Cache matching uses the policy hash after the document type is known. The full reproducible cleanup contract is not yet shipped.",
+      "status": "implemented",
+      "scope": "The worker writes cleaning_policy_snapshot.json with selected policy input routes, active file paths and SHA-256 hashes, filtered accepted-rule fingerprints, active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, compiler version, threshold summary, section hashes, and quality/run metadata references. Cache matching uses the policy hash after the document type is known. The snapshot records ids and hashes without copying private rule bodies, accepted-rule patterns, or source text.",
       "evidence": [
         "docs/development/06-cleaning-policy-library.md",
         "python/kbprep_worker/cleaning_policy_snapshot.py",
@@ -102,7 +102,7 @@
         "python/tests/test_core_processing_paths.py"
       ],
       "prohibitedClaims": [
-        "CleaningPolicySnapshot fully reproduces every shipped cleanup run"
+        "every shipped cleanup change is a guarded CleaningPatch"
       ]
     },
     {

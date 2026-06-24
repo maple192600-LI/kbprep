@@ -26,26 +26,31 @@ Private rules live under `.kbprep/rules/`. Public rules must remain generic or s
 
 ## Current Shipped Surface
 
-The current worker has a partial snapshot slice: each cleanup run writes
-`cleaning_policy_snapshot.json` after document type detection and before
-cleanup rules run. The artifact records selected rule routes, resolved active
-file paths, SHA-256 hashes, source identity summary, and the current cleanup
-and review thresholds. The snapshot hash is copied into `run_metadata.json` and
-`quality_report.json`. Cache matching is snapshot-aware after the document type
-and policy hash are available. Accepted user rules are fingerprinted after the
-document type and source filters run, so unrelated accepted rules do not change
-the current run's policy hash.
+The current worker writes `cleaning_policy_snapshot.json` after document type
+detection and before cleanup rules run. The artifact records selected rule
+routes, resolved active file paths, SHA-256 hashes, source identity summary, the
+current cleanup and review thresholds, and a compiled policy summary with active
+rule ids, dictionary ids, protection ids, disabled rule ids, conflict
+resolutions, preference selectors, compiler version, and section hashes.
 
-This is not the full reproducible cleanup contract yet. The remaining target
-still needs complete rule ids, dictionary ids, disabled rules, conflict
-resolutions, project/user preference semantics, CleaningPatch, and Clean View
-assembly.
+The snapshot hash is copied into `run_metadata.json` and `quality_report.json`.
+Cache matching is snapshot-aware after the document type and policy hash are
+available. Accepted user rules are fingerprinted after the document type and
+source filters run, so unrelated accepted rules do not change the current run's
+policy hash. The compiled summary records ids and hashes only; it does not copy
+private rule bodies, private dictionary values, accepted-rule patterns, or
+source text into the run artifact.
+
+The policy snapshot contract is shipped for the current cleanup rule semantics.
+The remaining Phase D target is to make cleanup itself patch-based:
+CleaningPatch generation, patch rejection evidence, Clean View assembly, and
+the DocumentCleaningGate.
 
 ## Acceptance
 
-- The compiled snapshot records every active rule source.
-- The partial shipped artifact records the active policy input files and hashes
-  without copying private rule contents.
+- The compiled snapshot records every active rule source and active rule id.
+- The shipped artifact records active policy input files, policy section
+  hashes, and private-rule fingerprints without copying private rule contents.
 - Conflicts keep original text unless a more specific protection or cleanup rule wins.
 - Dictionary entries have no deletion power without a cleanup rule.
 
