@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, and claimed transformation-ledger evidence; full route-wide IR semantics remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, and `transformation_ledger.json` artifacts exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans and full fact-layer usage are not shipped. |
+| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, and C4 coverage-report claims; full route-wide IR semantics remain future work. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, and embedded coverage report evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | partial | Worker records a first policy input/hash artifact, fingerprints filtered accepted rules, and threads the hash into run metadata, quality reports, and post-document-type cache matching; not the full cleanup contract. |
 | patch_clean_view | design_only | Patch and Clean View model defined; current cleanup has not moved to it. |
@@ -129,9 +129,10 @@ Slices:
   cells, and YouTube cue ids remains a converter-specific refinement before
   Phase C can be considered fully implemented.
 - **C3** Landed: `TransformationLedger` append-only record for conversion-phase Canonical IR evidence, referenced by the manifest and validated by the pre-clean conversion gate when claimed.
-- **C4** Complete coverage reporting: keep `typed_nodes_available` true only
-  for validated typed-node artifacts, and keep `source_spans_available` true
-  only for validated source-span artifacts.
+- **C4** Landed: complete coverage reporting keeps `typed_nodes_available`,
+  `source_spans_available`, and `transformation_ledger_available` tied to
+  validated artifacts, and embeds `coverage.report` with counts, ratios,
+  precision summaries, and remaining target gaps.
 - **C5** Conversion quality gate reads complete typed-node and source-span
   evidence instead of relying on rendered Markdown.
 

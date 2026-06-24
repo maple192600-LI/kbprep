@@ -79,6 +79,10 @@ It should identify:
 `batch_manifest.json` is the batch parent status summary for multi-file runs. It identifies parent status, per-file status, skipped unsupported files, artifact paths, and rerun scope.
 
 Run artifacts should also preserve conversion reports, discarded content, rejected patches, review-needed material, and publish reports when those artifacts exist for the profile.
+`canonical_ir/manifest.json` includes a coverage report for the current
+Canonical IR artifacts. It shows whether typed nodes, source spans, and the
+TransformationLedger are validated, and it lists the route-native precision and
+future IR gaps that remain open.
 
 ## Export Rule
 

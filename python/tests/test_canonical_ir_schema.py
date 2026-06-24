@@ -12,7 +12,7 @@ def _write_valid_manifest_pair(
     *,
     document_id: str = "doc_test",
     artifacts: dict[str, str] | None = None,
-    coverage: dict[str, bool] | None = None,
+    coverage: dict[str, object] | None = None,
 ) -> None:
     canonical_dir = run_dir / "canonical_ir"
     canonical_dir.mkdir(parents=True, exist_ok=True)
@@ -62,6 +62,54 @@ def _write_valid_manifest_pair(
         }),
         encoding="utf-8",
     )
+
+
+def _coverage_report(
+    *,
+    typed_available: bool = True,
+    source_spans_available: bool = False,
+    transformation_ledger_available: bool = False,
+    node_count: int = 1,
+    span_count: int = 0,
+    covered_count: int = 0,
+    node_types: dict[str, int] | None = None,
+    source_kinds: dict[str, int] | None = None,
+    precisions: dict[str, int] | None = None,
+) -> dict[str, object]:
+    return {
+        "schema": "kbprep.canonical_ir_coverage_report.v1",
+        "typed_nodes": {
+            "artifact": "canonical_ir/typed_nodes.json",
+            "available": typed_available,
+            "status": "validated" if typed_available else "not_available",
+            "node_count": node_count,
+            "node_types": node_types if node_types is not None else ({"heading": node_count} if node_count else {}),
+        },
+        "source_spans": {
+            "artifact": "canonical_ir/source_spans.json",
+            "available": source_spans_available,
+            "status": "validated" if source_spans_available else "not_available",
+            "span_count": span_count,
+            "typed_node_count": node_count,
+            "covered_typed_node_count": covered_count,
+            "typed_node_coverage_ratio": 1.0 if node_count == 0 else round(covered_count / node_count, 4),
+            "source_kinds": source_kinds if source_kinds is not None else {},
+            "precisions": precisions if precisions is not None else {},
+        },
+        "transformation_ledger": {
+            "artifact": "canonical_ir/transformation_ledger.json",
+            "available": transformation_ledger_available,
+            "status": "validated" if transformation_ledger_available else "not_available",
+            "entry_count": 6 if transformation_ledger_available else 0,
+        },
+        "gaps": {
+            "route_native_precision": {"status": "target_work"},
+            "relationships": {"status": "target_work"},
+            "assets": {"status": "target_work"},
+            "annotations": {"status": "target_work"},
+            "ir_markdown_regeneration": {"status": "target_work"},
+        },
+    }
 
 
 def _typed_nodes_payload(**overrides: object) -> dict[str, object]:
@@ -494,7 +542,10 @@ class CanonicalIrSchemaTests(unittest.TestCase):
                 run_dir,
                 converted,
                 artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
-                coverage={"typed_nodes_available": True},
+                coverage={
+                    "typed_nodes_available": True,
+                    "report": _coverage_report(node_count=0),
+                },
             )
             (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
                 json.dumps(_typed_nodes_payload(node_count=0, nodes=[])),
@@ -514,7 +565,13 @@ class CanonicalIrSchemaTests(unittest.TestCase):
                 run_dir,
                 converted,
                 artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
-                coverage={"typed_nodes_available": True},
+                coverage={
+                    "typed_nodes_available": True,
+                    "report": _coverage_report(
+                        node_count=3,
+                        node_types={"metadata": 1, "figure": 1, "formula": 1},
+                    ),
+                },
             )
             node = {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": None, "metadata": []}
             (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
@@ -537,7 +594,13 @@ class CanonicalIrSchemaTests(unittest.TestCase):
                 run_dir,
                 converted,
                 artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
-                coverage={"typed_nodes_available": True},
+                coverage={
+                    "typed_nodes_available": True,
+                    "report": _coverage_report(
+                        node_count=3,
+                        node_types={"metadata": 1, "figure": 1, "formula": 1},
+                    ),
+                },
             )
             node = {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": "Title"}
             (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
@@ -558,7 +621,13 @@ class CanonicalIrSchemaTests(unittest.TestCase):
                 run_dir,
                 converted,
                 artifacts={"converted_md": "converted.md", "typed_nodes": "canonical_ir/typed_nodes.json"},
-                coverage={"typed_nodes_available": True},
+                coverage={
+                    "typed_nodes_available": True,
+                    "report": _coverage_report(
+                        node_count=3,
+                        node_types={"metadata": 1, "figure": 1, "formula": 1},
+                    ),
+                },
             )
             nodes = [
                 {
@@ -605,7 +674,17 @@ class CanonicalIrSchemaTests(unittest.TestCase):
                     "typed_nodes": "canonical_ir/typed_nodes.json",
                     "source_spans": "canonical_ir/source_spans.json",
                 },
-                coverage={"typed_nodes_available": True, "source_spans_available": True},
+                coverage={
+                    "typed_nodes_available": True,
+                    "source_spans_available": True,
+                    "report": _coverage_report(
+                        source_spans_available=True,
+                        span_count=1,
+                        covered_count=1,
+                        source_kinds={"markdown_text": 1},
+                        precisions={"converted_line_range": 1},
+                    ),
+                },
             )
             (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
                 json.dumps(_typed_nodes_payload()),

@@ -56,7 +56,7 @@ def _write_manifest_pair(
     converted: Path,
     *,
     artifacts: dict[str, str] | None = None,
-    coverage: dict[str, bool] | None = None,
+    coverage: dict[str, object] | None = None,
 ) -> None:
     canonical_dir = run_dir / "canonical_ir"
     canonical_dir.mkdir(parents=True, exist_ok=True)
@@ -106,6 +106,48 @@ def _write_manifest_pair(
         }),
         encoding="utf-8",
     )
+
+
+def _full_coverage_payload() -> dict[str, object]:
+    return {
+        "typed_nodes_available": True,
+        "source_spans_available": True,
+        "transformation_ledger_available": True,
+        "report": {
+            "schema": "kbprep.canonical_ir_coverage_report.v1",
+            "typed_nodes": {
+                "artifact": "canonical_ir/typed_nodes.json",
+                "available": True,
+                "status": "validated",
+                "node_count": 1,
+                "node_types": {"heading": 1},
+            },
+            "source_spans": {
+                "artifact": "canonical_ir/source_spans.json",
+                "available": True,
+                "status": "validated",
+                "span_count": 1,
+                "typed_node_count": 1,
+                "covered_typed_node_count": 1,
+                "typed_node_coverage_ratio": 1.0,
+                "source_kinds": {"markdown_text": 1},
+                "precisions": {"converted_line_range": 1},
+            },
+            "transformation_ledger": {
+                "artifact": "canonical_ir/transformation_ledger.json",
+                "available": True,
+                "status": "validated",
+                "entry_count": 6,
+            },
+            "gaps": {
+                "route_native_precision": {"status": "target_work"},
+                "relationships": {"status": "target_work"},
+                "assets": {"status": "target_work"},
+                "annotations": {"status": "target_work"},
+                "ir_markdown_regeneration": {"status": "target_work"},
+            },
+        },
+    }
 
 
 def _write_valid_ledger_fixture(root: Path) -> tuple[Path, Path, Path, Path, Path]:
@@ -335,11 +377,7 @@ class CanonicalIrTransformationLedgerTests(unittest.TestCase):
                     "source_spans": "canonical_ir/source_spans.json",
                     "transformation_ledger": "canonical_ir/transformation_ledger.json",
                 },
-                coverage={
-                    "typed_nodes_available": True,
-                    "source_spans_available": True,
-                    "transformation_ledger_available": True,
-                },
+                coverage=_full_coverage_payload(),
             )
 
             issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)

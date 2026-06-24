@@ -198,6 +198,8 @@ def _failure_action(code: str) -> dict[str, str]:
         return _action(code, "regenerate_canonical_ir", "Regenerate Canonical IR source-span evidence before cleanup.")
     if code == "E_CANONICAL_IR_TRANSFORMATION_LEDGER_INVALID":
         return _action(code, "regenerate_canonical_ir", "Regenerate Canonical IR transformation ledger evidence before cleanup.")
+    if code == "E_CANONICAL_IR_COVERAGE_REPORT_INVALID":
+        return _action(code, "regenerate_canonical_ir", "Regenerate Canonical IR coverage evidence before cleanup.")
     if code in {"E_CANONICAL_IR_MANIFEST_INVALID", "E_DOCUMENT_MANIFEST_INVALID"}:
         return _action(code, "repair_manifest", "Repair manifest schema and artifact references before cleanup.")
     if code in {"E_CONVERT_OUTPUT_MISSING", "E_CONVERT_OUTPUT_EMPTY"}:

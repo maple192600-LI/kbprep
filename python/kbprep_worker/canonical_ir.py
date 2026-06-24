@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .atomic_io import atomic_write_json
+from .canonical_coverage import build_canonical_ir_coverage_report, validate_canonical_ir_coverage_report
 from .canonical_ledger import (
     validate_transformation_ledger_reference,
     write_transformation_ledger_artifact,
@@ -332,8 +333,11 @@ def _canonical_manifest_payload(
         ),
         "coverage": _coverage_snapshot(
             run_dir,
+            typed_nodes_path=typed_nodes_path,
             typed_nodes_available=typed_nodes_available,
+            source_spans_path=source_spans_path,
             source_spans_available=source_spans_available,
+            transformation_ledger_path=transformation_ledger_path,
             transformation_ledger_available=transformation_ledger_available,
         ),
         "status": "partial",
@@ -430,15 +434,27 @@ def _artifact_snapshot(
 def _coverage_snapshot(
     run_dir: Path,
     *,
+    typed_nodes_path: Path,
     typed_nodes_available: bool,
+    source_spans_path: Path,
     source_spans_available: bool,
+    transformation_ledger_path: Path,
     transformation_ledger_available: bool,
-) -> dict[str, bool]:
+) -> dict[str, Any]:
     return {
         "typed_nodes_available": typed_nodes_available,
         "source_spans_available": source_spans_available,
         "transformation_ledger_available": transformation_ledger_available,
         "assets_available": (run_dir / "images").exists(),
+        "report": build_canonical_ir_coverage_report(
+            run_dir=run_dir,
+            typed_nodes_path=typed_nodes_path,
+            typed_nodes_available=typed_nodes_available,
+            source_spans_path=source_spans_path,
+            source_spans_available=source_spans_available,
+            transformation_ledger_path=transformation_ledger_path,
+            transformation_ledger_available=transformation_ledger_available,
+        ),
     }
 
 
@@ -579,6 +595,8 @@ def _validate_coverage_snapshot(value: object, issues: list[CanonicalIrValidatio
                 f"canonical_ir/manifest.json coverage.{field} must be boolean",
                 {field: value},
             )
+    for issue in validate_canonical_ir_coverage_report(coverage):
+        _add_issue(issues, issue.code, issue.message, issue.evidence)
     return coverage
 
 

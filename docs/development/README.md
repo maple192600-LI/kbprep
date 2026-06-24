@@ -9,7 +9,7 @@ This directory turns the protected design into implementation work. The protecte
 ## Planning Entry Points
 
 - `development-roadmap.md` — connected phase-by-phase path from the current state to the completed design (read first).
-- `kbprep-development-implementation-plan.md` — M1–M6 milestones and current-truth rules.
+- `docs/kbprep-development-implementation-plan.md` — M1–M6 milestones and current-truth rules.
 - `kbprep-implementation-status.json` — capability status source of truth.
 - `docs/capability-matrix.md` — route-level capability status and evidence.
 

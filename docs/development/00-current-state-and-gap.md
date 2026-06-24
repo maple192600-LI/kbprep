@@ -18,9 +18,9 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 
 ## Target Gaps
 
-- Canonical IR now emits validated typed nodes, source spans, and a conversion-phase TransformationLedger, but it is not yet the complete internal fact layer.
+- Canonical IR now emits validated typed nodes, source spans, a conversion-phase TransformationLedger, and an embedded coverage report, but it is not yet the complete internal fact layer.
 - SourceSpan variants are not yet a full contract across all source kinds; route-native precision such as PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cells, and YouTube cue ids still needs converter-specific evidence.
-- Canonical IR still needs relationships, assets, annotations, complete coverage reporting, conversion-gate use of full IR evidence, and Markdown regeneration from IR plus accepted changes before Phase C is complete.
+- Canonical IR still needs relationships, assets, annotations, conversion-gate use of full IR evidence, and Markdown regeneration from IR plus accepted changes before Phase C is complete.
 - CleaningPolicySnapshot records the first policy input/hash artifact, but is not yet the full reproducibility boundary.
 - CleaningPatch and rejected patch reports are not yet the universal cleanup path.
 - Clean View is not yet the required render source for all profiles.

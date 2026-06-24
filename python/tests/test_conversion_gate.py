@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from kbprep_worker.canonical_ledger import write_transformation_ledger_artifact
 from kbprep_worker.quality.conversion_gate import run_pre_clean_conversion_gate
 
 
@@ -95,6 +96,121 @@ def _write_single_transcript_typed_node(run_dir: Path) -> None:
         }),
         encoding="utf-8",
     )
+
+
+def _write_single_heading_canonical_artifacts(run_dir: Path) -> None:
+    (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+        json.dumps({
+            "schema": "kbprep.canonical_ir_typed_nodes.v1",
+            "document_id": "doc_test",
+            "source_artifact": "converted.md",
+            "node_count": 1,
+            "nodes": [{
+                "node_id": "n_000001",
+                "ordinal": 1,
+                "type": "heading",
+                "text": "Tutorial",
+                "metadata": {"heading_level": 1},
+            }],
+        }),
+        encoding="utf-8",
+    )
+    (run_dir / "canonical_ir" / "source_spans.json").write_text(
+        json.dumps({
+            "schema": "kbprep.canonical_ir_source_spans.v1",
+            "document_id": "doc_test",
+            "source_artifact": "converted.md",
+            "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+            "span_count": 1,
+            "spans": [_heading_source_span()],
+        }),
+        encoding="utf-8",
+    )
+
+
+def _heading_source_span() -> dict[str, object]:
+    return {
+        "span_id": "s_000001",
+        "node_id": "n_000001",
+        "source_kind": "markdown_text",
+        "location": {"converted_line_start": 1, "converted_line_end": 1},
+        "evidence": {
+            "source_type": "markdown_note",
+            "converter": "direct_text",
+            "conversion_route": "direct_text",
+            "source_kind": "markdown_text",
+            "precision": "converted_line_range",
+        },
+    }
+
+
+def _add_coverage_report(run_dir: Path, source_ratio: float = 1.0) -> None:
+    manifest_path = run_dir / "canonical_ir" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["coverage"]["report"] = _coverage_report(source_ratio)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _enable_transformation_ledger(run_dir: Path, converted: Path) -> None:
+    typed_nodes_path = run_dir / "canonical_ir" / "typed_nodes.json"
+    source_spans_path = run_dir / "canonical_ir" / "source_spans.json"
+    ledger_path = write_transformation_ledger_artifact(
+        run_dir=run_dir,
+        document_id="doc_test",
+        run_id="run_test",
+        converted_path=converted,
+        typed_nodes_path=typed_nodes_path,
+        typed_nodes_available=True,
+        source_spans_path=source_spans_path,
+        source_spans_available=True,
+        conversion={
+            "converter": "direct_text",
+            "actual_route": "direct_text",
+            "route_decision_hash": "hash",
+        },
+    )
+    manifest_path = run_dir / "canonical_ir" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"]["transformation_ledger"] = ledger_path.relative_to(run_dir).as_posix()
+    manifest["coverage"]["transformation_ledger_available"] = True
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _coverage_report(source_ratio: float) -> dict[str, object]:
+    return {
+        "schema": "kbprep.canonical_ir_coverage_report.v1",
+        "typed_nodes": {
+            "artifact": "canonical_ir/typed_nodes.json",
+            "available": True,
+            "status": "validated",
+            "node_count": 1,
+            "node_types": {"heading": 1},
+        },
+        "source_spans": {
+            "artifact": "canonical_ir/source_spans.json",
+            "available": True,
+            "status": "validated",
+            "span_count": 1,
+            "typed_node_count": 1,
+            "covered_typed_node_count": 1 if source_ratio == 1.0 else 0,
+            "typed_node_coverage_ratio": source_ratio,
+            "source_kinds": {"markdown_text": 1},
+            "precisions": {"converted_line_range": 1},
+        },
+        "transformation_ledger": {
+            "artifact": "canonical_ir/transformation_ledger.json",
+            "available": False,
+            "status": "not_available",
+            "entry_count": 0,
+        },
+        "gaps": {
+            "route_native_precision": {"status": "target_work"},
+            "relationships": {"status": "target_work"},
+            "assets": {"status": "target_work"},
+            "annotations": {"status": "target_work"},
+            "ir_markdown_regeneration": {"status": "target_work"},
+        },
+    }
 
 
 def _write_conflicting_precision_source_span(run_dir: Path) -> None:
@@ -313,6 +429,60 @@ class ConversionGateTests(unittest.TestCase):
         self.assertEqual(report["status"], "fail")
         self.assertEqual(report["blocked_stage"], "cleanup")
         self.assertTrue(any(error.startswith("E_CANONICAL_IR_SOURCE_SPANS_INVALID") for error in report["strict_errors"]))
+        self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
+
+    def test_pre_clean_conversion_gate_fails_when_typed_nodes_available_lacks_coverage_report(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Tutorial\n\nRecord acceptance criteria.\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocked_stage"], "cleanup")
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_COVERAGE_REPORT_INVALID") for error in report["strict_errors"]))
+        self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
+
+    def test_pre_clean_conversion_gate_fails_when_source_span_coverage_report_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Tutorial\n\nRecord acceptance criteria.\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _add_coverage_report(run_dir, source_ratio=0.0)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocked_stage"], "cleanup")
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_COVERAGE_REPORT_INVALID") for error in report["strict_errors"]))
+        self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
+
+    def test_pre_clean_conversion_gate_fails_when_ledger_coverage_report_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Tutorial\n\nRecord acceptance criteria.\n", encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _enable_transformation_ledger(run_dir, converted)
+            _add_coverage_report(run_dir)
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertEqual(report["status"], "fail")
+        self.assertEqual(report["blocked_stage"], "cleanup")
+        self.assertTrue(any(error.startswith("E_CANONICAL_IR_COVERAGE_REPORT_INVALID") for error in report["strict_errors"]))
         self.assertTrue(any(action["action"] == "regenerate_canonical_ir" for action in report["failure_actions"]))
 
     def test_pre_clean_conversion_gate_fails_when_source_span_precision_conflicts(self):
