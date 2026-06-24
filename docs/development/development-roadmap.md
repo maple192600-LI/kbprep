@@ -36,8 +36,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
-| media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
-| youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
+| media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
+| youtube_url_routes | partial | Local YouTube `.url` descriptors route subtitle-first and fall back to media transcription with mocked fixtures; real-network YouTube evidence is not verified. |
 
 ## Guiding Principles
 
@@ -228,12 +228,15 @@ quality gates are ready.
 
 Slices:
 
-- **F1** Promote `media_local_transcript` from experimental toward verified
-  with real or golden ASR fixtures.
-- **F2** YouTube subtitle-first route, with media transcript fallback when
-  subtitles are unavailable, plus fixtures.
-- **F3** Update `capability-matrix.md` YouTube row from design_only toward
-  partial/verified only after fixtures pass.
+- **F1** Landed: `media_local_transcript` moved from experimental to partial
+  with mocked golden transcript route evidence, command evidence, and dependency
+  failure reporting. Verified promotion still requires real local ASR samples.
+- **F2** Landed: local YouTube `.url` descriptors use a subtitle-first route
+  and fall back to media transcription when subtitles are unavailable. Fixtures
+  mock `yt-dlp`, `ffmpeg`, and Whisper; no real network/account/cookie evidence
+  is claimed.
+- **F3** Landed: `capability-matrix.md`, status JSON, README/operator guidance,
+  and golden format manifest keep media and YouTube partial, not verified.
 
 Acceptance: optional routes are clearly marked until verified; no promotion
 without named tests; dependency failure messages are explicit.

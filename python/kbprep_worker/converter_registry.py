@@ -22,7 +22,9 @@ from .supported_formats import (
     MEDIA_EXTENSIONS,
     OFFICE_XML_EXTENSIONS,
     PDF_EXTENSIONS,
+    URL_DESCRIPTOR_EXTENSIONS,
 )
+from .youtube_source import is_youtube_url, source_url_from_descriptor
 from .zip_safety import ZipSafetyError, open_safe_zip
 
 
@@ -36,6 +38,7 @@ class ConversionRouteKind(str, Enum):
     IMAGE_TO_PDF_OCR = "image_to_pdf_ocr"
     LEGACY_OFFICE_TO_PDF = "legacy_office_to_pdf"
     MEDIA_TRANSCRIPT = "media_transcript"
+    YOUTUBE_TRANSCRIPT = "youtube_transcript"
     MEDIA_TRANSCRIPT_REQUIRED = "media_transcript_required"
     UNSUPPORTED = "unsupported"
 
@@ -97,6 +100,8 @@ def select_conversion_route(extension: str, diagnosis: dict, file_identity: File
         return _unsupported_route(ext, (*evidence, "extension_content_mismatch"))
     if not ext and content_ext:
         ext = content_ext
+    if ext in URL_DESCRIPTOR_EXTENSIONS:
+        return _youtube_or_unsupported_route(identity, evidence)
 
     strategy = selected_pdf_strategy(diagnosis) if ext in PDF_EXTENSIONS else str(diagnosis.get("conversion_strategy") or "")
     for registration in registered_converters():
@@ -282,6 +287,18 @@ def _route_from_registration(registration_id: str, strategy: str, evidence: tupl
         matched_converter=registration.id,
         match_evidence=evidence,
     )
+
+
+def _youtube_or_unsupported_route(identity: FileIdentity, evidence: tuple[str, ...]) -> ConversionRoute:
+    if identity.path and is_youtube_url(source_url_from_descriptor(identity.path)):
+        return ConversionRoute(
+            kind=ConversionRouteKind.YOUTUBE_TRANSCRIPT,
+            converter="youtube_transcript",
+            conversion_strategy="youtube_subtitle_then_media_transcript",
+            matched_converter="youtube_transcript",
+            match_evidence=(*evidence, "youtube_url_descriptor"),
+        )
+    return _unsupported_route(identity.extension or ".url", (*evidence, "non_youtube_url_descriptor"))
 
 
 def _unsupported_route(ext: str, evidence: tuple[str, ...]) -> ConversionRoute:

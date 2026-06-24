@@ -23,6 +23,7 @@ from ..converters.html import html_to_markdown as _html_to_markdown
 from ..document_cleaning_gate import document_cleaning_gate_allows_publication
 from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
 from ..supported_formats import IMAGE_EXTENSIONS
+from ..youtube_source import youtube_url_from_source
 from .pipeline_state import PipelineError
 
 EXISTING_RUN_SCAN_LIMIT = 20
@@ -464,16 +465,22 @@ def _actual_route_for_converter(converter: str, diagnosis: dict, mineru_artifact
         return "legacy_office_to_pdf_route"
     if converter == "media_transcript":
         return "media_to_transcript"
+    if converter == "youtube_transcript":
+        external: object = mineru_artifacts.get("external_conversion") if isinstance(mineru_artifacts, dict) else {}
+        raw_decision = external.get("route_decision") if isinstance(external, dict) else {}
+        decision = raw_decision if isinstance(raw_decision, dict) else {}
+        return str(decision.get("external_route") or "youtube_subtitle_then_media_transcript")
     return converter
 
 
-def _run_diagnose_direct(input_path: str, output_root: str, source_type: str) -> dict:
+def _run_diagnose_direct(input_path: str, output_root: str, source_type: str, source_url: str = "") -> dict:
     from ..diagnose import DiagnoseError, diagnose_file
 
     payload = {
         "input_path": input_path,
         "output_root": output_root,
         "source_type": source_type,
+        "source_url": source_url,
     }
     try:
         result, warnings = diagnose_file(payload)
@@ -706,6 +713,12 @@ def _source_identity_for_rules(input_path: Path, data: dict) -> dict:
 
     if "source_domain" not in identity:
         domain = _domain_from_identity_url(identity.get("source_url") or identity.get("origin_url"))
+        if domain:
+            identity["source_domain"] = domain
+    source_url = youtube_url_from_source(input_path, data)
+    if source_url and "source_url" not in identity:
+        identity["source_url"] = source_url
+        domain = _domain_from_identity_url(source_url)
         if domain:
             identity["source_domain"] = domain
 

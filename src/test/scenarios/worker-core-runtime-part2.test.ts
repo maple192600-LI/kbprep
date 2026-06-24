@@ -67,7 +67,11 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
           "assert pdf['status'] == 'verified', pdf",
           "assert pdf['test_evidence'], pdf",
           "assert video['route'] == 'media_to_transcript', video",
-          "assert video['status'] == 'experimental', video",
+          "assert video['status'] == 'partial', video",
+          "youtube = get_capability_for_extension('.url')",
+          "assert youtube['id'] == 'youtube_url_routes', youtube",
+          "assert youtube['route'] == 'youtube_subtitle_then_media_transcript', youtube",
+          "assert youtube['status'] == 'partial', youtube",
           "rows = capability_matrix_rows()",
           "assert any(row['route'] == 'office_xml' and row['status'] == 'partial' for row in rows), rows",
           "for row in rows:",
@@ -116,6 +120,38 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it("proves optional media and YouTube routes with mocked golden fixtures", () => {
+    runPython(
+      [
+        "import tempfile",
+        "from pathlib import Path",
+        "from kbprep_worker.converters.external_tools import ExternalCommandResult, extract_youtube_transcript, transcribe_media_with_whisper",
+        "root = Path(tempfile.mkdtemp(prefix='kbprep-media-youtube-'))",
+        "media = root / 'lesson.mp4'",
+        "media.write_bytes(b'golden media placeholder')",
+        "def media_runner(command, cwd, timeout_seconds):",
+        "    if command[0] == 'ffmpeg': Path(command[-1]).write_bytes(b'wav')",
+        "    if command[0] == 'whisper':",
+        "        out = Path(command[-1]); out.mkdir(parents=True, exist_ok=True)",
+        "        (out / 'lesson.txt').write_text('Step 1: keep threshold=0.8.\\n', encoding='utf-8')",
+        "    return ExternalCommandResult(0, '', '')",
+        "media_result = transcribe_media_with_whisper(media, root / 'media-run', which=lambda tool: tool, runner=media_runner)",
+        "assert media_result.ok, media_result.report",
+        "assert media_result.report['route_decision']['external_route'] == 'media_to_transcript', media_result.report",
+        "def youtube_runner(command, cwd, timeout_seconds):",
+        "    if '--skip-download' in command:",
+        "        out = Path(command[command.index('--output') + 1]); out.parent.mkdir(parents=True, exist_ok=True)",
+        "        out.with_name(out.name + '.en.vtt').write_text('WEBVTT\\n\\n00:00:00.000 --> 00:00:02.000\\nKeep setup step threshold=0.8.\\n', encoding='utf-8')",
+        "    return ExternalCommandResult(0, '', '')",
+        "youtube_result = extract_youtube_transcript('https://www.youtube.com/watch?v=ExampleVideo01', root / 'youtube-run', which=lambda tool: tool, runner=youtube_runner)",
+        "assert youtube_result.ok, youtube_result.report",
+        "assert youtube_result.report['route_decision']['external_route'] == 'youtube_subtitle', youtube_result.report",
+        "assert 'threshold=0.8' in youtube_result.artifact_path.read_text(encoding='utf-8')",
+      ].join("\n"),
+      [],
+    );
   });
 
   it("diagnoses local external-converter formats and keeps MOBI explicitly unsupported", () => {

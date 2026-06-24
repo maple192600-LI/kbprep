@@ -33,14 +33,14 @@ const HELP: Record<StandaloneCommand, string> = {
     "Checks KBPrep runtime readiness. Omit device_override to let KBPrep choose CPU/GPU automatically.",
   ].join("\n"),
   diagnose: [
-    "Usage: kbprep-analyze --input <file> [--output <dir>] [--source-type auto|pdf_like|markdown_note|generic_block|subtitle_transcript] [--config-file <file>]",
+    "Usage: kbprep-analyze --input <file|youtube.url> [--output <dir>] [--source-type auto|pdf_like|markdown_note|generic_block|subtitle_transcript] [--config-file <file>]",
     "",
-    "Reads one source file and reports source type, quality, and recommended processing route.",
+    "Reads one source file or local YouTube .url descriptor and reports source type, quality, and recommended processing route.",
   ].join("\n"),
   prepare: [
-    "Usage: kbprep-prepare --input <file> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--source-url <url>] [--source-domain <domain>] [--site-name <name>] [--max-quality-iterations <n>] [--force] [--config-file <file>]",
+    "Usage: kbprep-prepare --input <file|youtube.url> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--source-url <url>] [--source-domain <domain>] [--site-name <name>] [--max-quality-iterations <n>] [--force] [--config-file <file>]",
     "",
-    "Converts one local source file. Default profile standard publishes source-side Markdown; obsidian_kb publishes a generic Obsidian vault; curated_obsidian_kb is a compatibility template for course or self-media documents.",
+    "Converts one local source file or YouTube .url descriptor. Default profile standard publishes source-side Markdown; obsidian_kb publishes a generic Obsidian vault; curated_obsidian_kb is a compatibility template for course or self-media documents.",
   ].join("\n"),
   apply_review: [
     "Usage: kbprep-apply-review --run-dir <dir> --patch-file <json> [--config-file <file>]",

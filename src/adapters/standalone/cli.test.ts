@@ -10,7 +10,7 @@ describe("standalone KBPrep CLI adapter", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("Usage: kbprep-prepare");
-    expect(result.output).toContain("--input <file>");
+    expect(result.output).toContain("--input <file|youtube.url>");
     expect(result.output).toContain("Default profile standard");
     expect(result.output).toContain("compatibility template");
     expect(result.output).not.toContain("legacy course/self-media");

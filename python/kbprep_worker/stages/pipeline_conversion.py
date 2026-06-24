@@ -21,6 +21,7 @@ _EXTERNAL_CONVERSION_ROUTE_KINDS = {
     ConversionRouteKind.IMAGE_TO_PDF_OCR,
     ConversionRouteKind.LEGACY_OFFICE_TO_PDF,
     ConversionRouteKind.MEDIA_TRANSCRIPT,
+    ConversionRouteKind.YOUTUBE_TRANSCRIPT,
 }
 
 
@@ -236,6 +237,8 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return "image_to_pdf_ocr"
     if route == ConversionRouteKind.MEDIA_TRANSCRIPT:
         return "media_transcript"
+    if route == ConversionRouteKind.YOUTUBE_TRANSCRIPT:
+        return "youtube_transcript"
     if route == ConversionRouteKind.PDF_PYMUPDF4LLM:
         return "pymupdf4llm"
     if route == ConversionRouteKind.PDF_TEXT_LAYER:

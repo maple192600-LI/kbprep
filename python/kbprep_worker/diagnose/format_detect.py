@@ -7,7 +7,9 @@ import zipfile
 from html.parser import HTMLParser
 from pathlib import Path
 
+from ..converter_capabilities import get_capability_for_extension
 from ..quality.thresholds import DIAGNOSIS_THRESHOLDS
+from ..youtube_source import youtube_url_from_source
 from .text_quality import analyze_text_quality, detect_text_profile
 
 
@@ -149,6 +151,31 @@ def analyze_audio_video(input_path: str, detected_format: str) -> dict:
         "warnings": [
             "Audio/video will be transcribed with local ffmpeg + Whisper before quality gates run."
         ],
+    }
+
+
+def analyze_remote_url(input_path: str, data: dict | None = None) -> dict:
+    source_url = youtube_url_from_source(Path(input_path), data)
+    if not source_url:
+        return {
+            "page_count": 0,
+            "text_layer_health": "unsupported",
+            "needs_ocr": False,
+            "recommended_pipeline": "unsupported",
+            "conversion_strategy": "unsupported_extension",
+            "warnings": ["Only YouTube .url descriptors are supported by this optional route."],
+        }
+    capability = get_capability_for_extension(".url")
+    return {
+        "page_count": 0,
+        "total_text_length": 0,
+        "text_layer_health": "unavailable",
+        "needs_ocr": False,
+        "recommended_pipeline": "youtube_transcript",
+        "conversion_strategy": "youtube_subtitle_then_media_transcript",
+        "text_profile": "remote_url",
+        "capability": capability,
+        "warnings": ["YouTube subtitles are tried before local media transcription fallback."],
     }
 
 

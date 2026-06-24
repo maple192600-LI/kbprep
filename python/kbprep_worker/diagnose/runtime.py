@@ -11,7 +11,7 @@ from ..supported_formats import (
     FORMAT_BY_EXTENSION,
     SOURCE_TYPE_BY_FORMAT,
 )
-from .format_detect import analyze_audio_video, analyze_ebook, analyze_markdown, analyze_office
+from .format_detect import analyze_audio_video, analyze_ebook, analyze_markdown, analyze_office, analyze_remote_url
 from .pdf_analysis import analyze_pdf
 
 EXTENSION_MAP = FORMAT_BY_EXTENSION
@@ -45,7 +45,7 @@ def diagnose_file(data: dict) -> tuple[dict, list[str]]:
         raise DiagnoseError("E_UNSUPPORTED_TYPE", f"Unsupported file extension: {ext}")
 
     source_type = _diagnosed_source_type(detected_format, override_source_type)
-    analysis = _analyze_detected_format(input_path, detected_format, ext)
+    analysis = _analyze_detected_format(input_path, detected_format, ext, data)
     warnings.extend(analysis.pop("warnings", []))
     result = _diagnosis_result(input_p, file_hash, file_size, detected_format, source_type, capability, analysis, warnings)
     return result, warnings
@@ -62,7 +62,7 @@ def _diagnosed_source_type(detected_format: str, override_source_type: object) -
     return SOURCE_TYPE_MAP.get(detected_format, "generic_block")
 
 
-def _analyze_detected_format(input_path: str, detected_format: str, ext: str) -> dict:
+def _analyze_detected_format(input_path: str, detected_format: str, ext: str, data: dict | None = None) -> dict:
     if detected_format == "pdf":
         return analyze_pdf(input_path)
     if detected_format == "ebook":
@@ -71,6 +71,8 @@ def _analyze_detected_format(input_path: str, detected_format: str, ext: str) ->
         return analyze_markdown(input_path, detected_format)
     if detected_format in ("audio", "video"):
         return analyze_audio_video(input_path, detected_format)
+    if detected_format == "remote_url":
+        return analyze_remote_url(input_path, data)
     if detected_format in ("docx", "doc", "xlsx", "xls", "pptx", "ppt"):
         return analyze_office(input_path, detected_format)
     if detected_format == "image":

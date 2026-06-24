@@ -22,6 +22,7 @@ from .supported_formats import (
     PLAIN_TEXT_EXTENSIONS,
     SUBTITLE_EXTENSIONS,
     TABLE_TEXT_EXTENSIONS,
+    URL_DESCRIPTOR_EXTENSIONS,
     VIDEO_EXTENSIONS,
 )
 
@@ -34,6 +35,7 @@ EXTERNAL_FORMATS_EVIDENCE = (
 CAPABILITY_DIAGNOSIS_EVIDENCE = (
     f"{CORE_RUNTIME_PART2}::declares converter capabilities and exposes the chosen capability through diagnosis"
 )
+MEDIA_YOUTUBE_EVIDENCE = f"{CORE_RUNTIME_PART2}::proves optional media and YouTube routes with mocked golden fixtures"
 
 _CAPABILITIES: tuple[Capability, ...] = (
     {
@@ -248,9 +250,10 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "route": "media_to_transcript",
         "dependencies": ["ffmpeg", "local Whisper CLI"],
         "fallback": "Install ffmpeg and Whisper locally, or provide .srt, .vtt, .ass, .lrc, .txt, or .md transcript.",
-        "status": "experimental",
+        "status": "partial",
         "test_evidence": [
             CAPABILITY_DIAGNOSIS_EVIDENCE,
+            MEDIA_YOUTUBE_EVIDENCE,
         ],
         "required_evidence": [
             "golden MP3/MP4 fixtures with stable transcript snapshots",
@@ -266,28 +269,35 @@ _CAPABILITIES: tuple[Capability, ...] = (
     {
         "id": "youtube_url_routes",
         "source_type": "remote_url",
-        "extensions": [],
-        "route": "unsupported",
-        "dependencies": ["target-only: subtitle fetcher", "target-only: media transcript fallback"],
+        "extensions": sorted(URL_DESCRIPTOR_EXTENSIONS),
+        "route": "youtube_subtitle_then_media_transcript",
+        "dependencies": ["yt-dlp", "ffmpeg and local Whisper CLI for media fallback"],
         "fallback": (
             "Download or export a local subtitle, transcript, Markdown, text, PDF, "
             "or media file before running KBPrep."
         ),
-        "status": "design_only",
-        "test_evidence": [],
+        "status": "partial",
+        "test_evidence": [
+            MEDIA_YOUTUBE_EVIDENCE,
+        ],
         "required_evidence": [
             "documented YouTube URL technical contract",
             "subtitle-first golden fixtures",
             "fallback transcript fixtures",
+            "direct CLI URL input tests",
+            "real YouTube subtitle export fixture",
+            "real fallback media transcript acceptance evidence",
             "dependency failure and no-network tests",
         ],
         "promotion_blocker": (
-            "No standalone CLI URL route, subtitle extraction, media download, or verified fixture support is shipped."
+            "Only local .url descriptor routing with mocked subtitle and fallback fixtures is covered; "
+            "verified promotion needs direct URL input, real subtitle/fallback fixtures, dependency failures, "
+            "timeout handling, and final quality-gate evidence."
         ),
-        "preserves": ["target: subtitle order", "target: transcript text", "target: source URL evidence"],
+        "preserves": ["subtitle order", "transcript text", "source URL evidence"],
         "risk": (
-            "URL processing depends on network behavior, subtitle availability, external dependencies, "
-            "timeout handling, and transcript quality; it stays target-only."
+            "URL processing depends on accepted URL shapes, network timeout handling, subtitle availability, "
+            "external dependencies, transcript quality, and final quality gates; it remains partial."
         ),
     },
     {

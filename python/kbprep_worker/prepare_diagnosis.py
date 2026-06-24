@@ -12,6 +12,7 @@ from .supported_formats import (
     HTML_EXTENSIONS,
 )
 from .title_filters import load_title_filters
+from .youtube_source import youtube_url_from_source
 
 
 def write_diagnosis_report(
@@ -23,7 +24,7 @@ def write_diagnosis_report(
     runtime: dict,
     warnings: list[str],
 ) -> None:
-    fallback = diagnosis_fallback(input_path)
+    fallback = diagnosis_fallback(input_path, {"source_url": diagnosis.get("source_url", "")})
     capability = diagnosis.get("capability") or fallback["capability"]
     report = {
         "schema": "kbprep.diagnosis_report.v1",
@@ -60,13 +61,16 @@ def write_diagnosis_report(
     )
 
 
-def diagnosis_fallback(input_path: Path) -> dict:
+def diagnosis_fallback(input_path: Path, data: dict | None = None) -> dict:
     identity = file_identity_for_path(input_path)
     ext = _fallback_extension(input_path, identity)
     detected_format = FORMAT_BY_EXTENSION.get(ext, "unknown")
     capability = get_capability_for_extension(ext)
     route = select_conversion_route(ext, {}, file_identity=identity)
     pipeline, strategy = _public_diagnosis_route(route)
+    if youtube_url_from_source(input_path, data):
+        pipeline = "youtube_transcript"
+        strategy = "youtube_subtitle_then_media_transcript"
     return {
         "detected_format": detected_format,
         "recommended_pipeline": pipeline,

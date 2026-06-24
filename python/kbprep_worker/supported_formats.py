@@ -12,6 +12,7 @@ HTML_EXTENSIONS = {".html", ".htm"}
 JSON_EXTENSIONS = {".json"}
 NOTEBOOK_EXTENSIONS = {".ipynb"}
 SUBTITLE_EXTENSIONS = {".vtt", ".srt", ".ass", ".lrc"}
+URL_DESCRIPTOR_EXTENSIONS = {".url"}
 CODE_EXTENSIONS = {
     ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs",
     ".java", ".go", ".rs", ".c", ".cc", ".cpp", ".h", ".hpp",
@@ -69,6 +70,7 @@ DIRECT_EXTENSIONS = (
     | JSON_EXTENSIONS
     | NOTEBOOK_EXTENSIONS
     | SUBTITLE_EXTENSIONS
+    | URL_DESCRIPTOR_EXTENSIONS
     | CODE_EXTENSIONS
 )
 MEDIA_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
@@ -83,8 +85,9 @@ SUPPORTED_EXTENSIONS = (
     | IMAGE_EXTENSIONS
 )
 
-# Batch still excludes audio/video binaries because ASR can be slow and should be invoked intentionally.
-BATCH_SUPPORTED_EXTENSIONS = SUPPORTED_EXTENSIONS - MEDIA_EXTENSIONS
+# Batch still excludes audio/video binaries and remote descriptors because
+# ASR and URL routes should be invoked intentionally.
+BATCH_SUPPORTED_EXTENSIONS = SUPPORTED_EXTENSIONS - MEDIA_EXTENSIONS - URL_DESCRIPTOR_EXTENSIONS
 
 FORMAT_BY_EXTENSION = {
     **{ext: "pdf" for ext in PDF_EXTENSIONS},
@@ -101,6 +104,7 @@ FORMAT_BY_EXTENSION = {
     **{ext: "json" for ext in JSON_EXTENSIONS},
     **{ext: "notebook" for ext in NOTEBOOK_EXTENSIONS},
     **{ext: "subtitle_transcript" for ext in SUBTITLE_EXTENSIONS},
+    **{ext: "remote_url" for ext in URL_DESCRIPTOR_EXTENSIONS},
     **{ext: "code" for ext in CODE_EXTENSIONS},
     **{ext: "audio" for ext in AUDIO_EXTENSIONS},
     **{ext: "video" for ext in VIDEO_EXTENSIONS},
@@ -122,6 +126,7 @@ SOURCE_TYPE_BY_FORMAT = {
     "json": "generic_block",
     "notebook": "generic_block",
     "subtitle_transcript": "subtitle_transcript",
+    "remote_url": "generic_block",
     "code": "generic_block",
     "audio": "generic_block",
     "video": "generic_block",

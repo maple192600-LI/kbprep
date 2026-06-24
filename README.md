@@ -56,6 +56,12 @@ Batch runs write `batch_manifest.json` with parent status, per-file status, skip
 
 PDF routing is diagnosis-selected: simple trusted text-layer PDFs use `pymupdf4llm`, complex trusted PDFs use MinerU `txt` or `auto`, and scanned or untrusted text-layer PDFs use MinerU `ocr`. `conversion_report.json.route_decision` records the selected tier, actual route, fallback or upgrade, and reason.
 
+## Optional Media And YouTube Routes
+
+Local audio/video files can route through local `ffmpeg` + Whisper transcription before KBPrep runs the normal conversion and publication gates. The route is partial, not verified: mocked golden fixtures prove routing and error reporting, while real ASR quality evidence is still required before verified promotion.
+
+YouTube currently uses local `.url` descriptor files, such as an Internet Shortcut containing `URL=https://www.youtube.com/watch?v=...`. KBPrep tries subtitles first through `yt-dlp`; if subtitles are unavailable, it may fall back to the local media transcript route when `yt-dlp`, `ffmpeg`, and Whisper are available. Real account login, cookies, paid content, and unclear-copyright downloads are outside the verified evidence.
+
 ## Output
 
 The maintained standard profile publishes beside the source:

@@ -31,12 +31,24 @@
       "capability_id": "media_local_transcript",
       "extension": ".mp4",
       "expected_route": "media_to_transcript",
-      "expected_status": "experimental",
+      "expected_status": "partial",
       "required_tools": ["ffmpeg", "whisper"],
       "real_fixture": false,
       "manual_acceptance_evidence": false,
       "promote_to_verified": false,
-      "promotion_blocker": "Needs a real MP3/MP4 fixture and local ASR transcript-quality evidence."
+      "promotion_blocker": "Has mocked golden route evidence; needs a real MP3/MP4 fixture and local ASR transcript-quality evidence for verified promotion."
+    },
+    {
+      "id": "youtube_descriptor_subtitle_first",
+      "capability_id": "youtube_url_routes",
+      "extension": ".url",
+      "expected_route": "youtube_subtitle_then_media_transcript",
+      "expected_status": "partial",
+      "required_tools": ["yt-dlp", "ffmpeg", "whisper"],
+      "real_fixture": false,
+      "manual_acceptance_evidence": false,
+      "promote_to_verified": false,
+      "promotion_blocker": "Only local .url descriptor routing with mocked subtitle and fallback fixtures is covered."
     },
     {
       "id": "mobi_explicitly_unsupported",

@@ -281,7 +281,12 @@ def _stage_diagnose(state: PipelineState) -> None:
     run_dir = state.require_path("diagnose", "run_dir")
     _stderr_log("info", "diagnose", "Diagnosing file quality")
     try:
-        diag_envelope = _run_diagnose_direct(state.input_path, state.output_root, state.override_source_type)
+        diag_envelope = _run_diagnose_direct(
+            state.input_path,
+            state.output_root,
+            state.override_source_type,
+            str(state.source_identity.get("source_url", "")),
+        )
         if diag_envelope.get("ok"):
             state.diagnosis = diag_envelope.get("data", {})
             state.warnings.extend(state.diagnosis.get("warnings", []))

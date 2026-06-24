@@ -180,30 +180,38 @@
       "id": "media_local_transcript",
       "label": "Local media transcript route",
       "status": "partial",
-      "scope": "Local audio/video detection and external transcript routing are declared, and dependency failures are surfaced; route-level status remains experimental until real ASR fixtures prove quality.",
+      "scope": "Local audio/video detection, external transcript routing, dependency failures, command evidence, and mocked golden transcript fixtures exist. The route is not verified because real local ASR sample quality and timing evidence are not yet present.",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
         "docs/capability-matrix.md",
         "python/kbprep_worker/converter_capabilities.py",
+        "python/kbprep_worker/converters/external_tools.py",
+        "python/tests/test_media_youtube_routes.py",
         "src/test/scenarios/worker-core-runtime-part2.test.ts",
         "src/test/scenarios/worker-output-guards-part2.test.ts",
         "python/tests/golden/formats/manifest.json"
       ],
       "prohibitedClaims": [
-        "local media transcript route is verified"
+        "local media transcript route is verified with real ASR sample evidence"
       ]
     },
     {
       "id": "youtube_url_routes",
       "label": "YouTube URL route",
-      "status": "design_only",
-      "scope": "YouTube URL processing is a target optional route only; no standalone CLI URL input, subtitle extraction, media download, or verified fixture support is shipped.",
+      "status": "partial",
+      "scope": "Local YouTube .url descriptors can route through subtitle-first extraction and fall back to local media transcription when subtitles are unavailable. Tests use mocked yt-dlp, ffmpeg, and Whisper behavior; real account, cookie, paid, or unclear-copyright downloads are not part of the verified evidence.",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
-        "docs/capability-matrix.md"
+        "docs/capability-matrix.md",
+        "python/kbprep_worker/converters/external_tools.py",
+        "python/kbprep_worker/stages/external_conversion.py",
+        "python/tests/test_media_youtube_routes.py",
+        "src/test/scenarios/worker-core-runtime-part2.test.ts",
+        "python/tests/golden/formats/manifest.json"
       ],
       "prohibitedClaims": [
-        "YouTube input is a verified standalone CLI capability"
+        "YouTube input is a verified real-network capability",
+        "YouTube support works with account login, cookies, paid content, or unclear-copyright downloads"
       ]
     }
   ]
