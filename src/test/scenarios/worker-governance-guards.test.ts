@@ -14,9 +14,9 @@ describe("kbprep worker governance guards", () => {
     expect(command.prefix).toEqual([path.join(repoRoot, "scripts", "python-venv.mjs")]);
     expect(harnessText).toContain("python-venv.mjs");
     expect(harnessText).not.toContain("KBPREP_TEST_PYTHON");
-    expect(harnessText).not.toContain("command: \"py\"");
-    expect(harnessText).not.toContain("\"python3\"");
-    expect(harnessText).not.toContain("PYTHONPATH: path.join(repoRoot, \"python\")");
+    expect(harnessText).not.toContain('command: "py"');
+    expect(harnessText).not.toContain('"python3"');
+    expect(harnessText).not.toContain('PYTHONPATH: path.join(repoRoot, "python")');
   });
 
   it("keeps TypeScript integration and coverage gates in project checks", () => {
@@ -44,21 +44,25 @@ describe("kbprep worker governance guards", () => {
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/ts-coverage-floor.mjs",
-        "--summary",
-        summaryPath,
-        "--total-lines",
-        "85",
-        "--file",
-        "src/runtime/pythonRuntime.ts",
-        "--file-lines",
-        "80",
-      ], {
-        cwd: repoRoot,
-        encoding: "utf8",
-        timeout: 30_000,
-      });
+      const result = spawnSync(
+        process.execPath,
+        [
+          "scripts/checks/ts-coverage-floor.mjs",
+          "--summary",
+          summaryPath,
+          "--total-lines",
+          "85",
+          "--file",
+          "src/runtime/pythonRuntime.ts",
+          "--file-lines",
+          "80",
+        ],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("pythonRuntime.ts line coverage 70% is below 80%");
@@ -71,21 +75,25 @@ describe("kbprep worker governance guards", () => {
         }),
         "utf8",
       );
-      const pass = spawnSync(process.execPath, [
-        "scripts/checks/ts-coverage-floor.mjs",
-        "--summary",
-        summaryPath,
-        "--total-lines",
-        "85",
-        "--file",
-        "src/runtime/pythonRuntime.ts",
-        "--file-lines",
-        "80",
-      ], {
-        cwd: repoRoot,
-        encoding: "utf8",
-        timeout: 30_000,
-      });
+      const pass = spawnSync(
+        process.execPath,
+        [
+          "scripts/checks/ts-coverage-floor.mjs",
+          "--summary",
+          summaryPath,
+          "--total-lines",
+          "85",
+          "--file",
+          "src/runtime/pythonRuntime.ts",
+          "--file-lines",
+          "80",
+        ],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
 
       expect(pass.status).toBe(0);
       expect(JSON.parse(pass.stdout).file_lines).toBe(81);
@@ -114,13 +122,7 @@ describe("kbprep worker governance guards", () => {
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/project-env-commands.mjs",
-        "--repo-root",
-        root,
-        "--check",
-        "README.md",
-      ], {
+      const result = spawnSync(process.execPath, ["scripts/checks/project-env-commands.mjs", "--repo-root", root, "--check", "README.md"], {
         cwd: repoRoot,
         encoding: "utf8",
         timeout: 30_000,
@@ -161,20 +163,16 @@ describe("kbprep worker governance guards", () => {
           "",
           "def test_bad_env():",
           "    subprocess.run([",
-          "        \"python\",",
-          "        \"-m\",",
-          "        \"kbprep_worker.cli\",",
-          "        \"--help\",",
+          '        "python",',
+          '        "-m",',
+          '        "kbprep_worker.cli",',
+          '        "--help",',
           "    ])",
         ].join("\n"),
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/project-env-commands.mjs",
-        "--repo-root",
-        root,
-      ], {
+      const result = spawnSync(process.execPath, ["scripts/checks/project-env-commands.mjs", "--repo-root", root], {
         cwd: repoRoot,
         encoding: "utf8",
         timeout: 30_000,
@@ -199,39 +197,32 @@ describe("kbprep worker governance guards", () => {
       mkdirSync(workerDir, { recursive: true });
       writeFileSync(
         path.join(workerDir, "bad_html.py"),
-        [
-          "import re",
-          "",
-          "def strip_html(value: str) -> str:",
-          "    return re.sub(r\"<[^>]+>\", \"\", value)",
-        ].join("\n"),
+        ["import re", "", "def strip_html(value: str) -> str:", '    return re.sub(r"<[^>]+>", "", value)'].join("\n"),
         "utf8",
       );
       writeFileSync(
         path.join(workerDir, "bad_yaml.py"),
-        [
-          "def frontmatter(title: str) -> str:",
-          "    return f\"\"\"---",
-          "title: {title}",
-          "---",
-          "\"\"\"",
-        ].join("\n"),
+        ["def frontmatter(title: str) -> str:", '    return f"""---', "title: {title}", "---", '"""'].join("\n"),
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/forbidden-patterns.mjs",
-        "--repo-root",
-        root,
-        "--check",
-        "python/kbprep_worker/bad_html.py",
-        "--check",
-        "python/kbprep_worker/bad_yaml.py",
-      ], {
-        cwd: repoRoot,
-        encoding: "utf8",
-        timeout: 30_000,
-      });
+      const result = spawnSync(
+        process.execPath,
+        [
+          "scripts/checks/forbidden-patterns.mjs",
+          "--repo-root",
+          root,
+          "--check",
+          "python/kbprep_worker/bad_html.py",
+          "--check",
+          "python/kbprep_worker/bad_yaml.py",
+        ],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("regex_html_parsing");
@@ -248,27 +239,27 @@ describe("kbprep worker governance guards", () => {
       mkdirSync(statusDir, { recursive: true });
       writeFileSync(
         path.join(statusDir, "kbprep-implementation-status.json"),
-        JSON.stringify({
-          schema: "kbprep.implementation_status.v1",
-          capabilities: [
-            {
-              id: "design_source_alignment",
-              label: "Protected design and flowchart alignment",
-              status: "implemented",
-              scope: "Design sources are aligned.",
-              evidence: ["docs/kbprep-core-flow-design.md", "scripts/checks/development-docs.mjs"],
-              prohibitedClaims: [],
-            },
-          ],
-        }, null, 2),
+        JSON.stringify(
+          {
+            schema: "kbprep.implementation_status.v1",
+            capabilities: [
+              {
+                id: "design_source_alignment",
+                label: "Protected design and flowchart alignment",
+                status: "implemented",
+                scope: "Design sources are aligned.",
+                evidence: ["docs/kbprep-core-flow-design.md", "scripts/checks/development-docs.mjs"],
+                prohibitedClaims: [],
+              },
+            ],
+          },
+          null,
+          2,
+        ),
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/implementation-status.mjs",
-        "--repo-root",
-        root,
-      ], {
+      const result = spawnSync(process.execPath, ["scripts/checks/implementation-status.mjs", "--repo-root", root], {
         cwd: repoRoot,
         encoding: "utf8",
         timeout: 30_000,
@@ -289,58 +280,45 @@ describe("kbprep worker governance guards", () => {
       mkdirSync(statusDir, { recursive: true });
       writeFileSync(
         path.join(statusDir, "kbprep-implementation-status.json"),
-        JSON.stringify({
-          schema: "kbprep.implementation_status.v1",
-          capabilities: [
-            statusCapability("design_source_alignment", "implemented", [
-              "docs/kbprep-core-flow-design.md",
-              "scripts/checks/development-docs.mjs",
-            ]),
-            statusCapability("source_side_publish", "implemented", [
-              "README.md",
-              "python/tests/test_publish_safety.py",
-            ]),
-            statusCapability("conversion_quality_gate", "partial", [
-              "docs/development/04-conversion-quality-gate.md",
-              "python/tests/test_conversion_gate.py",
-            ]),
-            statusCapability("canonical_ir_contract", "partial", [
-              "docs/development/02-canonical-ir-contract.md",
-              "python/tests/test_canonical_ir_manifest.py",
-            ]),
-            statusCapability("document_type_classification", "partial", [
-              "docs/development/05-document-type-classification.md",
-            ]),
-            statusCapability("cleaning_policy_snapshot", "partial", [
-              "docs/development/06-cleaning-policy-library.md",
-              "python/tests/test_cleaning_policy_snapshot.py",
-            ]),
-            statusCapability("patch_clean_view", "design_only", [
-              "docs/development/07-cleaning-unit-patch-clean-view.md",
-            ]),
-            statusCapability("feedback_rule_learning", "partial", [
-              "docs/feedback-learning.md",
-              "python/tests/test_feedback_proposals.py",
-            ]),
-            statusCapability("batch_playlist_rerun", "partial", [
-              "python/tests/test_batch_status_manifest.py",
-            ]),
-            statusCapability("media_local_transcript", "partial", [
-              "src/test/scenarios/worker-core-runtime-part2.test.ts",
-            ]),
-            statusCapability("youtube_url_routes", "design_only", [
-              "docs/development/11-multimedia-youtube-optional.md",
-            ]),
-          ],
-        }, null, 2),
+        JSON.stringify(
+          {
+            schema: "kbprep.implementation_status.v1",
+            capabilities: [
+              statusCapability("design_source_alignment", "implemented", [
+                "docs/kbprep-core-flow-design.md",
+                "scripts/checks/development-docs.mjs",
+              ]),
+              statusCapability("source_side_publish", "implemented", ["README.md", "python/tests/test_publish_safety.py"]),
+              statusCapability("conversion_quality_gate", "partial", [
+                "docs/development/04-conversion-quality-gate.md",
+                "python/tests/test_conversion_gate.py",
+              ]),
+              statusCapability("canonical_ir_contract", "partial", [
+                "docs/development/02-canonical-ir-contract.md",
+                "python/tests/test_canonical_ir_manifest.py",
+              ]),
+              statusCapability("document_type_classification", "partial", ["docs/development/05-document-type-classification.md"]),
+              statusCapability("cleaning_policy_snapshot", "partial", [
+                "docs/development/06-cleaning-policy-library.md",
+                "python/tests/test_cleaning_policy_snapshot.py",
+              ]),
+              statusCapability("patch_clean_view", "design_only", ["docs/development/07-cleaning-unit-patch-clean-view.md"]),
+              statusCapability("feedback_rule_learning", "partial", [
+                "docs/feedback-learning.md",
+                "python/tests/test_feedback_proposals.py",
+              ]),
+              statusCapability("batch_playlist_rerun", "partial", ["python/tests/test_batch_status_manifest.py"]),
+              statusCapability("media_local_transcript", "partial", ["src/test/scenarios/worker-core-runtime-part2.test.ts"]),
+              statusCapability("youtube_url_routes", "design_only", ["docs/development/11-multimedia-youtube-optional.md"]),
+            ],
+          },
+          null,
+          2,
+        ),
         "utf8",
       );
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/implementation-status.mjs",
-        "--repo-root",
-        root,
-      ], {
+      const result = spawnSync(process.execPath, ["scripts/checks/implementation-status.mjs", "--repo-root", root], {
         cwd: repoRoot,
         encoding: "utf8",
         timeout: 30_000,
@@ -355,13 +333,8 @@ describe("kbprep worker governance guards", () => {
   });
 
   it("locks the code-or-test evidence exemption set to design_source_alignment only", () => {
-    const script = readFileSync(
-      path.join(repoRoot, "scripts", "checks", "implementation-status.mjs"),
-      "utf8",
-    );
-    const match = script.match(
-      /codeOrTestEvidenceExemptions\s*=\s*new Set\(\s*\[([\s\S]*?)\]\s*\)/,
-    );
+    const script = readFileSync(path.join(repoRoot, "scripts", "checks", "implementation-status.mjs"), "utf8");
+    const match = script.match(/codeOrTestEvidenceExemptions\s*=\s*new Set\(\s*\[([\s\S]*?)\]\s*\)/);
 
     expect(match, "codeOrTestEvidenceExemptions set must exist").not.toBeNull();
 

@@ -2,9 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - feedback proposals part 1", () => {
   it("records cleanup feedback as a reviewable rule proposal", () => {
@@ -26,9 +24,7 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       expect(envelope.data.proposal.pattern).toBe("关注公众号");
       expect(envelope.data.proposal.requires_confirmation).toBe(true);
 
-      const lines = readFileSync(path.join(rulesDir, "proposed_rules.jsonl"), "utf8")
-        .trim()
-        .split(/\r?\n/);
+      const lines = readFileSync(path.join(rulesDir, "proposed_rules.jsonl"), "utf8").trim().split(/\r?\n/);
       expect(lines.length).toBe(1);
       expect(JSON.parse(lines[0]).id).toBe(envelope.data.proposal.id);
     } finally {
@@ -85,13 +81,17 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       mkdirSync(runDir, { recursive: true });
       writeFileSync(path.join(runDir, "discarded.md"), "关注公众号领取资料\n", "utf8");
       writeFileSync(path.join(runDir, "cleaned.md"), "案例：字段值为关注公众号时表示渠道来源。\n", "utf8");
-      writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
-        source_type: "markdown_note",
-        profile: "standard",
-        document_type: "webpage",
-        quality_gates: [{ name: "cleanup_safety", status: "fail" }],
-        strict_errors: ["E_QA_FAILED: CTA patterns found in non-protected cleaned blocks"],
-      }), "utf8");
+      writeFileSync(
+        path.join(runDir, "quality_report.json"),
+        JSON.stringify({
+          source_type: "markdown_note",
+          profile: "standard",
+          document_type: "webpage",
+          quality_gates: [{ name: "cleanup_safety", status: "fail" }],
+          strict_errors: ["E_QA_FAILED: CTA patterns found in non-protected cleaned blocks"],
+        }),
+        "utf8",
+      );
 
       const proposed = runWorker("feedback", {
         run_dir: runDir,
@@ -100,11 +100,15 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       });
       expect(proposed.data.proposal.counterexamples).toContain("案例：字段值为关注公众号时表示渠道来源。");
 
-      const accepted = runWorker("feedback", {
-        rules_dir: rulesDir,
-        accept_proposal: proposed.data.proposal.id,
-        confirm_rule_acceptance: true,
-      }, 1);
+      const accepted = runWorker(
+        "feedback",
+        {
+          rules_dir: rulesDir,
+          accept_proposal: proposed.data.proposal.id,
+          confirm_rule_acceptance: true,
+        },
+        1,
+      );
 
       expect(accepted.ok).toBe(false);
       expect(accepted.error.code).toBe("E_RULE_VALIDATION_FAILED");
@@ -148,21 +152,29 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       writeFileSync(sourcePath, "# Site A\n", "utf8");
       writeFileSync(path.join(runDir, "discarded.md"), "站点广告 - site-a footer\n", "utf8");
       writeFileSync(path.join(runDir, "cleaned.md"), "案例：字段值为站点广告时表示投放来源。\n", "utf8");
-      writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
-        source_type: "markdown_note",
-        profile: "standard",
-        document_type: "unknown",
-        quality_gates: [{ name: "cleanup_safety", status: "fail" }],
-        strict_errors: ["E_QA_FAILED: cleanup residue"],
-      }), "utf8");
-      writeFileSync(path.join(runDir, "run_metadata.json"), JSON.stringify({
-        schema: "kbprep.run_metadata.v1",
-        prepare_payload: {
-          input_path: sourcePath,
-          output_root: path.join(root, "output"),
+      writeFileSync(
+        path.join(runDir, "quality_report.json"),
+        JSON.stringify({
+          source_type: "markdown_note",
           profile: "standard",
-        },
-      }), "utf8");
+          document_type: "unknown",
+          quality_gates: [{ name: "cleanup_safety", status: "fail" }],
+          strict_errors: ["E_QA_FAILED: cleanup residue"],
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        path.join(runDir, "run_metadata.json"),
+        JSON.stringify({
+          schema: "kbprep.run_metadata.v1",
+          prepare_payload: {
+            input_path: sourcePath,
+            output_root: path.join(root, "output"),
+            profile: "standard",
+          },
+        }),
+        "utf8",
+      );
 
       const proposed = runWorker("feedback", {
         run_dir: runDir,
@@ -170,11 +182,15 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
         feedback_text: "以后删除「站点广告」这种污染",
       });
 
-      const accepted = runWorker("feedback", {
-        rules_dir: rulesDir,
-        accept_proposal: proposed.data.proposal.id,
-        confirm_rule_acceptance: true,
-      }, 1);
+      const accepted = runWorker(
+        "feedback",
+        {
+          rules_dir: rulesDir,
+          accept_proposal: proposed.data.proposal.id,
+          confirm_rule_acceptance: true,
+        },
+        1,
+      );
 
       expect(accepted.ok).toBe(false);
       expect(accepted.error.code).toBe("E_RULE_VALIDATION_FAILED");
@@ -201,23 +217,34 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       writeFileSync(firstSource, "# Site A 1\n", "utf8");
       writeFileSync(secondSource, "# Site A 2\n", "utf8");
 
-      for (const [runDir, sourcePath] of [[firstRunDir, firstSource], [secondRunDir, secondSource]]) {
+      for (const [runDir, sourcePath] of [
+        [firstRunDir, firstSource],
+        [secondRunDir, secondSource],
+      ]) {
         writeFileSync(path.join(runDir, "discarded.md"), "站点页脚广告\n", "utf8");
-        writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
-          source_type: "markdown_note",
-          profile: "standard",
-          document_type: "unknown",
-          quality_gates: [{ name: "cleanup_safety", status: "fail" }],
-          strict_errors: ["E_QA_FAILED: cleanup residue"],
-        }), "utf8");
-        writeFileSync(path.join(runDir, "run_metadata.json"), JSON.stringify({
-          schema: "kbprep.run_metadata.v1",
-          prepare_payload: {
-            input_path: sourcePath,
-            output_root: path.join(root, "output"),
+        writeFileSync(
+          path.join(runDir, "quality_report.json"),
+          JSON.stringify({
+            source_type: "markdown_note",
             profile: "standard",
-          },
-        }), "utf8");
+            document_type: "unknown",
+            quality_gates: [{ name: "cleanup_safety", status: "fail" }],
+            strict_errors: ["E_QA_FAILED: cleanup residue"],
+          }),
+          "utf8",
+        );
+        writeFileSync(
+          path.join(runDir, "run_metadata.json"),
+          JSON.stringify({
+            schema: "kbprep.run_metadata.v1",
+            prepare_payload: {
+              input_path: sourcePath,
+              output_root: path.join(root, "output"),
+              profile: "standard",
+            },
+          }),
+          "utf8",
+        );
       }
 
       const first = runWorker("feedback", {
@@ -261,28 +288,36 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
         [secondRunDir, secondSource, "https://example.com/course/export-beta"],
       ]) {
         writeFileSync(path.join(runDir, "discarded.md"), "来源专属广告\n", "utf8");
-        writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
-          source_type: "markdown_note",
-          profile: "standard",
-          document_type: "unknown",
-          quality_gates: [{ name: "cleanup_safety", status: "fail" }],
-          strict_errors: ["E_QA_FAILED: cleanup residue"],
-        }), "utf8");
-        writeFileSync(path.join(runDir, "run_metadata.json"), JSON.stringify({
-          schema: "kbprep.run_metadata.v1",
-          source_identity: {
-            input_path: sourcePath,
-            source_name: path.basename(sourcePath),
-            source_url: sourceUrl,
-            source_domain: "example.com",
-            site_name: "Example Course",
-          },
-          prepare_payload: {
-            input_path: sourcePath,
-            output_root: path.join(root, "output"),
+        writeFileSync(
+          path.join(runDir, "quality_report.json"),
+          JSON.stringify({
+            source_type: "markdown_note",
             profile: "standard",
-          },
-        }), "utf8");
+            document_type: "unknown",
+            quality_gates: [{ name: "cleanup_safety", status: "fail" }],
+            strict_errors: ["E_QA_FAILED: cleanup residue"],
+          }),
+          "utf8",
+        );
+        writeFileSync(
+          path.join(runDir, "run_metadata.json"),
+          JSON.stringify({
+            schema: "kbprep.run_metadata.v1",
+            source_identity: {
+              input_path: sourcePath,
+              source_name: path.basename(sourcePath),
+              source_url: sourceUrl,
+              source_domain: "example.com",
+              site_name: "Example Course",
+            },
+            prepare_payload: {
+              input_path: sourcePath,
+              output_root: path.join(root, "output"),
+              profile: "standard",
+            },
+          }),
+          "utf8",
+        );
       }
 
       const first = runWorker("feedback", {
@@ -308,5 +343,4 @@ describe("kbprep worker pipeline - feedback proposals part 1", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

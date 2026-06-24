@@ -3,11 +3,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  repoRoot,
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { repoRoot, runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - core/runtime part 2", () => {
   it("keeps shared format routing consistent across diagnose, prepare, detect, and batch", () => {
@@ -163,14 +159,18 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
         expect(diagnosis.data.recommended_pipeline).toBe("unsupported");
         expect(diagnosis.data.conversion_strategy).toBe("unsupported_extension");
 
-        const prepared = runWorker("prepare", {
-          input_path: inputPath,
-          output_root: path.join(root, "output"),
-          profile: "standard",
-          mode: "rules_only",
-          language: "zh",
-          force: true,
-        }, 1);
+        const prepared = runWorker(
+          "prepare",
+          {
+            input_path: inputPath,
+            output_root: path.join(root, "output"),
+            profile: "standard",
+            mode: "rules_only",
+            language: "zh",
+            force: true,
+          },
+          1,
+        );
         expect(prepared.ok).toBe(false);
         expect(prepared.error.code).toBe("E_UNSUPPORTED_TYPE");
         expect(prepared.error.message).toContain("not supported by KBPrep's verified conversion routes");
@@ -220,19 +220,15 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
       writeFileSync(path.join(workerDir, "bad.py"), 'TITLE = r"\\u516c\\u4f17\\u53f7"\n', "utf8");
       writeFileSync(path.join(rulesDir, "obvious_noise.json"), JSON.stringify({ keyword_sets: {} }), "utf8");
 
-      const result = spawnSync(process.execPath, [
-        "scripts/checks/cleaning-hardcodes.mjs",
-        "--repo-root",
-        root,
-        "--check",
-        "python/kbprep_worker/bad.py",
-        "--rules-root",
-        "rules",
-      ], {
-        cwd: repoRoot,
-        encoding: "utf8",
-        timeout: 30_000,
-      });
+      const result = spawnSync(
+        process.execPath,
+        ["scripts/checks/cleaning-hardcodes.mjs", "--repo-root", root, "--check", "python/kbprep_worker/bad.py", "--rules-root", "rules"],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          timeout: 30_000,
+        },
+      );
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("公众号");
@@ -361,5 +357,4 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

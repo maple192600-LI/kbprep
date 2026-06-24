@@ -30,7 +30,9 @@ export function buildReviewPrompt(reviewPack: string, batchNumber = 1, batchCoun
     attempt > 1 ? "Previous response was invalid or unsafe. Return a valid patch array only, or [] if no safe change is needed." : "",
     "",
     reviewPack,
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function buildReviewBatches(reviewPack: string): string[] {
@@ -111,9 +113,7 @@ function summarizePolicyContext(reviewPack: string): string[] {
 function parseReviewPackObject(reviewPack: string): Record<string, unknown> | undefined {
   try {
     const parsed = JSON.parse(reviewPack) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : undefined;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
   }
@@ -121,9 +121,7 @@ function parseReviewPackObject(reviewPack: string): Record<string, unknown> | un
 
 function objectField(record: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
   const value = record[key];
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : undefined;
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
 }
 
 function stringField(record: Record<string, unknown>, key: string): string {
@@ -140,15 +138,15 @@ function protectedPatternLabels(policy: Record<string, unknown>): string[] {
   const value = policy.protected_patterns;
   if (!Array.isArray(value)) return [];
   return value
-    .map((item) => item && typeof item === "object" && !Array.isArray(item)
-      ? stringField(item as Record<string, unknown>, "label")
-      : "")
+    .map((item) => (item && typeof item === "object" && !Array.isArray(item) ? stringField(item as Record<string, unknown>, "label") : ""))
     .filter(Boolean);
 }
 
-export function validateAiReviewPatch(
-  patch: unknown[],
-): { valid: unknown[]; rejected: string[]; rejectedOperations: Array<{ operation: unknown; reason: string }> } {
+export function validateAiReviewPatch(patch: unknown[]): {
+  valid: unknown[];
+  rejected: string[];
+  rejectedOperations: Array<{ operation: unknown; reason: string }>;
+} {
   const valid: unknown[] = [];
   const rejected: string[] = [];
   const rejectedOperations: Array<{ operation: unknown; reason: string }> = [];
@@ -214,13 +212,17 @@ function validateAiReviewPatchValue(opType: "replace" | "add", field: string, va
     return typeof value === "string" && AI_REVIEW_ALLOWED_STATUSES.has(value) ? null : `invalid status ${String(value)}`;
   }
   if (field === "risk_tags") {
-    return Array.isArray(value) && value.every((item) => typeof item === "string") ? null : "risk_tags replace value must be a string array";
+    return Array.isArray(value) && value.every((item) => typeof item === "string")
+      ? null
+      : "risk_tags replace value must be a string array";
   }
   if (field === "reason") {
     return typeof value === "string" ? null : "reason must be a string";
   }
   if (field === "confidence") {
-    return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? null : "confidence must be a number between 0 and 1";
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
+      ? null
+      : "confidence must be a number between 0 and 1";
   }
   return `field ${field} is not allowed`;
 }
@@ -261,13 +263,13 @@ function parseJsonArrayCandidate(candidate: string): unknown[] | null {
           escaped = false;
         } else if (char === "\\") {
           escaped = true;
-        } else if (char === "\"") {
+        } else if (char === '"') {
           inString = false;
         }
         continue;
       }
 
-      if (char === "\"") {
+      if (char === '"') {
         inString = true;
       } else if (char === "[") {
         depth += 1;

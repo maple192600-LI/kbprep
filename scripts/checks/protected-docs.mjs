@@ -1,10 +1,7 @@
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-const protectedFiles = [
-  "docs/kbprep-core-flow-design.md",
-  "docs/kbprep-full-flowchart.html",
-];
+const protectedFiles = ["docs/kbprep-core-flow-design.md", "docs/kbprep-full-flowchart.html"];
 
 const allowEdit = process.env.KBPREP_ALLOW_CORE_DOC_EDIT === "1";
 const strictTracked = process.argv.includes("--strict-tracked");
@@ -33,28 +30,38 @@ for (const line of statusLines) {
 }
 
 if (missing.length || (protectedChanges.length && !allowEdit) || (strictTracked && trackedWarnings.length)) {
-  process.stderr.write(JSON.stringify({
-    ok: false,
-    missing,
-    protectedChanges,
-    untrackedProtectedFiles: trackedWarnings,
-    allowEditEnv: "KBPREP_ALLOW_CORE_DOC_EDIT=1",
-    strictTracked,
-    message: "Protected KBPrep design documents cannot be edited unless the owner explicitly orders it.",
-  }, null, 2));
+  process.stderr.write(
+    JSON.stringify(
+      {
+        ok: false,
+        missing,
+        protectedChanges,
+        untrackedProtectedFiles: trackedWarnings,
+        allowEditEnv: "KBPREP_ALLOW_CORE_DOC_EDIT=1",
+        strictTracked,
+        message: "Protected KBPrep design documents cannot be edited unless the owner explicitly orders it.",
+      },
+      null,
+      2,
+    ),
+  );
   process.stderr.write("\n");
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  protectedFiles,
-  protectedChanges,
-  untrackedProtectedFiles: trackedWarnings,
-  warnings: trackedWarnings.length
-    ? ["Protected design documents exist but are not tracked by git yet."]
-    : [],
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      protectedFiles,
+      protectedChanges,
+      untrackedProtectedFiles: trackedWarnings,
+      warnings: trackedWarnings.length ? ["Protected design documents exist but are not tracked by git yet."] : [],
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function git(args, options = {}) {

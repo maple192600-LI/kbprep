@@ -39,16 +39,7 @@ if (!Array.isArray(privateTerms) || privateTerms.length === 0) {
 
 const scanDirs = ["src", "scripts", "python", "docs", "rules"];
 const scanExts = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".py", ".json", ".md", ".html"]);
-const skipDirs = new Set([
-  "node_modules",
-  "dist",
-  "coverage",
-  "__pycache__",
-  ".mypy_cache",
-  ".ruff_cache",
-  ".git",
-  ".kbprep",
-]);
+const skipDirs = new Set(["node_modules", "dist", "coverage", "__pycache__", ".mypy_cache", ".ruff_cache", ".git", ".kbprep"]);
 
 const exempt = new Set([
   "scripts/redact-map.json",
@@ -83,13 +74,7 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write(
-  JSON.stringify(
-    { ok: true, privateTerms: privateTerms.length, scannedDirs: scanDirs },
-    null,
-    2,
-  ),
-);
+process.stdout.write(JSON.stringify({ ok: true, privateTerms: privateTerms.length, scannedDirs: scanDirs }, null, 2));
 process.stdout.write("\n");
 
 function collectSourceFiles(root) {

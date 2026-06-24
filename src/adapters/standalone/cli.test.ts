@@ -54,12 +54,7 @@ describe("standalone KBPrep CLI adapter", () => {
   });
 
   it("returns a JSON CLI error for invalid boolean options instead of silently using defaults", async () => {
-    const result = await runStandaloneCli("cleanup", [
-      "--output",
-      ".kbprep/cleanup",
-      "--dry-run",
-      "maybe",
-    ]);
+    const result = await runStandaloneCli("cleanup", ["--output", ".kbprep/cleanup", "--dry-run", "maybe"]);
     const payload = JSON.parse(result.output) as { ok: boolean; error: { code: string; message: string } };
 
     expect(result.exitCode).toBe(1);
@@ -74,12 +69,7 @@ describe("standalone KBPrep CLI adapter", () => {
       const configPath = join(root, "config.json");
       writeFileSync(configPath, JSON.stringify({ python_path: "python", unexpected: true }), "utf-8");
 
-      const result = await runStandaloneCli("preflight", [
-        "--workdir",
-        root,
-        "--config-file",
-        configPath,
-      ]);
+      const result = await runStandaloneCli("preflight", ["--workdir", root, "--config-file", configPath]);
       const payload = JSON.parse(result.output) as { ok: boolean; error: { code: string; message: string } };
 
       expect(result.exitCode).toBe(1);
@@ -97,12 +87,7 @@ describe("standalone KBPrep CLI adapter", () => {
       const patchPath = join(root, "patch.json");
       writeFileSync(patchPath, `[${'"x"'.repeat(1_100_000)}]`, "utf-8");
 
-      const result = await runStandaloneCli("apply_review", [
-        "--run-dir",
-        root,
-        "--patch-file",
-        patchPath,
-      ]);
+      const result = await runStandaloneCli("apply_review", ["--run-dir", root, "--patch-file", patchPath]);
       const payload = JSON.parse(result.output) as { ok: boolean; error: { code: string; message: string } };
 
       expect(result.exitCode).toBe(1);
@@ -119,18 +104,11 @@ describe("standalone KBPrep CLI adapter", () => {
     try {
       const inputPath = join(root, "source.md");
       writeFileSync(inputPath, "# Source\n", "utf-8");
-      const parsed = parseStandaloneArgs([
-        "--input",
-        inputPath,
-        "--output",
-        ".kbprep/absolute-input",
-      ]);
+      const parsed = parseStandaloneArgs(["--input", inputPath, "--output", ".kbprep/absolute-input"]);
       const plan = buildCliPlan("prepare", parsed.options);
       expect(plan.input.input_path).toBe(inputPath);
 
-      const rootOutput = process.platform === "win32"
-        ? inputPath.slice(0, 3)
-        : "/";
+      const rootOutput = process.platform === "win32" ? inputPath.slice(0, 3) : "/";
       const rejected = await runStandaloneCli("cleanup", ["--output", rootOutput]);
       const payload = JSON.parse(rejected.output) as { ok: boolean; error: { message: string } };
       expect(rejected.exitCode).toBe(1);
@@ -149,21 +127,11 @@ describe("standalone KBPrep CLI adapter", () => {
       const inputPath = join(outside, "source.md");
       writeFileSync(inputPath, "# External source\n", "utf-8");
 
-      const parsed = parseStandaloneArgs([
-        "--input",
-        inputPath,
-        "--output",
-        join(boundary, "out"),
-      ]);
+      const parsed = parseStandaloneArgs(["--input", inputPath, "--output", join(boundary, "out")]);
       const plan = buildCliPlan("prepare", parsed.options);
       expect(plan.input.input_path).toBe(inputPath);
 
-      const rejected = parseStandaloneArgs([
-        "--input",
-        inputPath,
-        "--output",
-        join(outside, "out"),
-      ]);
+      const rejected = parseStandaloneArgs(["--input", inputPath, "--output", join(outside, "out")]);
       expect(() => buildCliPlan("prepare", rejected.options)).toThrow(/Path escapes CLI boundary/);
     } finally {
       if (previous === undefined) delete process.env.KBPREP_CLI_BOUNDARY_DIR;
@@ -176,12 +144,7 @@ describe("standalone KBPrep CLI adapter", () => {
   it("rejects feedback file paths that are directories before calling the worker", async () => {
     const root = mkdtempSync(join(tmpdir(), "kbprep-cli-feedback-file-"));
     try {
-      const result = await runStandaloneCli("feedback", [
-        "--run-dir",
-        root,
-        "--feedback-file",
-        root,
-      ]);
+      const result = await runStandaloneCli("feedback", ["--run-dir", root, "--feedback-file", root]);
       const payload = JSON.parse(result.output) as { ok: boolean; error: { message: string } };
 
       expect(result.exitCode).toBe(1);
@@ -243,15 +206,7 @@ describe("standalone KBPrep CLI adapter", () => {
   });
 
   it("maps cleanup dry-run options to the Python cleanup worker command", () => {
-    const parsed = parseStandaloneArgs([
-      "--output",
-      ".kbprep/cleanup",
-      "--action",
-      "expired",
-      "--older-than-days",
-      "30",
-      "--dry-run",
-    ]);
+    const parsed = parseStandaloneArgs(["--output", ".kbprep/cleanup", "--action", "expired", "--older-than-days", "30", "--dry-run"]);
     const plan = buildCliPlan("cleanup", parsed.options);
 
     expect(plan.command).toBe("cleanup");
@@ -262,11 +217,7 @@ describe("standalone KBPrep CLI adapter", () => {
   });
 
   it("defaults cleanup dry-run to all-artifact preview without weakening finalize cleanup", () => {
-    const parsed = parseStandaloneArgs([
-      "--output",
-      ".kbprep/cleanup",
-      "--dry-run",
-    ]);
+    const parsed = parseStandaloneArgs(["--output", ".kbprep/cleanup", "--dry-run"]);
     const plan = buildCliPlan("cleanup", parsed.options);
 
     expect(plan.command).toBe("cleanup");
@@ -354,13 +305,7 @@ describe("standalone KBPrep CLI adapter", () => {
   });
 
   it("maps feedback dictionary suggestions without requiring a run directory", () => {
-    const parsed = parseStandaloneArgs([
-      "--suggest-dictionary-updates",
-      "--rules-dir",
-      ".kbprep/rules/user",
-      "--min-feedback-count",
-      "2",
-    ]);
+    const parsed = parseStandaloneArgs(["--suggest-dictionary-updates", "--rules-dir", ".kbprep/rules/user", "--min-feedback-count", "2"]);
     const plan = buildCliPlan("feedback", parsed.options);
 
     expect(plan.command).toBe("feedback");
@@ -420,13 +365,7 @@ describe("standalone KBPrep CLI adapter", () => {
   });
 
   it("maps promotion history summaries without requiring a run directory", () => {
-    const parsed = parseStandaloneArgs([
-      "--summarize-promotion-history",
-      "--document-type",
-      "course",
-      "--target-rules-dir",
-      "rules",
-    ]);
+    const parsed = parseStandaloneArgs(["--summarize-promotion-history", "--document-type", "course", "--target-rules-dir", "rules"]);
     const plan = buildCliPlan("feedback", parsed.options);
 
     expect(plan.command).toBe("feedback");

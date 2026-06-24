@@ -1,7 +1,5 @@
 import { describe, it } from "vitest";
-import {
-  runPython,
-} from "../helpers/workerHarness.js";
+import { runPython } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - quality gates part 2", () => {
   it("reports concrete detail retention and fails when detail-bearing blocks are discarded", () => {
@@ -173,6 +171,4 @@ describe("kbprep worker pipeline - quality gates part 2", () => {
       [],
     );
   });
-
 });
-

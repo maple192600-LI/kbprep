@@ -3,14 +3,8 @@ import { spawnSync } from "node:child_process";
 
 const strict = process.argv.includes("--strict");
 
-const coreDocs = [
-  "docs/kbprep-core-flow-design.md",
-  "docs/kbprep-full-flowchart.html",
-];
-const governanceDocs = [
-  ...coreDocs,
-  "docs/kbprep-development-implementation-plan.md",
-];
+const coreDocs = ["docs/kbprep-core-flow-design.md", "docs/kbprep-full-flowchart.html"];
+const governanceDocs = [...coreDocs, "docs/kbprep-development-implementation-plan.md"];
 const requiredPackageScripts = [
   "check:governance",
   "check:policy",
@@ -41,7 +35,7 @@ for (const file of coreDocs) {
 }
 for (const phrase of [
   "Do not edit either file unless the owner explicitly orders it.",
-  "The current development metric is not \"produces Markdown once.\"",
+  'The current development metric is not "produces Markdown once."',
   "Before editing code, explain to the owner:",
 ]) {
   if (!agentsText.includes(phrase)) {
@@ -61,7 +55,12 @@ if (!/\bnpm test\b/.test(packageJson.scripts?.["dev:check"] ?? "")) {
 if (!(packageJson.scripts?.["test:coverage"] ?? "").includes("--coverage")) {
   failures.push({ file: "package.json", reason: "test:coverage must run Vitest with measured coverage" });
 }
-for (const [metric, floor] of [["lines", "85"], ["branches", "70"], ["functions", "80"], ["statements", "80"]]) {
+for (const [metric, floor] of [
+  ["lines", "85"],
+  ["branches", "70"],
+  ["functions", "80"],
+  ["statements", "80"],
+]) {
   if (!(packageJson.scripts?.["test:coverage"] ?? "").includes(`coverage.thresholds.${metric}=${floor}`)) {
     failures.push({ file: "package.json", reason: `test:coverage must enforce at least ${floor}% TypeScript ${metric} coverage` });
   }
@@ -115,22 +114,34 @@ if (untracked.length) {
 }
 
 if (failures.length) {
-  process.stderr.write(JSON.stringify({
-    ok: false,
-    strict,
-    failures,
-    warnings,
-  }, null, 2));
+  process.stderr.write(
+    JSON.stringify(
+      {
+        ok: false,
+        strict,
+        failures,
+        warnings,
+      },
+      null,
+      2,
+    ),
+  );
   process.stderr.write("\n");
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  strict,
-  checkedGovernanceDocs: governanceDocs,
-  warnings,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      strict,
+      checkedGovernanceDocs: governanceDocs,
+      warnings,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function readText(file) {

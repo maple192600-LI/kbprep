@@ -2,10 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - batch and long documents part 1", () => {
   it("writes separate direct-use outputs for each file in a batch", () => {
@@ -94,13 +91,9 @@ describe("kbprep worker pipeline - batch and long documents part 1", () => {
       mkdirSync(outputRoot);
       writeFileSync(
         path.join(inputDir, "alpha.md"),
-        [
-          "# Alpha 方法",
-          "",
-          "第一步：保留 ALPHA_CURATED_MARKER，并设置 threshold=0.8。",
-          "",
-          "第二步：把操作流程写成可复盘 SOP。",
-        ].join("\n"),
+        ["# Alpha 方法", "", "第一步：保留 ALPHA_CURATED_MARKER，并设置 threshold=0.8。", "", "第二步：把操作流程写成可复盘 SOP。"].join(
+          "\n",
+        ),
         "utf8",
       );
       writeFileSync(
@@ -183,11 +176,7 @@ describe("kbprep worker pipeline - batch and long documents part 1", () => {
         ["# Alpha", "", "步骤1：保留 ALPHA_BATCH_MARKER，设置 threshold=0.8。"].join("\n"),
         "utf8",
       );
-      writeFileSync(
-        path.join(inputDir, "repo.py"),
-        ["retry_count = 3", "failure_reason = 'timeout'"].join("\n"),
-        "utf8",
-      );
+      writeFileSync(path.join(inputDir, "repo.py"), ["retry_count = 3", "failure_reason = 'timeout'"].join("\n"), "utf8");
       writeFileSync(path.join(inputDir, "lesson.mp4"), "not a real video", "utf8");
       writeFileSync(path.join(inputDir, "archive.bin"), "unknown local file", "utf8");
 
@@ -234,16 +223,8 @@ describe("kbprep worker pipeline - batch and long documents part 1", () => {
         ["# GitHub Guide", "", "步骤1：保留 GITHUB_DOC_MARKER，并设置 threshold=0.8。"].join("\n"),
         "utf8",
       );
-      writeFileSync(
-        path.join(inputDir, "examples", "script.py"),
-        ["retry_count = 3", "failure_reason = 'timeout'"].join("\n"),
-        "utf8",
-      );
-      writeFileSync(
-        path.join(inputDir, "node_modules", "noise", "ad.md"),
-        "# Dependency noise\n\nSHOULD_NOT_BE_PROCESSED",
-        "utf8",
-      );
+      writeFileSync(path.join(inputDir, "examples", "script.py"), ["retry_count = 3", "failure_reason = 'timeout'"].join("\n"), "utf8");
+      writeFileSync(path.join(inputDir, "node_modules", "noise", "ad.md"), "# Dependency noise\n\nSHOULD_NOT_BE_PROCESSED", "utf8");
 
       const envelope = runWorker("prepare_batch", {
         input_dir: inputDir,
@@ -268,16 +249,11 @@ describe("kbprep worker pipeline - batch and long documents part 1", () => {
       expect(envelope.data.failed).toBe(0);
       expect(envelope.data.total).toBe(2);
       expect(inventory.discovered_total).toBe(2);
-      expect(inventory.files.map((item) => item.relative_path).sort()).toEqual([
-        "docs/guide.md",
-        "examples/script.py",
-      ]);
-      expect(results.map((item) => item.relative_path).sort()).toEqual([
-        "docs/guide.md",
-        "examples/script.py",
-      ]);
-      expect(readFileSync(results.find((item) => item.relative_path === "docs/guide.md")!.latest_outputs.cleaned_md, "utf8"))
-        .toContain("GITHUB_DOC_MARKER");
+      expect(inventory.files.map((item) => item.relative_path).sort()).toEqual(["docs/guide.md", "examples/script.py"]);
+      expect(results.map((item) => item.relative_path).sort()).toEqual(["docs/guide.md", "examples/script.py"]);
+      expect(readFileSync(results.find((item) => item.relative_path === "docs/guide.md")!.latest_outputs.cleaned_md, "utf8")).toContain(
+        "GITHUB_DOC_MARKER",
+      );
       expect(results.some((item) => item.relative_path.includes("node_modules"))).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -345,5 +321,4 @@ describe("kbprep worker pipeline - batch and long documents part 1", () => {
       [],
     );
   });
-
 });

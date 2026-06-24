@@ -27,14 +27,20 @@ if (failures.length) {
   fail(failures.join("\n"));
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  total_lines: totalLines,
-  total_lines_floor: totalLinesFloor,
-  file: filePath,
-  file_lines: fileLines,
-  file_lines_floor: fileLinesFloor,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      total_lines: totalLines,
+      total_lines_floor: totalLinesFloor,
+      file: filePath,
+      file_lines: fileLines,
+      file_lines_floor: fileLinesFloor,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function parseArgs(rawArgs) {

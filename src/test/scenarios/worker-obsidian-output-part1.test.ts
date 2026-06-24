@@ -2,10 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - output lifecycle part 1", () => {
   it("renders a curated Obsidian knowledge base without author bios or identity wrappers", () => {
@@ -87,7 +84,7 @@ describe("kbprep worker pipeline - output lifecycle part 1", () => {
         "    assert 'drop_image_for_text_kb' in discarded, discarded",
         "    assert 'layout_table_artifact' in discarded, discarded",
         "    assert 'drop_brand_program_packaging_for_text_kb' in discarded, discarded",
-        "    assert '\"block_id\": \"body\"' in source_map, source_map",
+        '    assert \'"block_id": "body"\' in source_map, source_map',
       ].join("\n"),
       [],
     );
@@ -172,9 +169,9 @@ describe("kbprep worker pipeline - output lifecycle part 1", () => {
         [
           "<html><head><title>Diagram Test</title></head><body><main>",
           "<h1>Diagram Test</h1>",
-          "<svg viewbox=\"0 0 680 480\" width=\"100%\" role=\"img\" aria-label=\"Workflow diagram\">",
-          "<rect x=\"0\" y=\"0\" width=\"680\" height=\"480\" fill=\"#fff\"/>",
-          "<text x=\"340\" y=\"240\">threshold=0.8</text>",
+          '<svg viewbox="0 0 680 480" width="100%" role="img" aria-label="Workflow diagram">',
+          '<rect x="0" y="0" width="680" height="480" fill="#fff"/>',
+          '<text x="340" y="240">threshold=0.8</text>',
           "</svg>",
           "<p>Step 1: keep the complete diagram and threshold=0.8.</p>",
           "</main></body></html>",
@@ -305,11 +302,7 @@ describe("kbprep worker pipeline - output lifecycle part 1", () => {
       mkdirSync(inputDir);
       mkdirSync(outputRoot);
       const sourcePath = path.join(inputDir, "ExampleTool橙皮书.txt");
-      writeFileSync(
-        sourcePath,
-        ["# ExampleTool橙皮书", "", "步骤1：保留 FINAL_NAME_MARKER，并设置 threshold=0.8。"].join("\n"),
-        "utf8",
-      );
+      writeFileSync(sourcePath, ["# ExampleTool橙皮书", "", "步骤1：保留 FINAL_NAME_MARKER，并设置 threshold=0.8。"].join("\n"), "utf8");
 
       const envelope = runWorker("prepare", {
         input_path: sourcePath,
@@ -359,6 +352,4 @@ describe("kbprep worker pipeline - output lifecycle part 1", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });
-

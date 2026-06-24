@@ -89,9 +89,7 @@ const requiredFiles = [
 ];
 
 const npmCommand = process.platform === "win32" ? "cmd.exe" : "npm";
-const npmArgs = process.platform === "win32"
-  ? ["/d", "/s", "/c", "npm", "pack", "--dry-run", "--json"]
-  : ["pack", "--dry-run", "--json"];
+const npmArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm", "pack", "--dry-run", "--json"] : ["pack", "--dry-run", "--json"];
 const result = spawnSync(npmCommand, npmArgs, {
   encoding: "utf-8",
 });
@@ -111,11 +109,13 @@ try {
 
 const files = new Set(pack.files.map((file) => file.path));
 const missing = requiredFiles.filter((file) => !files.has(file));
-const forbidden = [...files].filter((file) => (
-  file.startsWith("rules/user/") && file.endsWith(".jsonl")
-) || file.startsWith(".kbprep/")
-  || file === "rules/templates/self_media_course.json"
-  || file === "rules/templates/obsidian_course_kb.json");
+const forbidden = [...files].filter(
+  (file) =>
+    (file.startsWith("rules/user/") && file.endsWith(".jsonl")) ||
+    file.startsWith(".kbprep/") ||
+    file === "rules/templates/self_media_course.json" ||
+    file === "rules/templates/obsidian_course_kb.json",
+);
 
 if (missing.length > 0) {
   process.stderr.write(`npm package is missing required files:\n${missing.map((file) => `- ${file}`).join("\n")}\n`);
@@ -126,12 +126,18 @@ if (forbidden.length > 0) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  filename: pack.filename,
-  version: pack.version,
-  fileCount: pack.files.length,
-  checked: requiredFiles.length,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      filename: pack.filename,
+      version: pack.version,
+      fileCount: pack.files.length,
+      checked: requiredFiles.length,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function runScript(label, script) {

@@ -4,17 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const roots = [
-  "docs",
-];
+const roots = ["docs"];
 
-const explicitFiles = [
-  "AGENTS.md",
-  "README.md",
-  "CHANGELOG.md",
-  "package.json",
-  "src/adapters/standalone/cli.ts",
-];
+const explicitFiles = ["AGENTS.md", "README.md", "CHANGELOG.md", "package.json", "src/adapters/standalone/cli.ts"];
 
 const forbiddenPhrases = [
   "openclaw-kbprep",
@@ -36,10 +28,9 @@ const forbiddenPhrases = [
   "serve-docs",
 ];
 
-const checkedFiles = [
-  ...explicitFiles,
-  ...roots.flatMap(collectFiles),
-].filter((file, index, all) => all.indexOf(file) === index && existsSync(path.join(repoRoot, file)));
+const checkedFiles = [...explicitFiles, ...roots.flatMap(collectFiles)].filter(
+  (file, index, all) => all.indexOf(file) === index && existsSync(path.join(repoRoot, file)),
+);
 
 const violations = [];
 for (const relative of checkedFiles) {
@@ -61,11 +52,17 @@ if (violations.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  checkedFiles: checkedFiles.length,
-  forbiddenPhrases: forbiddenPhrases.length,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      checkedFiles: checkedFiles.length,
+      forbiddenPhrases: forbiddenPhrases.length,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function collectFiles(relativeRoot) {

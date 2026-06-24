@@ -2,9 +2,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - direct content conversion part 1", () => {
   it("keeps short unnumbered case details that mention CTA phrases", () => {
@@ -145,9 +143,7 @@ describe("kbprep worker pipeline - direct content conversion part 1", () => {
       expect(quality.document_type).toBe("report");
       expect(quality.document_type_detection.confidence).toBeGreaterThan(0);
       expect(quality.document_type_detection.reasons.length).toBeGreaterThan(0);
-      const ruleSources = quality.cleaning_rule_sources.map((source: string) =>
-        source.replaceAll("\\", "/"),
-      );
+      const ruleSources = quality.cleaning_rule_sources.map((source: string) => source.replaceAll("\\", "/"));
       expect(ruleSources).toContain("rules/document_types/report.json");
       expect(ruleSources).not.toContain("rules/templates/self_media_course.json");
 
@@ -329,5 +325,4 @@ describe("kbprep worker pipeline - direct content conversion part 1", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

@@ -33,7 +33,10 @@ function parseMatrix() {
   const rows = new Map();
   for (const line of text.split(/\r?\n/)) {
     if (!line.startsWith("|")) continue;
-    const cells = line.split("|").slice(1, -1).map((cell) => cell.trim());
+    const cells = line
+      .split("|")
+      .slice(1, -1)
+      .map((cell) => cell.trim());
     if (cells.length < 7 || cells[0] === "Capability ID" || /^-+$/.test(cells[0])) continue;
     rows.set(cells[0], {
       id: cells[0],
@@ -61,9 +64,9 @@ const workerTestFiles = [
   path.join(repoRoot, "src", "worker.test.ts"),
   ...(existsSync(scenarioDir)
     ? readdirSync(scenarioDir)
-      .filter((file) => file.endsWith(".test.ts"))
-      .sort()
-      .map((file) => path.join(scenarioDir, file))
+        .filter((file) => file.endsWith(".test.ts"))
+        .sort()
+        .map((file) => path.join(scenarioDir, file))
     : []),
 ].filter((file) => existsSync(file));
 const workerTestText = workerTestFiles.map((file) => readFileSync(file, "utf8")).join("\n");
@@ -100,7 +103,11 @@ for (const capability of capabilities) {
     }
   }
   if (evidence.length === 0 && !/^none$/i.test(row.evidence)) {
-    evidenceErrors.push({ id: capability.id, reason: "matrix evidence must be none when registry has no test_evidence", found: row.evidence });
+    evidenceErrors.push({
+      id: capability.id,
+      reason: "matrix evidence must be none when registry has no test_evidence",
+      found: row.evidence,
+    });
   }
   if (evidence.length > 0) {
     if (/^none$/i.test(row.evidence)) {
@@ -126,13 +133,19 @@ if (missing.length || mismatched.length || extra.length || evidenceErrors.length
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  checked: capabilities.length,
-  missing,
-  mismatched,
-  extra,
-  evidenceErrors,
-  gapSummary: gapReport.summary,
-  gapErrors,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      checked: capabilities.length,
+      missing,
+      mismatched,
+      extra,
+      evidenceErrors,
+      gapSummary: gapReport.summary,
+      gapErrors,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");

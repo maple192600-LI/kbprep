@@ -2,10 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - output guards part 1", () => {
   it("copies local Markdown image assets into run and latest outputs", () => {
@@ -17,10 +14,7 @@ describe("kbprep worker pipeline - output guards part 1", () => {
       const imagesDir = path.join(sourceDir, "images");
       mkdirSync(assetsDir, { recursive: true });
       mkdirSync(imagesDir, { recursive: true });
-      const png1x1 = Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
-        "base64",
-      );
+      const png1x1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
       writeFileSync(path.join(assetsDir, "step.png"), png1x1);
       writeFileSync(path.join(assetsDir, "chart.png"), png1x1);
       writeFileSync(path.join(imagesDir, "result.png"), png1x1);
@@ -347,5 +341,4 @@ describe("kbprep worker pipeline - output guards part 1", () => {
       [],
     );
   });
-
 });

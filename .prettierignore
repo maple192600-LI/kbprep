@@ -8,6 +8,10 @@ node_modules/
 # Python 源码不归 Prettier 管
 python/
 
+# redact-map.ts 是 private-info-redaction-sync 维护的 mirror，
+# 其 "key": "value" 引号格式被同步正则依赖，Prettier 的 quoteProps 会去引号而破坏同步
+src/test/fixtures/redact-map.ts
+
 # 本项目 Prettier 只管 .ts/.mjs；以下类型显式忽略，防止 `prettier .` 误触
 *.md
 *.json

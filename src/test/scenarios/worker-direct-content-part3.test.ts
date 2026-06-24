@@ -2,9 +2,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - direct content conversion part 3", () => {
   it("converts Jupyter notebooks into readable Markdown cells with code and text outputs", () => {
@@ -79,5 +77,4 @@ describe("kbprep worker pipeline - direct content conversion part 3", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

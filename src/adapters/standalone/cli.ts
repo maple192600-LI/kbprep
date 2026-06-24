@@ -3,14 +3,7 @@ import { parse, relative, resolve } from "node:path";
 import { callWorker, type WorkerConfig, type WorkerResult } from "../../worker.js";
 import { ensurePythonRuntime, type RuntimeConfig } from "../../runtime/pythonRuntime.js";
 
-export type StandaloneCommand =
-  | "preflight"
-  | "diagnose"
-  | "prepare"
-  | "apply_review"
-  | "feedback"
-  | "cleanup"
-  | "prepare_batch";
+export type StandaloneCommand = "preflight" | "diagnose" | "prepare" | "apply_review" | "feedback" | "cleanup" | "prepare_batch";
 
 type ParsedArgs = {
   help: boolean;
@@ -31,13 +24,7 @@ type CliRunResult = {
 
 const MAX_PATCH_JSON_BYTES = 1_000_000;
 const MAX_CONFIG_JSON_BYTES = 64_000;
-const RUNTIME_CONFIG_KEYS = new Set([
-  "device_override",
-  "max_cpu_threads",
-  "min_free_memory_gb",
-  "mineru_timeout_seconds",
-  "python_path",
-]);
+const RUNTIME_CONFIG_KEYS = new Set(["device_override", "max_cpu_threads", "min_free_memory_gb", "mineru_timeout_seconds", "python_path"]);
 
 const HELP: Record<StandaloneCommand, string> = {
   preflight: [
@@ -264,13 +251,17 @@ export async function runStandaloneCli(command: StandaloneCommand, argv = proces
   } catch (error) {
     return {
       exitCode: 1,
-      output: `${JSON.stringify({
-        ok: false,
-        error: {
-          code: "KBPREP_CLI_ERROR",
-          message: error instanceof Error ? error.message : String(error),
+      output: `${JSON.stringify(
+        {
+          ok: false,
+          error: {
+            code: "KBPREP_CLI_ERROR",
+            message: error instanceof Error ? error.message : String(error),
+          },
         },
-      }, null, 2)}\n`,
+        null,
+        2,
+      )}\n`,
     };
   }
 }
@@ -283,9 +274,7 @@ export async function main(command: StandaloneCommand, argv = process.argv.slice
 
 function readRuntimeConfig(options: Record<string, string | boolean>): RuntimeConfig {
   const configPath = readString(options, "config_file");
-  const fileConfig = configPath
-    ? readJsonObjectFile(resolvePath(configPath), "config file", MAX_CONFIG_JSON_BYTES)
-    : {};
+  const fileConfig = configPath ? readJsonObjectFile(resolvePath(configPath), "config file", MAX_CONFIG_JSON_BYTES) : {};
   validateRuntimeConfig(fileConfig);
   return {
     device_override: readDeviceOverride(options, fileConfig),
@@ -345,16 +334,19 @@ function validateRuntimeConfig(config: Record<string, unknown>): void {
 
 function isRunDirOptionalFeedback(options: Record<string, string | boolean>): boolean {
   return Boolean(
-    readString(options, "accept_proposal")
-      || readString(options, "reject_proposal")
-      || readBoolean(options, "suggest_dictionary_updates", false)
-      || readBoolean(options, "promote_dictionary_suggestion", false)
-      || readBoolean(options, "summarize_promotion_history", false)
-      || readBoolean(options, "resolve_promotion_failures", false),
+    readString(options, "accept_proposal") ||
+    readString(options, "reject_proposal") ||
+    readBoolean(options, "suggest_dictionary_updates", false) ||
+    readBoolean(options, "promote_dictionary_suggestion", false) ||
+    readBoolean(options, "summarize_promotion_history", false) ||
+    readBoolean(options, "resolve_promotion_failures", false),
   );
 }
 
-function readDeviceOverride(options: Record<string, string | boolean>, fileConfig: Record<string, unknown>): RuntimeConfig["device_override"] {
+function readDeviceOverride(
+  options: Record<string, string | boolean>,
+  fileConfig: Record<string, unknown>,
+): RuntimeConfig["device_override"] {
   const raw = readString(options, "device_override") ?? readOptionalString(fileConfig.device_override);
   if (!raw) return undefined;
   if (raw === "auto") return undefined;

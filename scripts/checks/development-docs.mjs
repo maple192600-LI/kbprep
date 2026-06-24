@@ -49,7 +49,7 @@ for (const file of requiredDocs) {
   }
 }
 
-const read = (file) => existsSync(file) ? readFileSync(file, "utf8") : "";
+const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : "");
 
 requireIncludes("docs/development/README.md", read("docs/development/README.md"), [
   "Canonical IR",
@@ -68,13 +68,17 @@ requireIncludes("docs/kbprep-development-implementation-plan.md", read("docs/kbp
   "docs/development/12-release-acceptance-and-governance.md",
 ]);
 
-requireIncludes("docs/development/12-release-acceptance-and-governance.md", read("docs/development/12-release-acceptance-and-governance.md"), [
-  "docs/flowchart/kbprep-flow.json",
-  "## Conflict Handling Rule",
-  "## One-Sentence Feedback Behavior",
-  "## Required Checks",
-  "## Release Acceptance",
-]);
+requireIncludes(
+  "docs/development/12-release-acceptance-and-governance.md",
+  read("docs/development/12-release-acceptance-and-governance.md"),
+  [
+    "docs/flowchart/kbprep-flow.json",
+    "## Conflict Handling Rule",
+    "## One-Sentence Feedback Behavior",
+    "## Required Checks",
+    "## Release Acceptance",
+  ],
+);
 
 requireIncludes("docs/feedback-learning.md", read("docs/feedback-learning.md"), [
   "## Plain-Language Behavior",
@@ -104,11 +108,17 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  checkedDocs: requiredDocs.length,
-  currentDocs: currentDocs.length,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      checkedDocs: requiredDocs.length,
+      currentDocs: currentDocs.length,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function requireIncludes(file, text, phrases) {

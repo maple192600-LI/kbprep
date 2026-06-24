@@ -2,11 +2,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runPythonJson,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runPythonJson, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - feedback rules part 1", () => {
   it("applies accepted feedback rules while ignoring unaccepted proposals", () => {
@@ -23,14 +19,18 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
         counterexamples: ["正文段落"],
       });
 
-      const beforeAccept = runPythonJson([
-        "import json",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "load_cleaning_rules.cache_clear()",
-        "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '内部训练营限时招募', 'risk_tags': [], 'protected': False}]",
-        "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
-      ].join("\n"), [], { KBPREP_USER_RULES_DIR: rulesDir });
+      const beforeAccept = runPythonJson(
+        [
+          "import json",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "load_cleaning_rules.cache_clear()",
+          "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '内部训练营限时招募', 'risk_tags': [], 'protected': False}]",
+          "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
+        ].join("\n"),
+        [],
+        { KBPREP_USER_RULES_DIR: rulesDir },
+      );
 
       expect(beforeAccept.status).toBe("unclassified");
 
@@ -43,14 +43,18 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
       expect(accepted.ok).toBe(true);
       expect(accepted.data.accepted.status).toBe("accepted");
 
-      const afterAccept = runPythonJson([
-        "import json",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "load_cleaning_rules.cache_clear()",
-        "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '内部训练营限时招募', 'risk_tags': [], 'protected': False}]",
-        "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
-      ].join("\n"), [], { KBPREP_USER_RULES_DIR: rulesDir });
+      const afterAccept = runPythonJson(
+        [
+          "import json",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "load_cleaning_rules.cache_clear()",
+          "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '内部训练营限时招募', 'risk_tags': [], 'protected': False}]",
+          "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
+        ].join("\n"),
+        [],
+        { KBPREP_USER_RULES_DIR: rulesDir },
+      );
 
       expect(afterAccept.status).toBe("discard");
       expect(afterAccept.cleaning_rule_id).toContain(proposed.data.proposal.id);
@@ -63,36 +67,39 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
   it("loads project-local accepted feedback rules without environment variables", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-project-rules-"));
     try {
-      const result = runPythonJson([
-        "import json, os, sys",
-        "from pathlib import Path",
-        "project = Path(sys.argv[1])",
-        "rules_dir = project / '.kbprep' / 'rules' / 'user'",
-        "rules_dir.mkdir(parents=True)",
-        "(rules_dir / 'accepted_rules.jsonl').write_text(json.dumps({",
-        "  'schema': 'kbprep.rule_proposal.v1',",
-        "  'id': 'proposal-project-local',",
-        "  'status': 'accepted',",
-        "  'action': 'discard',",
-        "  'scope': 'project',",
-        "  'match': 'literal',",
-        "  'pattern': '项目本地污染短语',",
-        "  'reason': 'project local rule test',",
-        "  'risk_note': 'test fixture risk reviewed',",
-        "  'created_from_run': str(project / 'run'),",
-        "  'owner_confirmation_status': 'confirmed',",
-        "  'requires_confirmation': True,",
-        "  'examples': ['项目本地污染短语'],",
-        "  'counterexamples': ['正文段落'],",
-        "  'accepted_rule_id': 'user-feedback-project-local'",
-        "}, ensure_ascii=False) + '\\n', encoding='utf-8')",
-        "os.chdir(project)",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "load_cleaning_rules.cache_clear()",
-        "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '项目本地污染短语', 'risk_tags': [], 'protected': False}]",
-        "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
-      ].join("\n"), [root]);
+      const result = runPythonJson(
+        [
+          "import json, os, sys",
+          "from pathlib import Path",
+          "project = Path(sys.argv[1])",
+          "rules_dir = project / '.kbprep' / 'rules' / 'user'",
+          "rules_dir.mkdir(parents=True)",
+          "(rules_dir / 'accepted_rules.jsonl').write_text(json.dumps({",
+          "  'schema': 'kbprep.rule_proposal.v1',",
+          "  'id': 'proposal-project-local',",
+          "  'status': 'accepted',",
+          "  'action': 'discard',",
+          "  'scope': 'project',",
+          "  'match': 'literal',",
+          "  'pattern': '项目本地污染短语',",
+          "  'reason': 'project local rule test',",
+          "  'risk_note': 'test fixture risk reviewed',",
+          "  'created_from_run': str(project / 'run'),",
+          "  'owner_confirmation_status': 'confirmed',",
+          "  'requires_confirmation': True,",
+          "  'examples': ['项目本地污染短语'],",
+          "  'counterexamples': ['正文段落'],",
+          "  'accepted_rule_id': 'user-feedback-project-local'",
+          "}, ensure_ascii=False) + '\\n', encoding='utf-8')",
+          "os.chdir(project)",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "load_cleaning_rules.cache_clear()",
+          "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '项目本地污染短语', 'risk_tags': [], 'protected': False}]",
+          "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
+        ].join("\n"),
+        [root],
+      );
 
       expect(result.status).toBe("discard");
       expect(result.cleaning_rule_source.replaceAll("\\\\", "/")).toContain(".kbprep/rules/user/accepted_rules.jsonl");
@@ -129,17 +136,20 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
         "utf8",
       );
 
-      const result = runPythonJson([
-        "import json, os, sys",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[1]",
-        "def apply(source_identity):",
-        "    load_cleaning_rules.cache_clear()",
-        "    blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '站点专属广告', 'risk_tags': [], 'protected': False}]",
-        "    return apply_clean_rules(blocks, source_identity=source_identity)[0]",
-        "print(json.dumps({'matching': apply('inputs/site-a/page.md'), 'other': apply('inputs/site-b/page.md')}, ensure_ascii=False))",
-      ].join("\n"), [rulesDir]);
+      const result = runPythonJson(
+        [
+          "import json, os, sys",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[1]",
+          "def apply(source_identity):",
+          "    load_cleaning_rules.cache_clear()",
+          "    blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '站点专属广告', 'risk_tags': [], 'protected': False}]",
+          "    return apply_clean_rules(blocks, source_identity=source_identity)[0]",
+          "print(json.dumps({'matching': apply('inputs/site-a/page.md'), 'other': apply('inputs/site-b/page.md')}, ensure_ascii=False))",
+        ].join("\n"),
+        [rulesDir],
+      );
 
       expect(result.matching.status).toBe("discard");
       expect(result.matching.cleaning_rule_id).toBe("user-feedback-source-pattern");
@@ -177,19 +187,22 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
         "utf8",
       );
 
-      const result = runPythonJson([
-        "import json, os, sys",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[1]",
-        "def apply(source_identity):",
-        "    load_cleaning_rules.cache_clear()",
-        "    blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '来源专属广告', 'risk_tags': [], 'protected': False}]",
-        "    return apply_clean_rules(blocks, source_identity=source_identity)[0]",
-        "matching_identity = json.dumps({'input_path': 'exports/random-file.md', 'source_url': 'https://example.com/course/lesson-1', 'source_domain': 'example.com', 'site_name': 'Example Course'}, ensure_ascii=False)",
-        "other_identity = json.dumps({'input_path': 'exports/random-file.md', 'source_url': 'https://other.example.net/course/lesson-1', 'source_domain': 'other.example.net'}, ensure_ascii=False)",
-        "print(json.dumps({'matching': apply(matching_identity), 'other': apply(other_identity)}, ensure_ascii=False))",
-      ].join("\n"), [rulesDir]);
+      const result = runPythonJson(
+        [
+          "import json, os, sys",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[1]",
+          "def apply(source_identity):",
+          "    load_cleaning_rules.cache_clear()",
+          "    blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '来源专属广告', 'risk_tags': [], 'protected': False}]",
+          "    return apply_clean_rules(blocks, source_identity=source_identity)[0]",
+          "matching_identity = json.dumps({'input_path': 'exports/random-file.md', 'source_url': 'https://example.com/course/lesson-1', 'source_domain': 'example.com', 'site_name': 'Example Course'}, ensure_ascii=False)",
+          "other_identity = json.dumps({'input_path': 'exports/random-file.md', 'source_url': 'https://other.example.net/course/lesson-1', 'source_domain': 'other.example.net'}, ensure_ascii=False)",
+          "print(json.dumps({'matching': apply(matching_identity), 'other': apply(other_identity)}, ensure_ascii=False))",
+        ].join("\n"),
+        [rulesDir],
+      );
 
       expect(result.matching.status).toBe("discard");
       expect(result.matching.cleaning_rule_id).toBe("user-feedback-source-domain");
@@ -206,11 +219,7 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
       const outputRoot = path.join(root, "out");
       const rulesDir = path.join(root, "rules", "user");
       mkdirSync(rulesDir, { recursive: true });
-      writeFileSync(
-        inputPath,
-        "# 来源身份测试\n\n正文：这个步骤需要保留。\n\n来源专属广告\n",
-        "utf8",
-      );
+      writeFileSync(inputPath, "# 来源身份测试\n\n正文：这个步骤需要保留。\n\n来源专属广告\n", "utf8");
       writeFileSync(
         path.join(rulesDir, "accepted_rules.jsonl"),
         JSON.stringify({
@@ -234,37 +243,40 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
         "utf8",
       );
 
-      const result = runPythonJson([
-        "import contextlib, io, json, os, sys",
-        "from pathlib import Path",
-        "from kbprep_worker import prepare",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[3]",
-        "load_cleaning_rules.cache_clear()",
-        "buffer = io.StringIO()",
-        "try:",
-        "    with contextlib.redirect_stdout(buffer):",
-        "        prepare.run({",
-        "            'input_path': sys.argv[1],",
-        "            'output_root': sys.argv[2],",
-        "            'profile': 'standard',",
-        "            'mode': 'rules_only',",
-        "            'language': 'zh',",
-        "            'source_type': 'auto',",
-        "            'splitter': 'auto',",
-        "            'force': True,",
-        "            'source_url': 'https://example.com/course/lesson-1',",
-        "            'source_domain': 'example.com',",
-        "            'site_name': 'Example Course'",
-        "        })",
-        "except SystemExit as exc:",
-        "    if exc.code not in (0, None):",
-        "        raise",
-        "envelope = json.loads([line for line in buffer.getvalue().splitlines() if line][-1])",
-        "cleaned = Path(envelope['data']['outputs']['cleaned_md']).read_text(encoding='utf-8')",
-        "metadata = json.loads((Path(envelope['data']['run_dir']) / 'run_metadata.json').read_text(encoding='utf-8'))",
-        "print(json.dumps({'cleaned': cleaned, 'source_identity': metadata.get('source_identity')}, ensure_ascii=False))",
-      ].join("\n"), [inputPath, outputRoot, rulesDir]);
+      const result = runPythonJson(
+        [
+          "import contextlib, io, json, os, sys",
+          "from pathlib import Path",
+          "from kbprep_worker import prepare",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "os.environ['KBPREP_USER_RULES_DIR'] = sys.argv[3]",
+          "load_cleaning_rules.cache_clear()",
+          "buffer = io.StringIO()",
+          "try:",
+          "    with contextlib.redirect_stdout(buffer):",
+          "        prepare.run({",
+          "            'input_path': sys.argv[1],",
+          "            'output_root': sys.argv[2],",
+          "            'profile': 'standard',",
+          "            'mode': 'rules_only',",
+          "            'language': 'zh',",
+          "            'source_type': 'auto',",
+          "            'splitter': 'auto',",
+          "            'force': True,",
+          "            'source_url': 'https://example.com/course/lesson-1',",
+          "            'source_domain': 'example.com',",
+          "            'site_name': 'Example Course'",
+          "        })",
+          "except SystemExit as exc:",
+          "    if exc.code not in (0, None):",
+          "        raise",
+          "envelope = json.loads([line for line in buffer.getvalue().splitlines() if line][-1])",
+          "cleaned = Path(envelope['data']['outputs']['cleaned_md']).read_text(encoding='utf-8')",
+          "metadata = json.loads((Path(envelope['data']['run_dir']) / 'run_metadata.json').read_text(encoding='utf-8'))",
+          "print(json.dumps({'cleaned': cleaned, 'source_identity': metadata.get('source_identity')}, ensure_ascii=False))",
+        ].join("\n"),
+        [inputPath, outputRoot, rulesDir],
+      );
 
       expect(result.cleaned).not.toContain("来源专属广告");
       expect(result.cleaned).toContain("这个步骤需要保留");
@@ -284,7 +296,7 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
         "original = accepted.read_text(encoding='utf-8') if accepted.exists() else None",
         "try:",
         "    accepted.parent.mkdir(parents=True, exist_ok=True)",
-        "    accepted.write_text('{\"schema\":\"kbprep.rule_proposal.v1\",\"id\":\"proposal-packaged-skill\",\"status\":\"accepted\",\"action\":\"discard\",\"scope\":\"user\",\"match\":\"literal\",\"pattern\":\"PACKAGED_SKILL_RULE_POLLUTION\",\"reason\":\"packaged skill user rule\",\"risk_note\":\"test fixture risk reviewed\",\"created_from_run\":\"packaged\",\"owner_confirmation_status\":\"confirmed\",\"requires_confirmation\":true,\"examples\":[\"PACKAGED_SKILL_RULE_POLLUTION\"],\"counterexamples\":[\"body paragraph\"],\"accepted_rule_id\":\"user-feedback-packaged-skill\"}\\n', encoding='utf-8')",
+        '    accepted.write_text(\'{"schema":"kbprep.rule_proposal.v1","id":"proposal-packaged-skill","status":"accepted","action":"discard","scope":"user","match":"literal","pattern":"PACKAGED_SKILL_RULE_POLLUTION","reason":"packaged skill user rule","risk_note":"test fixture risk reviewed","created_from_run":"packaged","owner_confirmation_status":"confirmed","requires_confirmation":true,"examples":["PACKAGED_SKILL_RULE_POLLUTION"],"counterexamples":["body paragraph"],"accepted_rule_id":"user-feedback-packaged-skill"}\\n\', encoding=\'utf-8\')',
         "    load_cleaning_rules.cache_clear()",
         "    rules = load_cleaning_rules()",
         "    assert not any(source.replace('\\\\', '/').endswith('rules/user/accepted_rules.jsonl') for source in rules.sources), rules.sources",
@@ -357,7 +369,7 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
     try {
       const rulesDir = path.join(root, "rules", "user");
       mkdirSync(rulesDir, { recursive: true });
-      writeFileSync(path.join(rulesDir, "accepted_rules.jsonl"), "{\"schema\":\n", "utf8");
+      writeFileSync(path.join(rulesDir, "accepted_rules.jsonl"), '{"schema":\n', "utf8");
 
       runPython(
         [
@@ -380,5 +392,4 @@ describe("kbprep worker pipeline - feedback rules part 1", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

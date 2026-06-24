@@ -2,11 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runPythonJson,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runPythonJson, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - feedback rules part 2", () => {
   it("can rerun the affected markdown source after accepting a feedback rule", () => {
@@ -111,31 +107,34 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
   it("defaults feedback proposals to the current project .kbprep rules directory", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-project-feedback-default-"));
     try {
-      const result = runPythonJson([
-        "import io, json, os, sys",
-        "from pathlib import Path",
-        "from kbprep_worker import feedback",
-        "project = Path(sys.argv[1])",
-        "run_dir = project / 'run'",
-        "run_dir.mkdir(parents=True)",
-        "os.chdir(project)",
-        "stdout = io.StringIO()",
-        "old_stdout = sys.stdout",
-        "try:",
-        "    sys.stdout = stdout",
-        "    try:",
-        "        feedback.run({'run_dir': str(run_dir), 'feedback_text': '下次删除「项目默认规则污染」'})",
-        "    except SystemExit:",
-        "        pass",
-        "finally:",
-        "    sys.stdout = old_stdout",
-        "payload = json.loads(stdout.getvalue())",
-        "print(json.dumps({",
-        "  'ok': payload['ok'],",
-        "  'proposal_path': payload['data']['proposal_path'],",
-        "  'exists': (project / '.kbprep' / 'rules' / 'user' / 'proposed_rules.jsonl').exists()",
-        "}, ensure_ascii=False))",
-      ].join("\n"), [root]);
+      const result = runPythonJson(
+        [
+          "import io, json, os, sys",
+          "from pathlib import Path",
+          "from kbprep_worker import feedback",
+          "project = Path(sys.argv[1])",
+          "run_dir = project / 'run'",
+          "run_dir.mkdir(parents=True)",
+          "os.chdir(project)",
+          "stdout = io.StringIO()",
+          "old_stdout = sys.stdout",
+          "try:",
+          "    sys.stdout = stdout",
+          "    try:",
+          "        feedback.run({'run_dir': str(run_dir), 'feedback_text': '下次删除「项目默认规则污染」'})",
+          "    except SystemExit:",
+          "        pass",
+          "finally:",
+          "    sys.stdout = old_stdout",
+          "payload = json.loads(stdout.getvalue())",
+          "print(json.dumps({",
+          "  'ok': payload['ok'],",
+          "  'proposal_path': payload['data']['proposal_path'],",
+          "  'exists': (project / '.kbprep' / 'rules' / 'user' / 'proposed_rules.jsonl').exists()",
+          "}, ensure_ascii=False))",
+        ].join("\n"),
+        [root],
+      );
 
       expect(result.ok).toBe(true);
       expect(result.exists).toBe(true);
@@ -211,22 +210,30 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
       expect(existsSync(path.join(rulesDir, "rejected_rules.jsonl"))).toBe(true);
       expect(existsSync(path.join(rulesDir, "accepted_rules.jsonl"))).toBe(false);
 
-      const afterReject = runPythonJson([
-        "import json",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "load_cleaning_rules.cache_clear()",
-        "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '临时测试广告', 'risk_tags': [], 'protected': False}]",
-        "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
-      ].join("\n"), [], { KBPREP_USER_RULES_DIR: rulesDir });
+      const afterReject = runPythonJson(
+        [
+          "import json",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "load_cleaning_rules.cache_clear()",
+          "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '临时测试广告', 'risk_tags': [], 'protected': False}]",
+          "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
+        ].join("\n"),
+        [],
+        { KBPREP_USER_RULES_DIR: rulesDir },
+      );
 
       expect(afterReject.status).toBe("unclassified");
 
-      const acceptedAfterReject = runWorker("feedback", {
-        rules_dir: rulesDir,
-        accept_proposal: proposed.data.proposal.id,
-        confirm_rule_acceptance: true,
-      }, 1);
+      const acceptedAfterReject = runWorker(
+        "feedback",
+        {
+          rules_dir: rulesDir,
+          accept_proposal: proposed.data.proposal.id,
+          confirm_rule_acceptance: true,
+        },
+        1,
+      );
 
       expect(acceptedAfterReject.ok).toBe(false);
       expect(acceptedAfterReject.error.code).toBe("E_INVALID_INPUT");
@@ -255,14 +262,18 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
         confirm_rule_acceptance: true,
       });
 
-      const protectedBlock = runPythonJson([
-        "import json",
-        "from kbprep_worker.clean_rules import apply_clean_rules",
-        "from kbprep_worker.rule_loader import load_cleaning_rules",
-        "load_cleaning_rules.cache_clear()",
-        "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '扫码失败排查步骤', 'risk_tags': [], 'protected': False}]",
-        "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
-      ].join("\n"), [], { KBPREP_USER_RULES_DIR: rulesDir });
+      const protectedBlock = runPythonJson(
+        [
+          "import json",
+          "from kbprep_worker.clean_rules import apply_clean_rules",
+          "from kbprep_worker.rule_loader import load_cleaning_rules",
+          "load_cleaning_rules.cache_clear()",
+          "blocks = [{'block_id': 'b1', 'status': 'unclassified', 'type': 'paragraph', 'text': '扫码失败排查步骤', 'risk_tags': [], 'protected': False}]",
+          "print(json.dumps(apply_clean_rules(blocks)[0], ensure_ascii=False))",
+        ].join("\n"),
+        [],
+        { KBPREP_USER_RULES_DIR: rulesDir },
+      );
 
       expect(protectedBlock.status).toBe("keep");
       expect(protectedBlock.protected).toBe(true);
@@ -271,5 +282,4 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

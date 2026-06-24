@@ -42,11 +42,15 @@ export class ManagedProcessTimeoutError extends Error {
     const stderrTail = tailText(result.stderr ?? "");
     const stdoutTail = tailText(result.stdout ?? "");
     const evidence = stderrTail || stdoutTail;
-    super([
-      `Timed out while trying to ${label} after ${timeoutMs}ms`,
-      `(exit ${result.code ?? "unknown"}, signal ${result.signal ?? "unknown"})`,
-      evidence ? evidence : "",
-    ].filter(Boolean).join(". "));
+    super(
+      [
+        `Timed out while trying to ${label} after ${timeoutMs}ms`,
+        `(exit ${result.code ?? "unknown"}, signal ${result.signal ?? "unknown"})`,
+        evidence ? evidence : "",
+      ]
+        .filter(Boolean)
+        .join(". "),
+    );
     this.name = "ManagedProcessTimeoutError";
     this.timeoutMs = timeoutMs;
     this.code = result.code;
@@ -73,10 +77,7 @@ function spawnManagedProcess(options: ManagedProcessOptions): ChildProcess {
   return spawn(options.command, options.args ?? [], spawnOptions);
 }
 
-function collectManagedProcess(
-  child: ChildProcess,
-  options: ManagedProcessOptions,
-): Promise<ManagedProcessResult> {
+function collectManagedProcess(child: ChildProcess, options: ManagedProcessOptions): Promise<ManagedProcessResult> {
   return new Promise((resolve, reject) => {
     // Accumulate raw Buffer chunks and decode once at the end. Decoding each
     // chunk independently (chunk.toString("utf-8")) corrupts any multi-byte
@@ -105,12 +106,16 @@ function collectManagedProcess(
       terminateTimer = setTimeout(() => {
         forcedKill = true;
         child.kill("SIGKILL");
-        settle(() => reject(new ManagedProcessTimeoutError(options.label, options.timeoutMs, {
-          code: null,
-          signal: "SIGKILL",
-          stderr: decodeStderr(),
-          stdout: decodeStdout(),
-        })));
+        settle(() =>
+          reject(
+            new ManagedProcessTimeoutError(options.label, options.timeoutMs, {
+              code: null,
+              signal: "SIGKILL",
+              stderr: decodeStderr(),
+              stdout: decodeStdout(),
+            }),
+          ),
+        );
       }, options.terminateGraceMs ?? DEFAULT_TERMINATE_GRACE_MS);
     }, options.timeoutMs);
 

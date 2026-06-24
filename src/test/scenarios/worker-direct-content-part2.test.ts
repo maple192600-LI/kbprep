@@ -2,10 +2,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  repoRoot,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { repoRoot, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - direct content conversion part 2", () => {
   it("treats English Step N tutorial lines as protected operation steps", () => {
@@ -165,10 +162,7 @@ describe("kbprep worker pipeline - direct content conversion part 2", () => {
       mkdirSync(inputDir);
       const htmlAssetsDir = path.join(inputDir, "html-assets");
       mkdirSync(htmlAssetsDir);
-      const png1x1 = Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
-        "base64",
-      );
+      const png1x1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=", "base64");
       writeFileSync(path.join(htmlAssetsDir, "step.png"), png1x1);
 
       const htmlPath = path.join(inputDir, "saved-page.html");
@@ -177,8 +171,8 @@ describe("kbprep worker pipeline - direct content conversion part 2", () => {
         htmlPath,
         [
           "<html><head><style>.ad{display:none}</style><script>alert('x')</script></head>",
-          "<p>工具地址：<a href=\"https://example.com/tool?mode=kbprep\">打开工具</a></p>",
-          "<p><img src=\"html-assets/step.png\" alt=\"后台截图\"></p>",
+          '<p>工具地址：<a href="https://example.com/tool?mode=kbprep">打开工具</a></p>',
+          '<p><img src="html-assets/step.png" alt="后台截图"></p>',
           "<body><nav>扫码入群领取体验卡</nav><article>",
           "<h1>操作教程</h1><p>第一步：打开平台后台，设置 threshold=0.8。</p>",
           "<ul><li>保留工具名、参数和失败原因。</li></ul>",
@@ -335,6 +329,4 @@ describe("kbprep worker pipeline - direct content conversion part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });
-

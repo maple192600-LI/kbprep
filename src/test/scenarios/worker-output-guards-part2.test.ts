@@ -2,10 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - output guards part 2", () => {
   it("rejects AI review patches that rewrite text, drop protected blocks, or use invalid metadata", () => {
@@ -94,9 +91,7 @@ describe("kbprep worker pipeline - output guards part 2", () => {
       expect(updatedQuality.quality_loop.current_iteration).toBe(2);
       expect(updatedQuality.quality_loop.previous_iteration).toBe(1);
       expect(updatedQuality.quality_loop.max_iterations).toBe(initialQuality.quality_loop.max_iterations);
-      const qualityGates = Object.fromEntries(
-        updatedQuality.quality_gates.map((gate: { name: string }) => [gate.name, gate]),
-      );
+      const qualityGates = Object.fromEntries(updatedQuality.quality_gates.map((gate: { name: string }) => [gate.name, gate]));
       expect(qualityGates.review_safety.checked).toBe(true);
       expect(qualityGates.review_safety.status).toBe("pass");
       expect(reviewNeeded).toContain("扫码加入社群领取体验卡");
@@ -157,19 +152,21 @@ describe("kbprep worker pipeline - output guards part 2", () => {
       const sourcePath = path.join(inputDir, "broken.pptx");
       writeFileSync(sourcePath, "this is not a valid office zip container", "utf8");
 
-      const envelope = runWorker("prepare", {
-        input_path: sourcePath,
-        output_root: outputRoot,
-        profile: "tutorial",
-        mode: "rules_only",
-        language: "zh",
-        force: true,
-      }, 1);
+      const envelope = runWorker(
+        "prepare",
+        {
+          input_path: sourcePath,
+          output_root: outputRoot,
+          profile: "tutorial",
+          mode: "rules_only",
+          language: "zh",
+          force: true,
+        },
+        1,
+      );
 
       const originalsDir = path.join(outputRoot, "original");
-      const originalBackups = existsSync(originalsDir)
-        ? readdirSync(originalsDir).filter((name) => name.endsWith(".pptx"))
-        : [];
+      const originalBackups = existsSync(originalsDir) ? readdirSync(originalsDir).filter((name) => name.endsWith(".pptx")) : [];
 
       expect(envelope.ok).toBe(false);
       expect(envelope.error.code).toBe("E_CONVERT_INPUT_INVALID");
@@ -199,14 +196,18 @@ describe("kbprep worker pipeline - output guards part 2", () => {
       const sourcePath = path.join(inputDir, "lesson.mp4");
       writeFileSync(sourcePath, "not a real video", "utf8");
 
-      const envelope = runWorker("prepare", {
-        input_path: sourcePath,
-        output_root: outputRoot,
-        profile: "tutorial",
-        mode: "rules_only",
-        language: "zh",
-        force: true,
-      }, 1);
+      const envelope = runWorker(
+        "prepare",
+        {
+          input_path: sourcePath,
+          output_root: outputRoot,
+          profile: "tutorial",
+          mode: "rules_only",
+          language: "zh",
+          force: true,
+        },
+        1,
+      );
 
       expect(envelope.ok).toBe(false);
       expect(["E_ENV_MISSING", "E_CONVERT_FAILED"]).toContain(envelope.error.code);
@@ -216,5 +217,4 @@ describe("kbprep worker pipeline - output guards part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

@@ -2,9 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - output lifecycle part 2", () => {
   it("finalizes a successful run by deleting intermediate artifacts and keeping only source-side deliverables", () => {
@@ -139,10 +137,14 @@ describe("kbprep worker pipeline - output lifecycle part 2", () => {
       });
       writeFileSync(path.join(outputRoot, "review_needed.md"), "needs a human look", "utf8");
 
-      const blocked = runWorker("cleanup", {
-        output_root: outputRoot,
-        action: "finalize",
-      }, 1);
+      const blocked = runWorker(
+        "cleanup",
+        {
+          output_root: outputRoot,
+          action: "finalize",
+        },
+        1,
+      );
 
       expect(blocked.ok).toBe(false);
       expect(blocked.error.code).toBe("KBPREP_REVIEW_NEEDED");
@@ -186,10 +188,14 @@ describe("kbprep worker pipeline - output lifecycle part 2", () => {
       });
       writeFileSync(path.join(outputRoot, "review_needed.md"), "needs curated human review", "utf8");
 
-      const blocked = runWorker("cleanup", {
-        output_root: outputRoot,
-        action: "finalize",
-      }, 1);
+      const blocked = runWorker(
+        "cleanup",
+        {
+          output_root: outputRoot,
+          action: "finalize",
+        },
+        1,
+      );
 
       expect(blocked.ok).toBe(false);
       expect(blocked.error.code).toBe("KBPREP_REVIEW_NEEDED");
@@ -249,5 +255,4 @@ describe("kbprep worker pipeline - output lifecycle part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   }, 15_000);
-
 });

@@ -57,13 +57,7 @@ vi.mock("node:fs", () => ({
 
 vi.mock("./subprocess.js", () => ({
   ManagedProcessTimeoutError: class ManagedProcessTimeoutError extends Error {},
-  async runManagedProcess(options: {
-    command: string;
-    args?: string[];
-    stdin?: string;
-    env?: NodeJS.ProcessEnv;
-    label: string;
-  }) {
+  async runManagedProcess(options: { command: string; args?: string[]; stdin?: string; env?: NodeJS.ProcessEnv; label: string }) {
     runtimeState.calls.push({
       command: options.command,
       args: options.args,

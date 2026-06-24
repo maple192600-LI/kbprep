@@ -1,7 +1,5 @@
 import { describe, it } from "vitest";
-import {
-  runPython,
-} from "../helpers/workerHarness.js";
+import { runPython } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - quality gates part 1", () => {
   it("excludes image-only evidence from text coverage gates", () => {
@@ -359,5 +357,4 @@ describe("kbprep worker pipeline - quality gates part 1", () => {
       [],
     );
   });
-
 });

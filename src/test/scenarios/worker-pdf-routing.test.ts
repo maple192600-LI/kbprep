@@ -2,10 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "vitest";
-import {
-  makeImageOnlyPdf,
-  runPython,
-} from "../helpers/workerHarness.js";
+import { makeImageOnlyPdf, runPython } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - PDF routing", () => {
   it("routes image-only scanned PDFs through MinerU OCR and records the actual route", () => {
@@ -197,5 +194,4 @@ describe("kbprep worker pipeline - PDF routing", () => {
       [],
     );
   });
-
 });

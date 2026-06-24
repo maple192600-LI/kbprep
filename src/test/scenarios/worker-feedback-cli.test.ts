@@ -20,12 +20,7 @@ describe("kbprep worker pipeline - feedback standalone CLI", () => {
         counterexamples: ["正文段落"],
       });
 
-      const cliResult = await runStandaloneCli("feedback", [
-        "--rules-dir",
-        rulesDir,
-        "--accept-proposal",
-        proposed.data.proposal.id,
-      ]);
+      const cliResult = await runStandaloneCli("feedback", ["--rules-dir", rulesDir, "--accept-proposal", proposed.data.proposal.id]);
       const envelope = JSON.parse(cliResult.output);
 
       expect(cliResult.exitCode).toBe(1);
