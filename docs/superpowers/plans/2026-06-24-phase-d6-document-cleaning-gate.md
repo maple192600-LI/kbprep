@@ -175,4 +175,4 @@ Reviewer must check gate semantics, warning-vs-failure behavior, artifact safety
 
 - [x] **Step 4: Fix review findings and re-review**
 
-- [ ] **Step 5: Commit, push, merge, verify CI, and remove the D6 worktree without physical residue**
+- [x] **Step 5: Commit, push, merge, verify CI, and remove the D6 worktree without physical residue**
