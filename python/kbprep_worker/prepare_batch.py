@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .atomic_io import atomic_write_json
-from .batch_manifest import write_batch_manifest
+from .batch_manifest import batch_parent_status, write_batch_manifest
 from .envelope import fail, ok
 from .supported_formats import (
     BATCH_SUPPORTED_EXTENSIONS,
@@ -630,4 +630,4 @@ def _emit_batch_result(
         "results_json": str(output_p / "results.json"),
         "batch_manifest_json": str(manifest_path),
         "files_dir": str(output_p / "files"),
-    })
+    }, status=batch_parent_status(inventory, results, failures))

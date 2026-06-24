@@ -15,6 +15,7 @@ import { ManagedProcessTimeoutError, runManagedProcess } from "./runtime/subproc
 
 export interface WorkerResult<T = Record<string, unknown>> {
   ok: boolean;
+  status: "completed" | "completed_with_warnings" | "failed";
   data?: T;
   metrics?: Record<string, unknown>;
   warnings?: string[];
@@ -198,6 +199,7 @@ export async function callWorker<T = Record<string, unknown>>(
     if (!envelope.ok && !envelope.error) {
       return {
         ok: false,
+        status: "failed",
         error: makeError("E_TIMEOUT", `Worker exited with code ${result.code}`, {
           details: { exitCode: result.code, signal: result.signal, stderr_tail: stderrLines.slice(-10) },
         }),
@@ -211,6 +213,7 @@ export async function callWorker<T = Record<string, unknown>>(
     if (isAbortError(err)) {
       return {
         ok: false,
+        status: "failed",
         error: makeError("E_CANCELLED", "Worker call was cancelled.", {
           recoverable: true,
           suggested_action: "Retry if needed.",
@@ -221,6 +224,7 @@ export async function callWorker<T = Record<string, unknown>>(
       const timeoutStderrTail = (err.stderrTail || "").split(/\r?\n/).filter(Boolean);
       return {
         ok: false,
+        status: "failed",
         error: makeError("E_TIMEOUT", `Worker timed out after ${timeoutMs}ms`, {
           recoverable: true,
           suggested_action: "Increase timeout or check worker health.",
@@ -235,6 +239,7 @@ export async function callWorker<T = Record<string, unknown>>(
     }
     return {
       ok: false,
+      status: "failed",
       error: makeError("E_INTERNAL", String(err), {
         details: { stderr_tail: stderrLines.slice(-10) },
       }),
@@ -247,6 +252,7 @@ export function parseEnvelope<T>(raw: string, stderrTail: string[], command?: st
   if (!trimmed) {
     return {
       ok: false,
+      status: "failed",
       error: makeError("E_WORKER_BAD_JSON", "Worker returned empty stdout.", {
         details: { stderr_tail: stderrTail },
       }),
@@ -261,6 +267,7 @@ export function parseEnvelope<T>(raw: string, stderrTail: string[], command?: st
       }));
       return {
         ok: false,
+        status: "failed",
         error: makeError("E_WORKER_BAD_JSON", "Worker returned a malformed JSON envelope.", {
           details: {
             validation_errors: validationErrors,
@@ -276,6 +283,7 @@ export function parseEnvelope<T>(raw: string, stderrTail: string[], command?: st
   } catch (err) {
     return {
       ok: false,
+      status: "failed",
       error: makeError("E_WORKER_BAD_JSON", `Failed to parse worker stdout: ${err}`, {
         details: { stdout_preview: trimmed.slice(0, 500), stderr_tail: stderrTail },
       }),
@@ -295,6 +303,7 @@ function validateCommandData(
   if (hasOwnDataOk(envelope.data)) {
     return {
       ok: false,
+      status: "failed",
       error: makeError("E_WORKER_BAD_JSON", "Worker success data duplicated the envelope ok field.", {
         details: {
           command,
@@ -320,6 +329,7 @@ function validateCommandData(
   }));
   return {
     ok: false,
+    status: "failed",
     error: makeError("E_WORKER_BAD_JSON", `Worker returned malformed data for ${command}.`, {
       details: {
         command,
