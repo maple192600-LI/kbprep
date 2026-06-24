@@ -37,10 +37,7 @@ const forbiddenTerms = [
   "GMV",
 ];
 
-const allowedTerms = [
-  "MinerU",
-  "Obsidian",
-];
+const allowedTerms = ["MinerU", "Obsidian"];
 
 const runtimeRuleArtifacts = new Set([
   "accepted_rules.jsonl",
@@ -95,12 +92,18 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  checkedDirs: publicRuleDirs,
-  forbiddenTerms: forbiddenTerms.length,
-  runtimeRuleArtifacts: runtimeRuleArtifacts.size,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      checkedDirs: publicRuleDirs,
+      forbiddenTerms: forbiddenTerms.length,
+      runtimeRuleArtifacts: runtimeRuleArtifacts.size,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function collectRuleFiles(root) {

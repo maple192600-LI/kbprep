@@ -22,19 +22,18 @@ describe("managed subprocess timeout behavior", () => {
   it("waits for close after timeout and reports stderr tail with timing details", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-subprocess-timeout-"));
     const scriptPath = path.join(root, "slow.mjs");
-    writeFileSync(scriptPath, [
-      "process.stderr.write('before-timeout\\n');",
-      "setInterval(() => {}, 1000);",
-    ].join("\n"), "utf8");
+    writeFileSync(scriptPath, ["process.stderr.write('before-timeout\\n');", "setInterval(() => {}, 1000);"].join("\n"), "utf8");
 
     try {
-      await expect(runManagedProcess({
-        command: process.execPath,
-        args: [scriptPath],
-        label: "test timeout",
-        timeoutMs: 100,
-        terminateGraceMs: 100,
-      })).rejects.toMatchObject({
+      await expect(
+        runManagedProcess({
+          command: process.execPath,
+          args: [scriptPath],
+          label: "test timeout",
+          timeoutMs: 100,
+          terminateGraceMs: 100,
+        }),
+      ).rejects.toMatchObject({
         name: "ManagedProcessTimeoutError",
         timeoutMs: 100,
         stderrTail: expect.stringContaining("before-timeout"),
@@ -66,12 +65,16 @@ describe("managed subprocess timeout behavior", () => {
     // Each CJK char is 3 bytes in UTF-8; a 4096-byte write step (4096 % 3 != 0)
     // repeatedly splits characters across chunk boundaries.
     const payload = "中文测试内容".repeat(4000);
-    writeFileSync(scriptPath, [
-      "const buf = Buffer.from(JSON.parse(process.argv[2]));",
-      "for (let i = 0; i < buf.length; i += 4096) {",
-      "  process.stdout.write(buf.subarray(i, i + 4096));",
-      "}",
-    ].join("\n"), "utf8");
+    writeFileSync(
+      scriptPath,
+      [
+        "const buf = Buffer.from(JSON.parse(process.argv[2]));",
+        "for (let i = 0; i < buf.length; i += 4096) {",
+        "  process.stdout.write(buf.subarray(i, i + 4096));",
+        "}",
+      ].join("\n"),
+      "utf8",
+    );
     try {
       const result = await runManagedProcess({
         command: process.execPath,
@@ -90,12 +93,16 @@ describe("managed subprocess timeout behavior", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-subprocess-mb-"));
     const scriptPath = path.join(root, "multibyte-stderr.mjs");
     const payload = "日志行中文内容".repeat(4000);
-    writeFileSync(scriptPath, [
-      "const buf = Buffer.from(JSON.parse(process.argv[2]));",
-      "for (let i = 0; i < buf.length; i += 4096) {",
-      "  process.stderr.write(buf.subarray(i, i + 4096));",
-      "}",
-    ].join("\n"), "utf8");
+    writeFileSync(
+      scriptPath,
+      [
+        "const buf = Buffer.from(JSON.parse(process.argv[2]));",
+        "for (let i = 0; i < buf.length; i += 4096) {",
+        "  process.stderr.write(buf.subarray(i, i + 4096));",
+        "}",
+      ].join("\n"),
+      "utf8",
+    );
     try {
       const result = await runManagedProcess({
         command: process.execPath,

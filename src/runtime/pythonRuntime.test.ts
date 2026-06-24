@@ -18,12 +18,7 @@ describe("python runtime setup ergonomics", () => {
   it("exposes bounded setup steps for progress reporting", () => {
     const steps = runtimeSetupStepsForTest();
 
-    expect(steps.map((step) => step.id)).toEqual([
-      "create_venv",
-      "upgrade_packaging",
-      "install_worker",
-      "probe_environment",
-    ]);
+    expect(steps.map((step) => step.id)).toEqual(["create_venv", "upgrade_packaging", "install_worker", "probe_environment"]);
     expect(steps.every((step) => step.timeoutMs > 0)).toBe(true);
     expect(steps.reduce((total, step) => total + step.timeoutMs, 0)).toBeLessThanOrEqual(105 * 60_000);
   });
@@ -71,10 +66,15 @@ describe("python runtime setup ergonomics", () => {
     expect(isRuntimeMarkerCurrent(marker, { device_override: "cpu" })).toBe(true);
     expect(isRuntimeMarkerCurrent({ ...marker, kbprep_version: "0.0.0" }, { device_override: "cpu" })).toBe(false);
     expect(isRuntimeMarkerCurrent(marker, { device_override: "cuda" })).toBe(false);
-    expect(isRuntimeMarkerCurrent({
-      ...marker,
-      setup_env: { ok: true, data: { actions_taken: ["cuda_install_failed: no wheel"] } },
-    }, { device_override: "cpu" })).toBe(false);
+    expect(
+      isRuntimeMarkerCurrent(
+        {
+          ...marker,
+          setup_env: { ok: true, data: { actions_taken: ["cuda_install_failed: no wheel"] } },
+        },
+        { device_override: "cpu" },
+      ),
+    ).toBe(false);
     expect(isRuntimeMarkerCurrent(null, { device_override: "cpu" })).toBe(false);
   });
 
@@ -98,10 +98,15 @@ describe("python runtime setup ergonomics", () => {
 
     expect(isRuntimeMarkerCurrent(legacyMarker, { device_override: "cuda" })).toBe(true);
     expect(isRuntimeMarkerCurrent({ ...legacyMarker, device_override: "invalid" }, { device_override: "cuda" })).toBe(false);
-    expect(isRuntimeMarkerCurrent({
-      ...legacyMarker,
-      python_project: { dependency_spec: "old-dependencies" },
-    }, { device_override: "cuda" })).toBe(false);
+    expect(
+      isRuntimeMarkerCurrent(
+        {
+          ...legacyMarker,
+          python_project: { dependency_spec: "old-dependencies" },
+        },
+        { device_override: "cuda" },
+      ),
+    ).toBe(false);
   });
 
   it("uses configured Python fallbacks when skipped setup cannot reuse the ready marker", async () => {
@@ -111,15 +116,19 @@ describe("python runtime setup ergonomics", () => {
       process.env.KBPREP_SKIP_AUTO_SETUP = "1";
       process.env.KBPREP_PYTHON = "env-python";
 
-      expect(resolvePythonPath(undefined, {
-        device_override: "cuda",
-        python_path: "configured-python",
-      })).toBe("configured-python");
+      expect(
+        resolvePythonPath(undefined, {
+          device_override: "cuda",
+          python_path: "configured-python",
+        }),
+      ).toBe("configured-python");
       expect(resolvePythonPath(undefined, { device_override: "cuda" })).toBe("env-python");
-      await expect(ensurePythonRuntime({
-        device_override: "cuda",
-        python_path: "configured-python",
-      })).resolves.toBe("configured-python");
+      await expect(
+        ensurePythonRuntime({
+          device_override: "cuda",
+          python_path: "configured-python",
+        }),
+      ).resolves.toBe("configured-python");
     } finally {
       restoreEnv("KBPREP_SKIP_AUTO_SETUP", originalSkip);
       restoreEnv("KBPREP_PYTHON", originalKbprepPython);
@@ -129,18 +138,12 @@ describe("python runtime setup ergonomics", () => {
   it("reports setup command timeout with stderr evidence", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-runtime-timeout-"));
     const scriptPath = path.join(root, "slow-runtime.mjs");
-    writeFileSync(scriptPath, [
-      "process.stderr.write('before runtime timeout\\n');",
-      "setInterval(() => {}, 1000);",
-    ].join("\n"), "utf8");
+    writeFileSync(scriptPath, ["process.stderr.write('before runtime timeout\\n');", "setInterval(() => {}, 1000);"].join("\n"), "utf8");
 
     try {
-      await expect(runSetupCommandForTest(
-        process.execPath,
-        [scriptPath],
-        "test runtime timeout",
-        100,
-      )).rejects.toThrow(/Timed out while trying to test runtime timeout.*before runtime timeout/s);
+      await expect(runSetupCommandForTest(process.execPath, [scriptPath], "test runtime timeout", 100)).rejects.toThrow(
+        /Timed out while trying to test runtime timeout.*before runtime timeout/s,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -149,23 +152,21 @@ describe("python runtime setup ergonomics", () => {
   it("returns stdout and stderr for successful setup commands", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-runtime-success-"));
     const scriptPath = path.join(root, "good-runtime.mjs");
-    writeFileSync(scriptPath, [
-      "let input = '';",
-      "process.stdin.on('data', chunk => input += chunk);",
-      "process.stdin.on('end', () => {",
-      "  process.stderr.write('setup warning\\n');",
-      "  process.stdout.write(JSON.stringify({ received: input }));",
-      "});",
-    ].join("\n"), "utf8");
+    writeFileSync(
+      scriptPath,
+      [
+        "let input = '';",
+        "process.stdin.on('data', chunk => input += chunk);",
+        "process.stdin.on('end', () => {",
+        "  process.stderr.write('setup warning\\n');",
+        "  process.stdout.write(JSON.stringify({ received: input }));",
+        "});",
+      ].join("\n"),
+      "utf8",
+    );
 
     try {
-      const result = await runSetupCommandForTest(
-        process.execPath,
-        [scriptPath],
-        "test runtime success",
-        5_000,
-        "payload",
-      );
+      const result = await runSetupCommandForTest(process.execPath, [scriptPath], "test runtime success", 5_000, "payload");
 
       expect(JSON.parse(result.stdout)).toEqual({ received: "payload" });
       expect(result.stderr).toContain("setup warning");
@@ -177,18 +178,16 @@ describe("python runtime setup ergonomics", () => {
   it("reports setup command nonzero exits with stderr tail", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-runtime-nonzero-"));
     const scriptPath = path.join(root, "bad-runtime.mjs");
-    writeFileSync(scriptPath, [
-      "for (let i = 0; i < 25; i += 1) process.stderr.write('runtime fail line ' + i + '\\n');",
-      "process.exit(7);",
-    ].join("\n"), "utf8");
+    writeFileSync(
+      scriptPath,
+      ["for (let i = 0; i < 25; i += 1) process.stderr.write('runtime fail line ' + i + '\\n');", "process.exit(7);"].join("\n"),
+      "utf8",
+    );
 
     try {
-      await expect(runSetupCommandForTest(
-        process.execPath,
-        [scriptPath],
-        "test runtime nonzero",
-        5_000,
-      )).rejects.toThrow(/Failed to test runtime nonzero.*runtime fail line 24/s);
+      await expect(runSetupCommandForTest(process.execPath, [scriptPath], "test runtime nonzero", 5_000)).rejects.toThrow(
+        /Failed to test runtime nonzero.*runtime fail line 24/s,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -218,30 +217,33 @@ describe("python runtime setup ergonomics", () => {
     expect(existsSync(path.join(repoRoot, "scripts", "python-venv.mjs"))).toBe(true);
     const runtime = await import("../../scripts/python-venv.mjs");
     expect(runtime.kbprepVenvPythonPathForTest(repoRoot)).toBe(
-      path.join(repoRoot, ".kbprep", "venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python"),
+      path.join(
+        repoRoot,
+        ".kbprep",
+        "venv",
+        process.platform === "win32" ? "Scripts" : "bin",
+        process.platform === "win32" ? "python.exe" : "python",
+      ),
     );
 
     const wrapper = readFileSync(path.join(repoRoot, "scripts", "python-venv.mjs"), "utf8");
-    expect(wrapper).toContain("\"--no-deps\", \"-e\"");
-    expect(wrapper).toContain("\"PyMuPDF>=1.27,<2\"");
-    expect(wrapper).toContain("\"pymupdf4llm>=0.0.27,<1\"");
-    expect(wrapper).toContain("\"beautifulsoup4==4.14.3\"");
-    expect(wrapper).toContain("\"lxml==6.0.2\"");
-    expect(wrapper).toContain("\"setuptools<82\"");
-    expect(wrapper).toContain("stdio: \"pipe\"");
+    expect(wrapper).toContain('"--no-deps", "-e"');
+    expect(wrapper).toContain('"PyMuPDF>=1.27,<2"');
+    expect(wrapper).toContain('"pymupdf4llm>=0.0.27,<1"');
+    expect(wrapper).toContain('"beautifulsoup4==4.14.3"');
+    expect(wrapper).toContain('"lxml==6.0.2"');
+    expect(wrapper).toContain('"setuptools<82"');
+    expect(wrapper).toContain('stdio: "pipe"');
     expect(wrapper).toContain("process.stderr.write(output)");
-    expect(wrapper).not.toContain("python) + \"[dev]\"");
+    expect(wrapper).not.toContain('python) + "[dev]"');
 
-    const nestedCheckScripts = [
-      "scripts/checks/capability-matrix.mjs",
-      "scripts/checks/cleaning-hardcodes.mjs",
-    ];
+    const nestedCheckScripts = ["scripts/checks/capability-matrix.mjs", "scripts/checks/cleaning-hardcodes.mjs"];
     for (const script of nestedCheckScripts) {
       const text = readFileSync(path.join(repoRoot, script), "utf8");
       expect(text, script).toContain("scripts/python-venv.mjs");
       expect(text, script).not.toMatch(/spawnSync\(\s*["']python["']/);
-      expect(text, script).not.toContain("command: \"py\"");
-      expect(text, script).not.toContain("\"python3\"");
+      expect(text, script).not.toContain('command: "py"');
+      expect(text, script).not.toContain('"python3"');
     }
   });
 

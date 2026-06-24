@@ -12,9 +12,7 @@ import { fileURLToPath } from "node:url";
  */
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const jsonMap = JSON.parse(
-  readFileSync(path.join(repoRoot, "scripts", "redact-map.json"), "utf8"),
-).mapping;
+const jsonMap = JSON.parse(readFileSync(path.join(repoRoot, "scripts", "redact-map.json"), "utf8")).mapping;
 
 const tsText = readFileSync(path.join(repoRoot, "src/test/fixtures/redact-map.ts"), "utf8");
 const pyText = readFileSync(path.join(repoRoot, "python/tests/redact_map.py"), "utf8");
@@ -32,13 +30,7 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write(
-  JSON.stringify(
-    { ok: true, entries: Object.keys(jsonMap).length },
-    null,
-    2,
-  ),
-);
+process.stdout.write(JSON.stringify({ ok: true, entries: Object.keys(jsonMap).length }, null, 2));
 process.stdout.write("\n");
 
 function extractQuotedMap(text) {

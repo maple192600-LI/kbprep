@@ -61,10 +61,12 @@ describe("kbprep package entry", () => {
     expect(isRuntimeMarkerCurrent({ ...validMarker, schema: "kbprep.local_venv.v2" })).toBe(false);
     expect(isRuntimeMarkerCurrent({ ...validMarker, kbprep_version: "0.4.0" })).toBe(false);
     expect(isRuntimeMarkerCurrent({ ...validMarker, setup_env: { ok: false } })).toBe(false);
-    expect(isRuntimeMarkerCurrent({
-      ...validMarker,
-      setup_env: { ok: true, data: { actions_taken: ["cuda_install_failed: timed out"] } },
-    })).toBe(false);
+    expect(
+      isRuntimeMarkerCurrent({
+        ...validMarker,
+        setup_env: { ok: true, data: { actions_taken: ["cuda_install_failed: timed out"] } },
+      }),
+    ).toBe(false);
     expect(isRuntimeMarkerCurrent(validMarker, { device_override: "cpu" })).toBe(false);
   });
 });

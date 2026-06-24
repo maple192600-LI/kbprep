@@ -23,8 +23,10 @@ describe("kbprep worker pipeline - batch and long documents part 2", () => {
       const sourcePath = path.join(inputDir, "long-guide.md");
       const chapters = Array.from({ length: 9 }, (_, index) => {
         const chapterNo = index + 1;
-        const body = Array.from({ length: 18 }, (__, paragraphIndex) =>
-          `第${chapterNo}章第${paragraphIndex + 1}段：这是一个教程正文段落，保留 LONG_PART_MARKER_${chapterNo}_${paragraphIndex + 1}。这里包含工具名 ExampleTool、参数 threshold=0.8、retry_count=3、失败原因、限制条件和复盘标准，不能被总结成概念。`,
+        const body = Array.from(
+          { length: 18 },
+          (__, paragraphIndex) =>
+            `第${chapterNo}章第${paragraphIndex + 1}段：这是一个教程正文段落，保留 LONG_PART_MARKER_${chapterNo}_${paragraphIndex + 1}。这里包含工具名 ExampleTool、参数 threshold=0.8、retry_count=3、失败原因、限制条件和复盘标准，不能被总结成概念。`,
         ).join("\n\n");
         return `# 第${chapterNo}章 长文档章节 ${chapterNo}\n\n${body}`;
       }).join("\n\n");
@@ -47,11 +49,16 @@ describe("kbprep worker pipeline - batch and long documents part 2", () => {
         block_ids: string[];
         char_count: number;
       }>;
-      const partFiles = readdirSync(partsDir).filter((name) => /^part_\d{3}\.md$/.test(name)).sort();
-      const reconstructed = partFiles.map((name) => {
-        const raw = readFileSync(path.join(partsDir, name), "utf8");
-        return normalizeMarkdownText(raw.replace(/^---[\s\S]*?---\s*/, ""));
-      }).join("\n\n").trim();
+      const partFiles = readdirSync(partsDir)
+        .filter((name) => /^part_\d{3}\.md$/.test(name))
+        .sort();
+      const reconstructed = partFiles
+        .map((name) => {
+          const raw = readFileSync(path.join(partsDir, name), "utf8");
+          return normalizeMarkdownText(raw.replace(/^---[\s\S]*?---\s*/, ""));
+        })
+        .join("\n\n")
+        .trim();
 
       expect(envelope.data.strict_errors).toEqual([]);
       expect(partFiles.length).toBeGreaterThan(1);

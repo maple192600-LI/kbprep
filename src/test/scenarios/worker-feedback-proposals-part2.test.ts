@@ -2,9 +2,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - feedback proposals part 2", () => {
   it("suggests document-type dictionary updates from accepted and rejected feedback history", () => {
@@ -110,8 +108,16 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
           artifact_context: { document_type: "course", source_name: "course-c.md" },
         },
       ];
-      writeFileSync(path.join(rulesDir, "accepted_rules.jsonl"), acceptedRules.map((item) => JSON.stringify(item)).join("\n") + "\n", "utf8");
-      writeFileSync(path.join(rulesDir, "rejected_rules.jsonl"), rejectedRules.map((item) => JSON.stringify(item)).join("\n") + "\n", "utf8");
+      writeFileSync(
+        path.join(rulesDir, "accepted_rules.jsonl"),
+        acceptedRules.map((item) => JSON.stringify(item)).join("\n") + "\n",
+        "utf8",
+      );
+      writeFileSync(
+        path.join(rulesDir, "rejected_rules.jsonl"),
+        rejectedRules.map((item) => JSON.stringify(item)).join("\n") + "\n",
+        "utf8",
+      );
 
       const envelope = runWorker("feedback", {
         rules_dir: rulesDir,
@@ -153,33 +159,37 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
       const rulesDir = path.join(root, "rules", "user");
       const targetRulesDir = path.join(root, "rules");
       mkdirSync(rulesDir, { recursive: true });
-      writeFileSync(path.join(rulesDir, "dictionary_suggestions.jsonl"), JSON.stringify({
-        schema: "kbprep.dictionary_suggestion.v1",
-        document_type: "course",
-        target: "rules/document_types/course.json",
-        required_confirmation: true,
-        feedback_count: 2,
-        proposed_rules: [
-          {
-            action: "discard",
-            match: "literal",
-            pattern: "加入训练营领取资料",
-            reason: "course wrapper pollution",
-            examples: ["加入训练营领取资料"],
-            source_proposal_id: "proposal-course-join",
-            accepted_rule_id: "user-feedback-course-join",
-          },
-          {
-            action: "discard",
-            match: "literal",
-            pattern: "私信老师领取课件",
-            reason: "course wrapper pollution",
-            examples: ["私信老师领取课件"],
-            source_proposal_id: "proposal-course-consult",
-            accepted_rule_id: "user-feedback-course-consult",
-          },
-        ],
-      }) + "\n", "utf8");
+      writeFileSync(
+        path.join(rulesDir, "dictionary_suggestions.jsonl"),
+        JSON.stringify({
+          schema: "kbprep.dictionary_suggestion.v1",
+          document_type: "course",
+          target: "rules/document_types/course.json",
+          required_confirmation: true,
+          feedback_count: 2,
+          proposed_rules: [
+            {
+              action: "discard",
+              match: "literal",
+              pattern: "加入训练营领取资料",
+              reason: "course wrapper pollution",
+              examples: ["加入训练营领取资料"],
+              source_proposal_id: "proposal-course-join",
+              accepted_rule_id: "user-feedback-course-join",
+            },
+            {
+              action: "discard",
+              match: "literal",
+              pattern: "私信老师领取课件",
+              reason: "course wrapper pollution",
+              examples: ["私信老师领取课件"],
+              source_proposal_id: "proposal-course-consult",
+              accepted_rule_id: "user-feedback-course-consult",
+            },
+          ],
+        }) + "\n",
+        "utf8",
+      );
 
       const envelope = runWorker("feedback", {
         rules_dir: rulesDir,
@@ -196,13 +206,12 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
       const courseRules = JSON.parse(readFileSync(path.join(targetRulesDir, "document_types", "course.json"), "utf8"));
       expect(courseRules.schema).toBe("kbprep.cleaning_rules.v1");
       expect(courseRules.rules).toHaveLength(2);
-      expect(courseRules.rules.map((rule: { pattern: string }) => rule.pattern)).toEqual([
-        "加入训练营领取资料",
-        "私信老师领取课件",
-      ]);
-      expect(courseRules.rules.every((rule: { type: string; risk_tag: string }) => (
-        rule.type === "promotional_line" && rule.risk_tag === "learned_feedback_course"
-      ))).toBe(true);
+      expect(courseRules.rules.map((rule: { pattern: string }) => rule.pattern)).toEqual(["加入训练营领取资料", "私信老师领取课件"]);
+      expect(
+        courseRules.rules.every(
+          (rule: { type: string; risk_tag: string }) => rule.type === "promotional_line" && rule.risk_tag === "learned_feedback_course",
+        ),
+      ).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -232,42 +241,54 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
         ].join("\n"),
         "utf8",
       );
-      writeFileSync(path.join(runDir, "run_metadata.json"), JSON.stringify({
-        schema: "kbprep.run_metadata.v1",
-        prepare_payload: {
-          input_path: sourcePath,
-          output_root: outputRoot,
-          profile: "standard",
-          mode: "rules_only",
-          language: "zh",
-          source_type: "auto",
-          splitter: "auto",
-          artifact_policy: "keep_latest",
-          force: true,
-        },
-      }), "utf8");
-      writeFileSync(path.join(runDir, "quality_report.json"), JSON.stringify({
-        profile: "standard",
-        document_type: "course",
-        strict_errors: [],
-      }), "utf8");
-      writeFileSync(path.join(rulesDir, "dictionary_suggestions.jsonl"), JSON.stringify({
-        schema: "kbprep.dictionary_suggestion.v1",
-        document_type: "course",
-        target: "rules/document_types/course.json",
-        required_confirmation: true,
-        feedback_count: 1,
-        proposed_rules: [
-          {
-            action: "discard",
-            match: "literal",
-            pattern: "加入训练营领取资料",
-            reason: "course wrapper pollution",
-            examples: ["加入训练营领取资料"],
-            created_from_run: runDir,
+      writeFileSync(
+        path.join(runDir, "run_metadata.json"),
+        JSON.stringify({
+          schema: "kbprep.run_metadata.v1",
+          prepare_payload: {
+            input_path: sourcePath,
+            output_root: outputRoot,
+            profile: "standard",
+            mode: "rules_only",
+            language: "zh",
+            source_type: "auto",
+            splitter: "auto",
+            artifact_policy: "keep_latest",
+            force: true,
           },
-        ],
-      }) + "\n", "utf8");
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        path.join(runDir, "quality_report.json"),
+        JSON.stringify({
+          profile: "standard",
+          document_type: "course",
+          strict_errors: [],
+        }),
+        "utf8",
+      );
+      writeFileSync(
+        path.join(rulesDir, "dictionary_suggestions.jsonl"),
+        JSON.stringify({
+          schema: "kbprep.dictionary_suggestion.v1",
+          document_type: "course",
+          target: "rules/document_types/course.json",
+          required_confirmation: true,
+          feedback_count: 1,
+          proposed_rules: [
+            {
+              action: "discard",
+              match: "literal",
+              pattern: "加入训练营领取资料",
+              reason: "course wrapper pollution",
+              examples: ["加入训练营领取资料"],
+              created_from_run: runDir,
+            },
+          ],
+        }) + "\n",
+        "utf8",
+      );
 
       const envelope = runWorker("feedback", {
         rules_dir: rulesDir,
@@ -287,7 +308,10 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
       expect(readFileSync(sample.cleaned_md, "utf8")).not.toContain("加入训练营领取资料");
       expect(readFileSync(sample.cleaned_md, "utf8")).toContain("质量复检");
       expect(envelope.data.promoted.promotion_history_path).toContain("promotion_history.jsonl");
-      const history = readFileSync(path.join(targetRulesDir, "promotion_history.jsonl"), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+      const history = readFileSync(path.join(targetRulesDir, "promotion_history.jsonl"), "utf8")
+        .trim()
+        .split(/\r?\n/)
+        .map((line) => JSON.parse(line));
       expect(history).toHaveLength(1);
       expect(history[0].schema).toBe("kbprep.dictionary_promotion_history.v1");
       expect(history[0].document_type).toBe("course");
@@ -297,5 +321,4 @@ describe("kbprep worker pipeline - feedback proposals part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });

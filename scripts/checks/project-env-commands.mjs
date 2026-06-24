@@ -7,9 +7,7 @@ const args = parseArgs(process.argv.slice(2));
 const repoRoot = path.resolve(args.repoRoot ?? defaultRepoRoot);
 const checkedFiles = args.check.length ? args.check : defaultCheckedFiles();
 const violations = [];
-const selfTestFiles = new Set([
-  "src/test/scenarios/worker-governance-guards.test.ts",
-]);
+const selfTestFiles = new Set(["src/test/scenarios/worker-governance-guards.test.ts"]);
 
 const commandRules = [
   {
@@ -98,11 +96,17 @@ if (violations.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  checkedFiles: checkedFiles.length,
-  rules: commandRules.length,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      checkedFiles: checkedFiles.length,
+      rules: commandRules.length,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function defaultCheckedFiles() {

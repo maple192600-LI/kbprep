@@ -39,25 +39,34 @@ export interface WorkerConfig {
 
 const EnvelopeRecordSchema = Type.Record(Type.String(), Type.Unknown());
 const GenericDataSchema = EnvelopeRecordSchema;
-const PrepareDataSchema = Type.Object({
-  run_id: Type.Optional(Type.String()),
-  run_dir: Type.String(),
-  outputs: Type.Optional(EnvelopeRecordSchema),
-  latest_outputs: Type.Optional(EnvelopeRecordSchema),
-  strict_errors: Type.Optional(Type.Array(Type.String())),
-  warnings: Type.Optional(Type.Array(Type.String())),
-}, { additionalProperties: true });
-const DiagnoseDataSchema = Type.Object({
-  input_file: Type.Optional(Type.String()),
-  detected_format: Type.Optional(Type.String()),
-  recommended_pipeline: Type.Optional(Type.String()),
-}, { additionalProperties: true });
-const ApplyReviewDataSchema = Type.Object({
-  run_dir: Type.Optional(Type.String()),
-  applied: Type.Optional(Type.Number()),
-  rejected: Type.Optional(Type.Number()),
-  latest_outputs: Type.Optional(EnvelopeRecordSchema),
-}, { additionalProperties: true });
+const PrepareDataSchema = Type.Object(
+  {
+    run_id: Type.Optional(Type.String()),
+    run_dir: Type.String(),
+    outputs: Type.Optional(EnvelopeRecordSchema),
+    latest_outputs: Type.Optional(EnvelopeRecordSchema),
+    strict_errors: Type.Optional(Type.Array(Type.String())),
+    warnings: Type.Optional(Type.Array(Type.String())),
+  },
+  { additionalProperties: true },
+);
+const DiagnoseDataSchema = Type.Object(
+  {
+    input_file: Type.Optional(Type.String()),
+    detected_format: Type.Optional(Type.String()),
+    recommended_pipeline: Type.Optional(Type.String()),
+  },
+  { additionalProperties: true },
+);
+const ApplyReviewDataSchema = Type.Object(
+  {
+    run_dir: Type.Optional(Type.String()),
+    applied: Type.Optional(Type.Number()),
+    rejected: Type.Optional(Type.Number()),
+    latest_outputs: Type.Optional(EnvelopeRecordSchema),
+  },
+  { additionalProperties: true },
+);
 const FeedbackDataSchema = GenericDataSchema;
 const CleanupDataSchema = GenericDataSchema;
 const PrepareBatchDataSchema = GenericDataSchema;
@@ -70,23 +79,32 @@ const WorkerDataSchemas = {
   prepare_batch: PrepareBatchDataSchema,
 } as const;
 const WorkerEnvelopeSchema = Type.Union([
-  Type.Object({
-    ok: Type.Literal(true),
-    data: Type.Optional(EnvelopeRecordSchema),
-    metrics: Type.Optional(EnvelopeRecordSchema),
-    warnings: Type.Optional(Type.Array(Type.String())),
-  }, { additionalProperties: false }),
-  Type.Object({
-    ok: Type.Literal(false),
-    error: Type.Object({
-      code: Type.String(),
-      message: Type.String(),
-      recoverable: Type.Boolean(),
-      suggested_action: Type.String(),
-      details: EnvelopeRecordSchema,
-    }, { additionalProperties: false }),
-    warnings: Type.Optional(Type.Array(Type.String())),
-  }, { additionalProperties: false }),
+  Type.Object(
+    {
+      ok: Type.Literal(true),
+      data: Type.Optional(EnvelopeRecordSchema),
+      metrics: Type.Optional(EnvelopeRecordSchema),
+      warnings: Type.Optional(Type.Array(Type.String())),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    {
+      ok: Type.Literal(false),
+      error: Type.Object(
+        {
+          code: Type.String(),
+          message: Type.String(),
+          recoverable: Type.Boolean(),
+          suggested_action: Type.String(),
+          details: EnvelopeRecordSchema,
+        },
+        { additionalProperties: false },
+      ),
+      warnings: Type.Optional(Type.Array(Type.String())),
+    },
+    { additionalProperties: false },
+  ),
 ]);
 
 /**
@@ -111,9 +129,7 @@ export async function callWorker<T = Record<string, unknown>>(
   env.PYTHONNOUSERSITE = "1";
   if (/[\\/]Scripts[\\/]python\.exe$/i.test(pythonPath) || /[\\/]bin[\\/]python(?:\d+(?:\.\d+)?)?$/i.test(pythonPath)) {
     const venvDir = pythonPath.replace(/[\\/](Scripts[\\/]python\.exe|bin[\\/]python(?:\d+(?:\.\d+)?)?)$/i, "");
-    const venvBin = process.platform === "win32"
-      ? join(venvDir, "Scripts")
-      : join(venvDir, "bin");
+    const venvBin = process.platform === "win32" ? join(venvDir, "Scripts") : join(venvDir, "bin");
     env.PATH = `${venvBin}${delimiter}${env.PATH || ""}`;
   }
   env.PYTHONUTF8 = "1";
@@ -237,12 +253,10 @@ export function parseEnvelope<T>(raw: string, stderrTail: string[], command?: st
   try {
     const parsed = JSON.parse(trimmed) as unknown;
     if (!Value.Check(WorkerEnvelopeSchema, parsed)) {
-      const validationErrors = [...Value.Errors(WorkerEnvelopeSchema, parsed)]
-        .slice(0, 8)
-        .map((error) => ({
-          path: "path" in error ? error.path : undefined,
-          message: error.message,
-        }));
+      const validationErrors = [...Value.Errors(WorkerEnvelopeSchema, parsed)].slice(0, 8).map((error) => ({
+        path: "path" in error ? error.path : undefined,
+        message: error.message,
+      }));
       return {
         ok: false,
         error: makeError("E_WORKER_BAD_JSON", "Worker returned a malformed JSON envelope.", {
@@ -298,12 +312,10 @@ function validateCommandData(
   const schema = WorkerDataSchemas[command as keyof typeof WorkerDataSchemas];
   if (!schema || Value.Check(schema, envelope.data)) return null;
 
-  const validationErrors = [...Value.Errors(schema, envelope.data)]
-    .slice(0, 8)
-    .map((error) => ({
-      path: "path" in error ? error.path : undefined,
-      message: error.message,
-    }));
+  const validationErrors = [...Value.Errors(schema, envelope.data)].slice(0, 8).map((error) => ({
+    path: "path" in error ? error.path : undefined,
+    message: error.message,
+  }));
   return {
     ok: false,
     error: makeError("E_WORKER_BAD_JSON", `Worker returned malformed data for ${command}.`, {
@@ -318,10 +330,7 @@ function validateCommandData(
 }
 
 function hasOwnDataOk(data: unknown): boolean {
-  return typeof data === "object"
-    && data !== null
-    && !Array.isArray(data)
-    && Object.prototype.hasOwnProperty.call(data, "ok");
+  return typeof data === "object" && data !== null && !Array.isArray(data) && Object.prototype.hasOwnProperty.call(data, "ok");
 }
 
 function isAbortError(err: unknown): boolean {

@@ -4,27 +4,12 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-const roots = [
-  "src",
-  "python/kbprep_worker",
-  "scripts",
-  ".github/workflows",
-];
+const roots = ["src", "python/kbprep_worker", "scripts", ".github/workflows"];
 
-const explicitFiles = [
-  "package.json",
-];
+const explicitFiles = ["package.json"];
 
-const allowlistedFiles = new Set([
-  "scripts/checks/agent-neutral-runtime.mjs",
-  "scripts/checks/guidance-drift.mjs",
-]);
-const namedAgentTerms = [
-  "claude",
-  "codex",
-  "openclaw",
-  "hermes",
-];
+const allowlistedFiles = new Set(["scripts/checks/agent-neutral-runtime.mjs", "scripts/checks/guidance-drift.mjs"]);
+const namedAgentTerms = ["claude", "codex", "openclaw", "hermes"];
 
 function collectFiles(relativeRoot) {
   const absoluteRoot = path.join(repoRoot, relativeRoot);
@@ -49,10 +34,7 @@ function collectFiles(relativeRoot) {
   return files;
 }
 
-const checkedFiles = [
-  ...explicitFiles,
-  ...roots.flatMap(collectFiles),
-].filter((file, index, all) => all.indexOf(file) === index);
+const checkedFiles = [...explicitFiles, ...roots.flatMap(collectFiles)].filter((file, index, all) => all.indexOf(file) === index);
 
 const violations = [];
 for (const relative of checkedFiles) {
@@ -75,9 +57,15 @@ if (violations.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  checkedFiles: checkedFiles.length,
-  namedAgentTerms: namedAgentTerms.length,
-  violations,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      checkedFiles: checkedFiles.length,
+      namedAgentTerms: namedAgentTerms.length,
+      violations,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");

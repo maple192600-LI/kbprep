@@ -118,7 +118,5 @@ export const KBPREP_WARNING_CODES = [
   "W_SOURCE_TEXT_LAYER",
 ] as const;
 
-export type KBPrepErrorCode =
-  | (typeof KBPREP_ERROR_CODES)[number]
-  | (typeof KBPREP_RUNTIME_ERROR_CODES)[number];
+export type KBPrepErrorCode = (typeof KBPREP_ERROR_CODES)[number] | (typeof KBPREP_RUNTIME_ERROR_CODES)[number];
 export type KBPrepWarningCode = (typeof KBPREP_WARNING_CODES)[number];

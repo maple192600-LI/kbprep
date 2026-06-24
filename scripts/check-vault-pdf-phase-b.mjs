@@ -8,16 +8,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const vaultRoot = path.resolve(process.env.KBPREP_VAULT_SMOKE_ROOT || defaultVaultRoot());
 const workRoot = mkdtempSync(path.join(tmpdir(), "kbprep-vault-pdf-phase-b-"));
-const ignoredDirs = new Set([
-  ".git",
-  ".obsidian",
-  ".trash",
-  "build",
-  "coverage",
-  "dist",
-  "kbprep-output",
-  "node_modules",
-]);
+const ignoredDirs = new Set([".git", ".obsidian", ".trash", "build", "coverage", "dist", "kbprep-output", "node_modules"]);
 const minTier1Hits = Number(process.env.KBPREP_VAULT_PDF_MIN_TIER_1 || "3");
 
 if (!existsSync(vaultRoot)) fail(`Vault root does not exist: ${vaultRoot}`);
@@ -46,39 +37,44 @@ if ((tierCounts.tier_1 || 0) < minTier1Hits) {
 }
 
 if (missing.length) {
-  failWithEvidence(
-    `Missing required real PDF acceptance class(es): ${missing.join(", ")}`,
-    { pdfCount: pdfs.length, diagnosedCount: diagnoses.length, tierCounts, routeCounts, missing },
-  );
+  failWithEvidence(`Missing required real PDF acceptance class(es): ${missing.join(", ")}`, {
+    pdfCount: pdfs.length,
+    diagnosedCount: diagnoses.length,
+    tierCounts,
+    routeCounts,
+    missing,
+  });
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  pdfCount: pdfs.length,
-  diagnosedCount: diagnoses.length,
-  tierCounts,
-  routeCounts,
-  selected: Object.fromEntries(
-    Object.entries(selected).map(([name, item]) => [name, publicEvidence(item)]),
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      pdfCount: pdfs.length,
+      diagnosedCount: diagnoses.length,
+      tierCounts,
+      routeCounts,
+      selected: Object.fromEntries(Object.entries(selected).map(([name, item]) => [name, publicEvidence(item)])),
+    },
+    null,
+    2,
   ),
-}, null, 2));
+);
 process.stdout.write("\n");
 rmSync(workRoot, { recursive: true, force: true });
 
 function diagnose(file) {
-  const result = spawnSync(process.execPath, [
-    path.join(repoRoot, "scripts", "python-venv.mjs"),
-    "-m",
-    "kbprep_worker.cli",
-    "diagnose",
-    "--json-stdin",
-  ], {
-    cwd: repoRoot,
-    input: JSON.stringify({ input_path: file, output_root: workRoot, source_type: "auto" }),
-    encoding: "utf8",
-    timeout: 120_000,
-    env: { ...process.env, PYTHONUTF8: "1" },
-  });
+  const result = spawnSync(
+    process.execPath,
+    [path.join(repoRoot, "scripts", "python-venv.mjs"), "-m", "kbprep_worker.cli", "diagnose", "--json-stdin"],
+    {
+      cwd: repoRoot,
+      input: JSON.stringify({ input_path: file, output_root: workRoot, source_type: "auto" }),
+      encoding: "utf8",
+      timeout: 120_000,
+      env: { ...process.env, PYTHONUTF8: "1" },
+    },
+  );
   if (result.status !== 0) return null;
   const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
   const payload = JSON.parse(lines.at(-1) || "{}");

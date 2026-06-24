@@ -6,13 +6,7 @@ import {
   type KBPrepWarningCode,
 } from "./errorCodes.js";
 
-export {
-  KBPREP_ERROR_CODES,
-  KBPREP_RUNTIME_ERROR_CODES,
-  KBPREP_WARNING_CODES,
-  type KBPrepErrorCode,
-  type KBPrepWarningCode,
-};
+export { KBPREP_ERROR_CODES, KBPREP_RUNTIME_ERROR_CODES, KBPREP_WARNING_CODES, type KBPrepErrorCode, type KBPrepWarningCode };
 
 export interface KBPrepError {
   code: KBPrepErrorCode;
@@ -39,7 +33,7 @@ export function makeError(
     recoverable?: boolean;
     suggested_action?: string;
     details?: Record<string, unknown>;
-  } = {}
+  } = {},
 ): KBPrepError {
   return {
     code,

@@ -2,12 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, readFileSync } from "node:f
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  makeEpubFixture,
-  makeOfficeFixtures,
-  makeTextLayerPdf,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { makeEpubFixture, makeOfficeFixtures, makeTextLayerPdf, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - local formats", () => {
   it("converts modern Office files through the local XML fallback when MinerU is unnecessary", () => {
@@ -209,5 +204,4 @@ describe("kbprep worker pipeline - local formats", () => {
       rmSync(root, { recursive: true, force: true });
     }
   }, 10_000);
-
 });

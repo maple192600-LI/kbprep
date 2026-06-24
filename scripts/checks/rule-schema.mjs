@@ -41,12 +41,7 @@ const allowedCleaningKeywordSets = new Set([
 ]);
 
 const objectKeywordSets = new Set(["evidence_patterns", "protected_patterns"]);
-const allowedTextProfileNames = new Set([
-  "ebook_or_long_report",
-  "meeting_or_interview",
-  "note",
-  "tutorial",
-]);
+const allowedTextProfileNames = new Set(["ebook_or_long_report", "meeting_or_interview", "note", "tutorial"]);
 
 const failures = [];
 for (const relative of collectJsonFiles(rulesRoot)) {
@@ -80,19 +75,26 @@ if (failures.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  checkedRuleFiles: collectJsonFiles(rulesRoot).length,
-  allowedSchemas: [...allowedSchemas],
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      checkedRuleFiles: collectJsonFiles(rulesRoot).length,
+      allowedSchemas: [...allowedSchemas],
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function validateCleaningRuleFile(file, data) {
   const rules = Array.isArray(data.rules) ? data.rules : [];
   const ruleIds = new Set(rules.map((rule) => rule?.id).filter((id) => typeof id === "string" && id));
-  const keywordSets = data.keyword_sets && typeof data.keyword_sets === "object" && !Array.isArray(data.keyword_sets)
-    ? new Set(Object.keys(data.keyword_sets))
-    : new Set();
+  const keywordSets =
+    data.keyword_sets && typeof data.keyword_sets === "object" && !Array.isArray(data.keyword_sets)
+      ? new Set(Object.keys(data.keyword_sets))
+      : new Set();
 
   validateCleaningKeywordSets(file, data.keyword_sets);
 

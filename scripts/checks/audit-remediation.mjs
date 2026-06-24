@@ -10,12 +10,7 @@ if (!existsSync(remediationPath)) {
 }
 
 const remediation = readFileSync(remediationPath, "utf8");
-for (const required of [
-  "真实 coverage",
-  "测试体量",
-  "TS scenario 集成测试",
-  "能力矩阵证据",
-]) {
+for (const required of ["真实 coverage", "测试体量", "TS scenario 集成测试", "能力矩阵证据"]) {
   if (!remediation.includes(required)) {
     fail(`docs/audit-remediation.md must mention: ${required}`);
   }

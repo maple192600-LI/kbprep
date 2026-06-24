@@ -8,16 +8,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const vaultRoot = path.resolve(process.env.KBPREP_VAULT_SMOKE_ROOT || defaultVaultRoot());
 const workRoot = mkdtempSync(path.join(tmpdir(), "kbprep-vault-smoke-"));
 
-const ignoredDirs = new Set([
-  ".obsidian",
-  ".trash",
-  ".git",
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "kbprep-output",
-]);
+const ignoredDirs = new Set([".obsidian", ".trash", ".git", "node_modules", "dist", "build", "coverage", "kbprep-output"]);
 
 if (!existsSync(vaultRoot)) {
   fail(`Vault root does not exist: ${vaultRoot}. Set KBPREP_VAULT_SMOKE_ROOT to override.`);
@@ -47,13 +38,19 @@ for (const [name, sample] of [
 }
 runBatchSmoke([samples.markdownPlain, samples.docx, samples.txt]);
 
-process.stdout.write(JSON.stringify({
-  ok: true,
-  vaultRoot,
-  workRoot,
-  checked: results.length,
-  results,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      ok: true,
+      vaultRoot,
+      workRoot,
+      checked: results.length,
+      results,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
 
 function runAnalyzeOnly(name, source) {
@@ -258,9 +255,10 @@ function runCli(command, args) {
 }
 
 function projectPythonPath() {
-  const pythonPath = process.platform === "win32"
-    ? path.join(repoRoot, ".kbprep", "venv", "Scripts", "python.exe")
-    : path.join(repoRoot, ".kbprep", "venv", "bin", "python");
+  const pythonPath =
+    process.platform === "win32"
+      ? path.join(repoRoot, ".kbprep", "venv", "Scripts", "python.exe")
+      : path.join(repoRoot, ".kbprep", "venv", "bin", "python");
   if (!existsSync(pythonPath)) {
     fail(`Project Python runtime is missing: ${pythonPath}. Run npm run python:check-size first.`);
   }

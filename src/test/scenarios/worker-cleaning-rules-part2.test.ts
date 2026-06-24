@@ -2,10 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  runPython,
-  runWorker,
-} from "../helpers/workerHarness.js";
+import { runPython, runWorker } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - cleanup rules part 2", () => {
   it("keeps short policy-analysis paragraphs that mention public account CTA terms", () => {
@@ -16,15 +13,7 @@ describe("kbprep worker pipeline - cleanup rules part 2", () => {
       mkdirSync(inputDir);
       mkdirSync(outputRoot);
       const sourcePath = path.join(inputDir, "policy.md");
-      writeFileSync(
-        sourcePath,
-        [
-          "# 平台规则分析",
-          "",
-          "平台规则：不得诱导关注公众号，这类文案要作为违规案例记录。",
-        ].join("\n"),
-        "utf8",
-      );
+      writeFileSync(sourcePath, ["# 平台规则分析", "", "平台规则：不得诱导关注公众号，这类文案要作为违规案例记录。"].join("\n"), "utf8");
 
       const envelope = runWorker("prepare", {
         input_path: sourcePath,
@@ -59,7 +48,7 @@ describe("kbprep worker pipeline - cleanup rules part 2", () => {
           "",
           "Step 1: record threshold=0.8 and retry_count=3 before changing the campaign.",
           "",
-          "Policy example: do not write \"scan the QR code to join our Discord\" in the landing page CTA.",
+          'Policy example: do not write "scan the QR code to join our Discord" in the landing page CTA.',
           "",
           "Scan the QR code to join our Discord and claim your free trial.",
         ].join("\n"),
@@ -287,6 +276,4 @@ describe("kbprep worker pipeline - cleanup rules part 2", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });
-

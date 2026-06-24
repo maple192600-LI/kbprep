@@ -2,12 +2,7 @@ import { existsSync, mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  repoRoot,
-  runPython,
-  runWorker,
-  runWorkerRawInput,
-} from "../helpers/workerHarness.js";
+import { repoRoot, runPython, runWorker, runWorkerRawInput } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - cleanup rules part 1", () => {
   it("splits obvious promotional lines out of otherwise useful source blocks", () => {
@@ -239,7 +234,7 @@ describe("kbprep worker pipeline - cleanup rules part 1", () => {
         "    converted.write_text('\\n'.join([",
         "        '<!-- page: 1 -->',",
         "        '',",
-        "        \"The Founder\\'s Playbook示例行动手册✻ Claude\",",
+        '        "The Founder\\\'s Playbook示例行动手册✻ Claude",',
         "        'Anthropic · 2026 年 5 月Building an AI-Native Startup示例译者 译横版 36 页中文译本仅供个人学习与内部研究',",
         "        '',",
         "        '<!-- page: 2 -->',",
@@ -256,17 +251,19 @@ describe("kbprep worker pipeline - cleanup rules part 1", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-worker-"));
     try {
       const sourcePath = path.join(root, "technical-manual.md");
-      const sections = Array.from({ length: 12 }, (_, index) => [
-        `# 第${index + 1}章 配置说明`,
-        "",
-        "模型名称： gpt-4.1-mini",
-        "参数 threshold： 0.8",
-        "失败原因： 需要记录原始错误，不要总结掉。",
-        "操作步骤： 打开后台，选择项目，填写参数，保存配置。",
-        "注意事项： 如果接口返回 429，需要等待并重试。",
-        "",
-        "这是一段正文，用来描述章节里的知识背景、限制条件、案例过程和复盘细节。".repeat(60),
-      ].join("\n"));
+      const sections = Array.from({ length: 12 }, (_, index) =>
+        [
+          `# 第${index + 1}章 配置说明`,
+          "",
+          "模型名称： gpt-4.1-mini",
+          "参数 threshold： 0.8",
+          "失败原因： 需要记录原始错误，不要总结掉。",
+          "操作步骤： 打开后台，选择项目，填写参数，保存配置。",
+          "注意事项： 如果接口返回 429，需要等待并重试。",
+          "",
+          "这是一段正文，用来描述章节里的知识背景、限制条件、案例过程和复盘细节。".repeat(60),
+        ].join("\n"),
+      );
       writeFileSync(sourcePath, sections.join("\n\n"), "utf8");
 
       const envelope = runWorker("diagnose", {
@@ -347,6 +344,4 @@ describe("kbprep worker pipeline - cleanup rules part 1", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
-
 });
-

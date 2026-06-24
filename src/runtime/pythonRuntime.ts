@@ -14,11 +14,7 @@ export type RuntimeConfig = {
   python_path?: string;
 };
 
-export type RuntimeSetupStepId =
-  | "create_venv"
-  | "upgrade_packaging"
-  | "install_worker"
-  | "probe_environment";
+export type RuntimeSetupStepId = "create_venv" | "upgrade_packaging" | "install_worker" | "probe_environment";
 
 export type RuntimeSetupStep = {
   id: RuntimeSetupStepId;
@@ -71,7 +67,9 @@ export function resolvePythonPath(_startPath?: string, config?: RuntimeConfig): 
     if (process.env.KBPREP_PYTHON?.trim()) return process.env.KBPREP_PYTHON.trim();
     if (existsSync(runtimePython)) return runtimePython;
 
-    throw new Error("KBPrep project Python runtime is not available. Create .kbprep/venv through the project runtime wrapper before running skipped-setup tests.");
+    throw new Error(
+      "KBPrep project Python runtime is not available. Create .kbprep/venv through the project runtime wrapper before running skipped-setup tests.",
+    );
   }
 
   return runtimePython;
@@ -90,18 +88,8 @@ export async function ensurePythonRuntime(config?: RuntimeConfig, onProgress?: R
   const bootstrap = bootstrapPythonCommand(config);
   const steps = runtimeSetupSteps();
   await runRuntimeSetupStep(steps[0], onProgress, bootstrap.command, [...bootstrap.args, "-m", "venv", venvDir]);
-  await runRuntimeSetupStep(
-    steps[1],
-    onProgress,
-    pythonPath,
-    ["-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"],
-  );
-  await runRuntimeSetupStep(
-    steps[2],
-    onProgress,
-    pythonPath,
-    ["-m", "pip", "install", "-e", kbprepPythonProjectDir()],
-  );
+  await runRuntimeSetupStep(steps[1], onProgress, pythonPath, ["-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"]);
+  await runRuntimeSetupStep(steps[2], onProgress, pythonPath, ["-m", "pip", "install", "-e", kbprepPythonProjectDir()]);
   const setupResult = await runRuntimeSetupStep(
     steps[3],
     onProgress,
@@ -110,19 +98,27 @@ export async function ensurePythonRuntime(config?: RuntimeConfig, onProgress?: R
     JSON.stringify({ device_override: config?.device_override }),
   );
   const setupEnvelope = parseSetupEnvelope(setupResult.stdout);
-  writeFileSync(kbprepVenvReadyMarker(), JSON.stringify({
-    schema: RUNTIME_MARKER_SCHEMA,
-    created_at: new Date().toISOString(),
-    kbprep_version: kbprepPackageVersion(),
-    python_executable: pythonPath,
-    requested_device_override: config?.device_override ?? null,
-    actual_device: actualDeviceFromSetupEnvelope(setupEnvelope),
-    python_project: {
-      path: kbprepPythonProjectDir(),
-      dependency_spec: PYTHON_WORKER_DEPENDENCY_SPEC,
-    },
-    setup_env: setupEnvelope,
-  }, null, 2), "utf-8");
+  writeFileSync(
+    kbprepVenvReadyMarker(),
+    JSON.stringify(
+      {
+        schema: RUNTIME_MARKER_SCHEMA,
+        created_at: new Date().toISOString(),
+        kbprep_version: kbprepPackageVersion(),
+        python_executable: pythonPath,
+        requested_device_override: config?.device_override ?? null,
+        actual_device: actualDeviceFromSetupEnvelope(setupEnvelope),
+        python_project: {
+          path: kbprepPythonProjectDir(),
+          dependency_spec: PYTHON_WORKER_DEPENDENCY_SPEC,
+        },
+        setup_env: setupEnvelope,
+      },
+      null,
+      2,
+    ),
+    "utf-8",
+  );
   return pythonPath;
 }
 
@@ -210,9 +206,7 @@ function isKbprepVenvReady(config?: RuntimeConfig): boolean {
 
 export function kbprepVenvPythonPath(): string {
   const venvDir = kbprepVenvDir();
-  return process.platform === "win32"
-    ? join(venvDir, "Scripts", "python.exe")
-    : join(venvDir, "bin", "python");
+  return process.platform === "win32" ? join(venvDir, "Scripts", "python.exe") : join(venvDir, "bin", "python");
 }
 
 function shouldSkipAutoSetupForTests(): boolean {
@@ -251,13 +245,13 @@ export function isRuntimeMarkerCurrent(marker: unknown, config?: RuntimeConfig):
   const setupData = setupEnv?.data as Record<string, unknown> | undefined;
 
   return (
-    data.schema === RUNTIME_MARKER_SCHEMA
-    && markerVersion(data) === kbprepPackageVersion()
-    && data.python_executable === kbprepVenvPythonPath()
-    && requestedDeviceOverride(data) === (config?.device_override ?? null)
-    && pythonProject?.dependency_spec === PYTHON_WORKER_DEPENDENCY_SPEC
-    && setupEnv?.ok === true
-    && !hasCudaSetupFailure(setupData)
+    data.schema === RUNTIME_MARKER_SCHEMA &&
+    markerVersion(data) === kbprepPackageVersion() &&
+    data.python_executable === kbprepVenvPythonPath() &&
+    requestedDeviceOverride(data) === (config?.device_override ?? null) &&
+    pythonProject?.dependency_spec === PYTHON_WORKER_DEPENDENCY_SPEC &&
+    setupEnv?.ok === true &&
+    !hasCudaSetupFailure(setupData)
   );
 }
 

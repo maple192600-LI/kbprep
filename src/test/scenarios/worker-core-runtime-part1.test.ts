@@ -2,10 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  parseEnvelope,
-  runPython,
-} from "../helpers/workerHarness.js";
+import { parseEnvelope, runPython } from "../helpers/workerHarness.js";
 
 describe("kbprep worker pipeline - core/runtime part 1", () => {
   it("rejects worker envelopes that are missing the ok discriminator", async () => {
@@ -340,5 +337,4 @@ describe("kbprep worker pipeline - core/runtime part 1", () => {
       [],
     );
   });
-
 });

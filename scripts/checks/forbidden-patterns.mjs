@@ -48,18 +48,9 @@ function inspectFStringYaml(file, source) {
 
 function looksLikeHtmlParsingRegex(pattern) {
   const compact = pattern.toLowerCase().replace(/\s+/g, "");
-  return [
-    "<[^>]+>",
-    "<table[^",
-    "</table",
-    "<tr[^",
-    "</tr",
-    "<t[dh]",
-    "</t[dh]",
-    "<br",
-    "<(script|style",
-    "</(p|div|li|h",
-  ].some((token) => compact.includes(token));
+  return ["<[^>]+>", "<table[^", "</table", "<tr[^", "</tr", "<t[dh]", "</t[dh]", "<br", "<(script|style", "</(p|div|li|h"].some((token) =>
+    compact.includes(token),
+  );
 }
 
 function looksLikeYamlFrontmatter(body) {
@@ -106,8 +97,14 @@ if (violations.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  checkedFiles: checkedFiles.length,
-  violations,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      checkedFiles: checkedFiles.length,
+      violations,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");

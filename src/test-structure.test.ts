@@ -12,9 +12,7 @@ describe("test suite structure", () => {
   it("keeps worker scenarios split into focused files", () => {
     const legacyPath = path.join("src", "test", "fixtures", "workerScenarios.ts");
     const scenarioDir = path.join("src", "test", "scenarios");
-    const scenarioFiles = existsSync(scenarioDir)
-      ? readdirSync(scenarioDir).filter((name) => name.endsWith(".test.ts"))
-      : [];
+    const scenarioFiles = existsSync(scenarioDir) ? readdirSync(scenarioDir).filter((name) => name.endsWith(".test.ts")) : [];
 
     expect(scenarioFiles.length).toBeGreaterThanOrEqual(8);
     if (existsSync(legacyPath)) {

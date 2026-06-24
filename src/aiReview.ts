@@ -1,10 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  buildBackend,
-  resolveBackendName,
-  type AIReviewBackend,
-} from "./adapters/ai_review/index.js";
+import { buildBackend, resolveBackendName, type AIReviewBackend } from "./adapters/ai_review/index.js";
 import {
   AI_REVIEW_MAX_ATTEMPTS as PIPELINE_AI_REVIEW_MAX_ATTEMPTS,
   AI_REVIEW_SYSTEM_PROMPT as PIPELINE_AI_REVIEW_SYSTEM_PROMPT,
@@ -130,7 +126,9 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
       if (reviewed.warning) aiWarnings.push(reviewed.warning);
       const patch = pipelineExtractJsonPatch(reviewed.messages);
       if (!patch) {
-        aiWarnings.push(`W_LLM_REVIEW_BATCH_ATTEMPT_FAILED: batch ${index + 1}/${batches.length} attempt ${attempt}/${PIPELINE_AI_REVIEW_MAX_ATTEMPTS} did not return a JSON Patch array.`);
+        aiWarnings.push(
+          `W_LLM_REVIEW_BATCH_ATTEMPT_FAILED: batch ${index + 1}/${batches.length} attempt ${attempt}/${PIPELINE_AI_REVIEW_MAX_ATTEMPTS} did not return a JSON Patch array.`,
+        );
         continue;
       }
 
@@ -182,15 +180,19 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
     );
   }
 
-  const applied = await callWorker<T>("apply_review", {
-    run_dir: runDir,
-    patch_json: combinedPatch,
-  }, {
-    pythonPath: opts.pythonPath,
-    timeoutMs: AI_REVIEW_APPLY_PATCH_TIMEOUT_MS,
-    signal: context.signal,
-    config: opts.workerConfig,
-  });
+  const applied = await callWorker<T>(
+    "apply_review",
+    {
+      run_dir: runDir,
+      patch_json: combinedPatch,
+    },
+    {
+      pythonPath: opts.pythonPath,
+      timeoutMs: AI_REVIEW_APPLY_PATCH_TIMEOUT_MS,
+      signal: context.signal,
+      config: opts.workerConfig,
+    },
+  );
 
   if (!applied.ok) {
     return withAiWarning(result, `W_LLM_REVIEW_SKIPPED: AI patch was rejected (${applied.error?.message ?? "unknown error"}).`);
@@ -203,7 +205,7 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
 
   return {
     ...applied,
-    data: ({
+    data: {
       ...originalData,
       ...appliedData,
       run_id: originalData.run_id,
@@ -221,7 +223,7 @@ export async function maybeRunAiReview<T extends Record<string, unknown>>(
         batches: batches.length,
         patch_ops: combinedPatch.length,
       },
-    } as unknown) as T,
+    } as unknown as T,
     warnings: [...(result.warnings ?? []), ...aiWarnings, ...(applied.warnings ?? [])],
   };
 }
@@ -308,12 +310,12 @@ function attachAiReviewMetadata<T extends Record<string, unknown>>(
     ...result,
     error: result.error
       ? {
-        ...result.error,
-        details: {
-          ...result.error.details,
-          ai_review: metadata,
-        },
-      }
+          ...result.error,
+          details: {
+            ...result.error.details,
+            ai_review: metadata,
+          },
+        }
       : result.error,
     warnings: [...(result.warnings ?? []), ...warnings],
   };
@@ -353,9 +355,7 @@ function originalBlockStatusMap(reviewPack: string): Record<string, Record<strin
 function parseReviewPack(reviewPack: string): Record<string, unknown> | undefined {
   try {
     const parsed = JSON.parse(reviewPack) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : undefined;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
   }

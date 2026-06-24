@@ -140,7 +140,9 @@ function validateCapability(capability, scannedText) {
 }
 
 function isCodeOrTestEvidence(evidence) {
-  const relative = String(evidence || "").split("::")[0].replaceAll("\\", "/");
+  const relative = String(evidence || "")
+    .split("::")[0]
+    .replaceAll("\\", "/");
   if (!/^(python\/kbprep_worker\/|python\/tests\/|src\/|scripts\/checks\/)/.test(relative)) {
     return false;
   }

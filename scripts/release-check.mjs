@@ -37,12 +37,14 @@ process.stdout.write("\nrelease:check passed\n");
 function runBuildDistCheck(label) {
   const trackedDist = capture("git", ["ls-files", "dist"]).trim();
   if (trackedDist) {
-    process.stderr.write([
-      "\ndist/ must not be tracked by git.",
-      "Run: git rm -r --cached dist",
-      "Tracked dist files:",
-      trackedDist.split(/\r?\n/).slice(0, 40).join("\n"),
-    ].join("\n"));
+    process.stderr.write(
+      [
+        "\ndist/ must not be tracked by git.",
+        "Run: git rm -r --cached dist",
+        "Tracked dist files:",
+        trackedDist.split(/\r?\n/).slice(0, 40).join("\n"),
+      ].join("\n"),
+    );
     process.exit(1);
   }
   runOrFail(npm, ["run", "build"], label);

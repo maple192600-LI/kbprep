@@ -40,26 +40,14 @@ const baseForbiddenTerms = [
 ];
 
 const fileSpecificForbiddenTerms = {
-  "python/kbprep_worker/document_type.py": [
-  "课程",
-  "报告",
-  "摘要",
-  "市场规模",
-  "订阅",
-  "购物车",
-  "主持人",
-  "嘉宾",
-  ],
+  "python/kbprep_worker/document_type.py": ["课程", "报告", "摘要", "市场规模", "订阅", "购物车", "主持人", "嘉宾"],
 };
 
 const violations = [];
 const rulesText = rulesCorpus(rulesRoot);
 for (const relative of checkedFiles) {
   const absolute = path.join(repoRoot, relative);
-  const forbiddenTerms = [
-    ...baseForbiddenTerms,
-    ...(fileSpecificForbiddenTerms[relative] ?? []),
-  ];
+  const forbiddenTerms = [...baseForbiddenTerms, ...(fileSpecificForbiddenTerms[relative] ?? [])];
   for (const file of pythonFiles(absolute)) {
     const fileRelative = path.relative(repoRoot, file).replaceAll(path.sep, "/");
     const text = readFileSync(file, "utf8");
@@ -94,14 +82,13 @@ function pythonFiles(target) {
   if (stat.isFile()) {
     return target.endsWith(".py") ? [target] : [];
   }
-  return readdirSync(target, { withFileTypes: true })
-    .flatMap((entry) => {
-      const child = path.join(target, entry.name);
-      if (entry.isDirectory()) {
-        return pythonFiles(child);
-      }
-      return entry.isFile() && entry.name.endsWith(".py") ? [child] : [];
-    });
+  return readdirSync(target, { withFileTypes: true }).flatMap((entry) => {
+    const child = path.join(target, entry.name);
+    if (entry.isDirectory()) {
+      return pythonFiles(child);
+    }
+    return entry.isFile() && entry.name.endsWith(".py") ? [child] : [];
+  });
 }
 
 function pythonStringLiterals(file) {
@@ -180,7 +167,9 @@ function isSensitiveBusinessTerm(term) {
   if (term.length > 12) {
     return false;
   }
-  return /(?:品牌|课程|训练营|社群|入群|扫码|二维码|关注|小红书|公众号|视频号|抖音|生财|宝典|会员|优惠|退款|体验卡|领取|购买|营销|广告)/.test(term);
+  return /(?:品牌|课程|训练营|社群|入群|扫码|二维码|关注|小红书|公众号|视频号|抖音|生财|宝典|会员|优惠|退款|体验卡|领取|购买|营销|广告)/.test(
+    term,
+  );
 }
 
 function parseArgs(rawArgs) {
@@ -204,10 +193,16 @@ if (violations.length) {
   process.exit(1);
 }
 
-process.stdout.write(JSON.stringify({
-  checkedFiles: checkedFiles.length,
-  baseForbiddenTerms: baseForbiddenTerms.length,
-  fileSpecificForbiddenTerms: Object.values(fileSpecificForbiddenTerms).reduce((total, terms) => total + terms.length, 0),
-  violations,
-}, null, 2));
+process.stdout.write(
+  JSON.stringify(
+    {
+      checkedFiles: checkedFiles.length,
+      baseForbiddenTerms: baseForbiddenTerms.length,
+      fileSpecificForbiddenTerms: Object.values(fileSpecificForbiddenTerms).reduce((total, terms) => total + terms.length, 0),
+      violations,
+    },
+    null,
+    2,
+  ),
+);
 process.stdout.write("\n");
