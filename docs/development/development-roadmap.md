@@ -32,6 +32,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
+| job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
 | feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
@@ -269,8 +270,130 @@ Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
 | M2 Canonical IR Contract | Phase C | in progress (partial) |
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
-| M5 Feedback And Selective Rerun | Phase A + D (rerun from Canonical IR) | partial |
-| M6 Optional Source Expansion | Phase F | not started (design_only) |
+| M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | partial |
+| M6 Optional Source Expansion | Phase F | local media route is experimental; YouTube remains design_only |
+
+Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
+M1-M6. Phase B (PDF routing), Phase D (cleanup), and Phase E (job status)
+landed while Phase C remains partial because their slices could ship against
+the current Canonical IR artifacts without completing every route-native span,
+relationship, asset, annotation, and IR-regeneration requirement in M2.
+
+## Current Completion Flow
+
+This is the ordered path from the current repository state to the completed
+protected design. Status must move only when `kbprep-implementation-status.json`,
+`docs/capability-matrix.md`, code, and named tests agree.
+
+### 1. Close M2 / Phase C First
+
+Goal: make Canonical IR the complete internal fact layer instead of a partial
+evidence layer.
+
+Required slices:
+
+- Add route-native SourceSpan precision for PDF bounding boxes, DOCX run
+  ranges, PPTX shape ids, XLSX cells, transcript cue ids, and future YouTube
+  cue ids when that route exists.
+- Add relationship evidence, asset registry evidence, and annotation evidence
+  to Canonical IR.
+- Make conversion gates consume complete route-wide IR semantics for every
+  verified or promoted route.
+- Render Markdown from Canonical IR plus accepted changes, not from parallel
+  legacy cleanup state.
+- Promote `canonical_ir_contract` and `conversion_quality_gate` only after
+  named tests cover the above across representative routes.
+
+Acceptance: `canonical_ir_contract` and `conversion_quality_gate` can move from
+`partial` to `implemented`; no route claims complete IR coverage without tests.
+
+### 2. Close M5 / Feedback And Selective Rerun
+
+Goal: feedback remains proposal-first, but accepted rules can safely rerun only
+the affected evidence-backed scope.
+
+Required slices:
+
+- Complete rerun scope selection from source evidence, Canonical IR ids,
+  document type, and policy snapshot identity.
+- Add executable selective rerun commands for accepted feedback proposals.
+- Preserve failed-promotion history and counterexamples when rerun evidence is
+  weak or negative.
+- Prove accepted rules do not silently become broad permanent deletion rules.
+- Update operator docs so a non-developer can see proposed, accepted, rejected,
+  rerun, and failed-promotion states.
+
+Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
+acceptance, rerun, rejection, and failed-promotion paths have named tests and
+manual operator guidance.
+
+### 3. Close Batch / Playlist Rerun Gaps
+
+Goal: batch stays source-safe while playlist and rerun behavior become
+executable, inspectable, and recoverable.
+
+Required slices:
+
+- Implement playlist input only after the URL/network/copyright boundary is
+  explicitly approved and represented in capability status.
+- Add executable selective batch rerun using the parent status manifest and
+  child run evidence.
+- Keep unsupported files visible as skipped, not silent failures.
+- Prove partial batch success, completed-with-warnings, failed children, and
+  rerun scopes with tests.
+
+Acceptance: `batch_playlist_rerun` moves from `partial` only when playlist and
+selective rerun are implemented or the project intentionally splits playlist
+into a separate target-only capability.
+
+### 4. Close M6 / Phase F Last
+
+Goal: optional media and YouTube routes become real product promises only after
+dependency setup, fixtures, quality gates, and status promotion are complete.
+
+Current truth:
+
+- `media_local_transcript` has local detection and an external transcript route,
+  but capability status is still experimental at the route level because real
+  ASR fixtures and timing-quality evidence are missing.
+- `youtube_url_routes` is design_only. No standalone CLI URL route, subtitle
+  extraction, media download, or verified fixture support is shipped.
+- Image OCR and legacy Office routes are also experimental and need real
+  fixtures before promotion.
+
+Required slices:
+
+- Add real or golden media ASR fixtures with stable transcript snapshots,
+  timing evidence, dependency failure tests, and final-output quality checks.
+- Promote local media only after those fixtures pass and the capability matrix
+  changes from experimental toward partial or verified.
+- Design and approve the YouTube URL input boundary, including network,
+  copyright, dependency, timeout, and no-subtitle fallback behavior.
+- Implement subtitle-first YouTube route, then media-transcript fallback only
+  when dependencies and owner-approved risk boundaries are satisfied.
+- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists if
+  in scope, and final source-side publication.
+
+Acceptance: `youtube_url_routes` leaves `design_only` only after real CLI
+support and fixtures exist. M6 is complete only when every optional route in
+scope is either verified/partial with evidence or explicitly kept unsupported
+with owner-readable guidance.
+
+### 5. Final Release Closure
+
+Run release-level acceptance only after M2, M5, batch/rerun, and M6 status are
+honest and aligned:
+
+- `npm run dev:full-check`
+- `npm run pack:check`
+- `npm run check:flowchart`
+- `npm run check:development-docs`
+- real sample or vault checks for routes whose quality depends on external
+  tools, especially PDF, media, image OCR, legacy Office, and YouTube.
+
+The project is fully complete only when no capability remains `partial`,
+`experimental`, or `design_only` unless the owner explicitly accepts that scope
+as intentionally unsupported or deferred.
 
 ## Slice Pattern
 

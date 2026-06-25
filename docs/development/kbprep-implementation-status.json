@@ -1,6 +1,6 @@
 {
   "schema": "kbprep.implementation_status.v1",
-  "updated": "2026-06-24",
+  "updated": "2026-06-25",
   "capabilities": [
     {
       "id": "design_source_alignment",
@@ -125,6 +125,21 @@
         "python/tests/test_cleaning_patches.py",
         "python/tests/test_core_processing_paths.py",
         "src/test/scenarios/worker-output-guards-part1.test.ts"
+      ],
+      "prohibitedClaims": []
+    },
+    {
+      "id": "job_status_envelope",
+      "label": "Single-source job status envelope",
+      "status": "implemented",
+      "scope": "The worker envelope carries completed, completed_with_warnings, or failed status. Single-source prepare maps strict errors to failed, non-blocking warnings to completed_with_warnings, and clean successful runs to completed. TypeScript validates the required status field across success and failure envelopes.",
+      "evidence": [
+        "docs/development/development-roadmap.md",
+        "python/kbprep_worker/envelope.py",
+        "python/kbprep_worker/stages/pipeline_core.py",
+        "python/tests/test_envelope_status.py",
+        "src/worker.ts",
+        "src/test/scenarios/worker-job-status.test.ts"
       ],
       "prohibitedClaims": []
     },

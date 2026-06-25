@@ -267,6 +267,7 @@ describe("kbprep worker governance guards", () => {
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain("missing required capability id: document_type_classification");
+      expect(result.stderr).toContain("missing required capability id: job_status_envelope");
       expect(result.stderr).toContain("missing required capability id: youtube_url_routes");
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -303,6 +304,7 @@ describe("kbprep worker governance guards", () => {
                 "python/tests/test_cleaning_policy_snapshot.py",
               ]),
               statusCapability("patch_clean_view", "design_only", ["docs/development/07-cleaning-unit-patch-clean-view.md"]),
+              statusCapability("job_status_envelope", "implemented", ["python/tests/test_envelope_status.py"]),
               statusCapability("feedback_rule_learning", "partial", [
                 "docs/feedback-learning.md",
                 "python/tests/test_feedback_proposals.py",

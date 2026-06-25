@@ -25,6 +25,7 @@ const requiredCapabilityIds = [
   "document_type_classification",
   "cleaning_policy_snapshot",
   "patch_clean_view",
+  "job_status_envelope",
   "feedback_rule_learning",
   "batch_playlist_rerun",
   "media_local_transcript",

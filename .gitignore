@@ -17,6 +17,7 @@ __pycache__/
 !/README.md
 !/CHANGELOG.md
 !/AGENTS.md
+!/SESSION_START.md
 *.pdf
 *.doc
 *.docx

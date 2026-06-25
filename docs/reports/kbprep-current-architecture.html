@@ -52,7 +52,9 @@
       <div class="grid">
         <div class="tile"><span class="status">implemented</span><h3>CLI and worker</h3><p>Node commands call the Python worker through JSON envelopes.</p></div>
         <div class="tile"><span class="status">implemented</span><h3>Source-side output</h3><p>Standard profile publishes final Markdown beside the source.</p></div>
-        <div class="tile"><span class="status">partial</span><h3>Conversion gates</h3><p>Current checks exist; target coverage must move toward Canonical IR evidence.</p></div>
+        <div class="tile"><span class="status">partial</span><h3>Conversion gates</h3><p>Current checks use Canonical IR evidence when complete; route-wide IR semantics remain partial.</p></div>
+        <div class="tile"><span class="status">implemented</span><h3>Phase D cleanup</h3><p>Policy snapshots, guarded patches, Clean View, and DocumentCleaningGate are shipped for the current cleanup path.</p></div>
+        <div class="tile"><span class="status">implemented</span><h3>Job status</h3><p>Worker envelopes distinguish completed, completed with warnings, and failed results.</p></div>
         <div class="tile"><span class="status">partial</span><h3>Feedback learning</h3><p>Feedback creates proposals first and requires confirmation before promotion.</p></div>
       </div>
     </section>
@@ -60,8 +62,8 @@
       <h2>Target Gaps</h2>
       <ul>
         <li>Canonical IR is not yet the universal worker artifact.</li>
-        <li>CleaningPolicySnapshot is not yet the full reproducibility boundary.</li>
-        <li>CleaningPatch and Clean View are target contracts awaiting full migration.</li>
+        <li>Route-native source spans, relationships, assets, annotations, and IR-based regeneration remain incomplete.</li>
+        <li>Selective rerun and playlist workflows remain partial.</li>
         <li>Optional media and YouTube routes need dependency, fixture, and quality evidence before promotion.</li>
       </ul>
     </section>
