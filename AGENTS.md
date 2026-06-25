@@ -260,3 +260,19 @@ These rules are enforced by the Stop Hook in `.codex/hooks.json`. Violations cau
 4. Check: did I modify error codes? If yes, sync both sides and run contract test.
 5. Report what commands ran and what they output. If a command cannot run, say so explicitly.
 6. Note: The Stop Hook runs `npm run dev:check`, `npm run python:ruff`, and `npm run python:typecheck` automatically; `dev:check` includes `npm test`. Fixing issues proactively saves a retry loop.
+
+## Parallel Subagent And Worktree Protocol
+
+Parallel subagents (codex workers, review agents, etc.) and any agent implementing a slice MUST follow this protocol. It exists because an uncontrolled parallel subagent once produced a "shadow branch": a dangling, unpushed commit that silently downgraded the project torch to CPU, declared a false `verified` capability status, and was reported as "pushed" without ever reaching the remote. The rules below prevent a recurrence.
+
+1. **Use a registered worktree, never a wild directory.** Start every slice with `git worktree add .worktrees/<slice> -b codex/<slice> main`. Do not create working directories under `Documents\Projects\` or anywhere outside `.worktrees/`. `git worktree list` must show every active slice.
+2. **Start from current `main`.** Before any work: `git fetch --all --prune`, then rebase the slice onto `origin/main`. A slice base must not fall more than 5 commits behind `main`. Stale-base work rebases before merge.
+3. **Push to a named branch and self-verify.** Before reporting a slice "done" or "pushed", run `git ls-remote origin <branch>` and confirm the branch and tip commit are actually on the remote. Reporting "pushed" without this verification is a process violation. Unpushed dangling commits are not deliverables.
+4. **`verified` promotion requires three gates.** (a) Real samples or fixtures — never TTS-synthesized audio, never pure mocks, never real third-party copyrighted content committed as golden evidence. (b) A second, independent agent review. (c) Owner approval for any cross-capability status change. Self-verified, self-reported promotion is forbidden; keep the capability `partial` until all three gates pass.
+5. **Dependency discipline — never downgrade project torch.** Adding a heavy dependency (a new ML framework, an ASR/OCR engine, etc.) requires declaring it in `python/pyproject.toml` first and verifying it does not conflict with the locked `torch==2.8.0+cu126` (required by mineru/lmdeploy). If a dependency needs a different torch/CUDA, run it in an isolated environment (separate venv or HTTP service) — never let it downgrade the project venv to CPU torch. The `setup_env.py` torch probe must stay `cuda_available=True`.
+6. **Architecture changes go through the Change Protocol.** Swapping a core engine (for example Whisper to another ASR) is an architecture change requiring owner decision, not an optional-route tweak. Do not silently replace an existing engine.
+7. **Clean up.** After merge or explicit abandon: `git worktree remove .worktrees/<slice>` and delete the slice branch. Do not leave orphan worktrees or branches.
+
+### Enforcement
+
+The automatable parts of this protocol are backed by `scripts/checks/subagent-worktree-discipline.mjs`, wired into `npm run check:governance` (and therefore `check:development-docs`, `pack:check`). It fails when a registered worktree is outside `.worktrees/`, when a `codex/*` slice branch lags `main` by more than 5 commits, or when a diff promotes a capability to `verified`/`implemented` without the owner marker `KBPREP_ALLOW_STATUS_PROMOTION=1`. The non-automatable gates (real samples, second-agent review, owner approval) remain the agent's and owner's responsibility; the check only prevents silent status overclaims from reaching `main`.

@@ -6,6 +6,7 @@ const checks = [
   ["Development docs closure", "scripts/checks/development-docs.mjs"],
   ["Flowchart drift", "scripts/checks/flowchart-drift.mjs"],
   ["Implementation status", "scripts/checks/implementation-status.mjs"],
+  ["Subagent worktree discipline", "scripts/checks/subagent-worktree-discipline.mjs"],
   ["Guidance drift", "scripts/checks/guidance-drift.mjs"],
   ["Project environment commands", "scripts/checks/project-env-commands.mjs"],
   ["Private info redaction", "scripts/checks/private-info-redaction.mjs"],
