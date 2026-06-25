@@ -16,6 +16,7 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - All children failed means parent `failed`.
 - Rerun uses existing run metadata only when the source can be safely located.
 - `batch_manifest.json` records parent status, per-file status, skipped unsupported files, artifact paths, and rerun scope.
+- Playlist input expands into bounded child jobs that reuse the YouTube subtitle-first route and keep per-video status visible.
 
 ## Acceptance
 
@@ -23,6 +24,7 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - Child jobs publish source-side results independently.
 - Rerun reports unavailable metadata instead of pretending evidence exists.
 - Batch status manifest exists for successful, partially successful, and sample-failed runs.
+- Playlist status records every child video, preserves successful child deliverables, and reports mixed success as completed with warnings.
 
 ## Risk And Rollback
 

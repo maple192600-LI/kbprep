@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -37,10 +38,35 @@ SOURCE_SPAN_EVIDENCE_KEYS = frozenset({
 SOURCE_LINE_LOCATION_KEYS = frozenset({"source_line_start", "source_line_end"})
 TRANSCRIPT_TIMING_LOCATION_KEYS = frozenset({"cue_id", "start_time", "end_time", "cue_settings"})
 TRANSCRIPT_CUE_LOCATION_KEYS = TRANSCRIPT_TIMING_LOCATION_KEYS | {"cue_index", "cue_settings"}
+PDF_BBOX_LOCATION_KEYS = frozenset({"page", "bbox"})
+DOCX_RUN_LOCATION_KEYS = frozenset({"paragraph_index", "run_start", "run_end"})
+PPTX_SHAPE_LOCATION_KEYS = frozenset({"slide", "shape_id"})
+XLSX_CELL_LOCATION_KEYS = frozenset({"sheet", "start", "end"})
+YOUTUBE_CUE_LOCATION_KEYS = frozenset({"cue_id"})
+NATIVE_LOCATION_KEYS = (
+    PDF_BBOX_LOCATION_KEYS
+    | DOCX_RUN_LOCATION_KEYS
+    | PPTX_SHAPE_LOCATION_KEYS
+    | XLSX_CELL_LOCATION_KEYS
+)
+CONVERTED_LINE_LOCATION_KEYS = frozenset({"converted_line_start", "converted_line_end"})
+TRANSCRIPT_CUE_ID_LOCATION_KEYS = frozenset({"cue_index", "cue_id"})
+ROUTE_NATIVE_LOCATION_KEYS = (
+    NATIVE_LOCATION_KEYS
+    | YOUTUBE_CUE_LOCATION_KEYS
+    | TRANSCRIPT_CUE_ID_LOCATION_KEYS
+    | TRANSCRIPT_TIMING_LOCATION_KEYS
+)
 SUPPORTED_PRECISIONS = frozenset({
     "converted_line_range",
     "source_line_range",
     "transcript_cue_timing",
+    "pdf_bbox",
+    "docx_run_range",
+    "pptx_shape",
+    "xlsx_cell_range",
+    "transcript_cue_id",
+    "youtube_cue_id",
 })
 SUPPORTED_SOURCE_KINDS = frozenset({
     "converted_markdown",
@@ -58,6 +84,7 @@ SUPPORTED_SOURCE_KINDS = frozenset({
     "youtube",
     "unknown",
 })
+_XLSX_CELL_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
 
 
 @dataclass(frozen=True)
@@ -449,6 +476,18 @@ def _validate_precision_location(
         _validate_transcript_timing_precision(source_kind, location, position, issues)
     if precision == "converted_line_range":
         _validate_converted_line_precision(location, position, issues)
+    if precision == "pdf_bbox":
+        _validate_pdf_bbox_precision(source_kind, location, position, issues)
+    if precision == "docx_run_range":
+        _validate_docx_run_precision(source_kind, location, position, issues)
+    if precision == "pptx_shape":
+        _validate_pptx_shape_precision(source_kind, location, position, issues)
+    if precision == "xlsx_cell_range":
+        _validate_xlsx_cell_precision(source_kind, location, position, issues)
+    if precision == "transcript_cue_id":
+        _validate_transcript_cue_id_precision(source_kind, location, position, issues)
+    if precision == "youtube_cue_id":
+        _validate_youtube_cue_precision(source_kind, location, position, issues)
 
 
 def _validate_source_line_precision(
@@ -461,6 +500,8 @@ def _validate_source_line_precision(
         _add_issue(issues, "source_line_range precision requires source line range", {"position": position})
     if source_kind == "transcript" or _has_any_location_key(location, TRANSCRIPT_CUE_LOCATION_KEYS):
         _add_issue(issues, "source_line_range precision cannot include transcript cue fields", {"position": position})
+    if _has_any_location_key(location, NATIVE_LOCATION_KEYS):
+        _add_issue(issues, "source_line_range precision cannot include route-native fields", {"position": position})
 
 
 def _validate_transcript_timing_precision(
@@ -475,6 +516,8 @@ def _validate_transcript_timing_precision(
         _add_issue(issues, "transcript_cue_timing precision requires start_time and end_time", {"position": position})
     if _has_any_location_key(location, SOURCE_LINE_LOCATION_KEYS):
         _add_issue(issues, "transcript_cue_timing precision cannot include source line range", {"position": position})
+    if _has_any_location_key(location, NATIVE_LOCATION_KEYS):
+        _add_issue(issues, "transcript_cue_timing precision cannot include route-native fields", {"position": position})
 
 
 def _validate_converted_line_precision(
@@ -486,6 +529,111 @@ def _validate_converted_line_precision(
         _add_issue(issues, "source line range requires source_line_range precision", {"position": position})
     if _has_any_location_key(location, TRANSCRIPT_TIMING_LOCATION_KEYS):
         _add_issue(issues, "transcript timing requires transcript_cue_timing precision", {"position": position})
+    if _has_any_location_key(location, NATIVE_LOCATION_KEYS):
+        _add_issue(issues, "route-native fields require route-native precision", {"position": position})
+
+
+def _validate_pdf_bbox_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, PDF_BBOX_LOCATION_KEYS, "pdf_bbox", position, issues)
+    if source_kind != "pdf":
+        _add_issue(issues, "pdf_bbox precision requires pdf source_kind", {"position": position})
+    bbox = location.get("bbox")
+    if not _valid_positive_int(location.get("page")) or not _valid_bbox(bbox):
+        _add_issue(issues, "pdf_bbox precision requires page and bbox", {"position": position})
+
+
+def _validate_docx_run_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, DOCX_RUN_LOCATION_KEYS, "docx_run_range", position, issues)
+    if source_kind != "docx":
+        _add_issue(issues, "docx_run_range precision requires docx source_kind", {"position": position})
+    if not _valid_non_negative_int(location.get("paragraph_index")):
+        _add_issue(issues, "docx_run_range precision requires paragraph_index", {"position": position})
+    if not _valid_run_range(location.get("run_start"), location.get("run_end")):
+        _add_issue(issues, "docx_run_range precision requires run_start and run_end", {"position": position})
+
+
+def _validate_pptx_shape_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, PPTX_SHAPE_LOCATION_KEYS, "pptx_shape", position, issues)
+    if source_kind != "pptx":
+        _add_issue(issues, "pptx_shape precision requires pptx source_kind", {"position": position})
+    if not _valid_positive_int(location.get("slide")) or not _valid_nonempty_string(location.get("shape_id")):
+        _add_issue(issues, "pptx_shape precision requires slide and shape_id", {"position": position})
+
+
+def _validate_xlsx_cell_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, XLSX_CELL_LOCATION_KEYS, "xlsx_cell_range", position, issues)
+    if source_kind != "xlsx":
+        _add_issue(issues, "xlsx_cell_range precision requires xlsx source_kind", {"position": position})
+    if not _valid_nonempty_string(location.get("sheet")):
+        _add_issue(issues, "xlsx_cell_range precision requires sheet", {"position": position})
+    if not _valid_xlsx_cell(location.get("start")) or not _valid_xlsx_cell(location.get("end")):
+        _add_issue(issues, "xlsx_cell_range precision requires start and end cells", {"position": position})
+
+
+def _validate_youtube_cue_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, YOUTUBE_CUE_LOCATION_KEYS, "youtube_cue_id", position, issues)
+    if source_kind != "youtube":
+        _add_issue(issues, "youtube_cue_id precision requires youtube source_kind", {"position": position})
+    if not _valid_nonempty_string(location.get("cue_id")):
+        _add_issue(issues, "youtube_cue_id precision requires cue_id", {"position": position})
+
+
+def _validate_transcript_cue_id_precision(
+    source_kind: object,
+    location: dict[str, object],
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    _validate_exclusive_native_location(location, TRANSCRIPT_CUE_ID_LOCATION_KEYS, "transcript_cue_id", position, issues)
+    if source_kind != "transcript":
+        _add_issue(issues, "transcript_cue_id precision requires transcript source_kind", {"position": position})
+    if not _valid_positive_int(location.get("cue_index")) or not _valid_nonempty_string(location.get("cue_id")):
+        _add_issue(issues, "transcript_cue_id precision requires cue_index and cue_id", {"position": position})
+
+
+def _validate_exclusive_native_location(
+    location: dict[str, object],
+    allowed_native_keys: frozenset[str],
+    precision: str,
+    position: int,
+    issues: list[SourceSpanValidationIssue],
+) -> None:
+    allowed_keys = CONVERTED_LINE_LOCATION_KEYS | allowed_native_keys
+    conflicting_keys = (SOURCE_LINE_LOCATION_KEYS | ROUTE_NATIVE_LOCATION_KEYS).difference(allowed_native_keys)
+    if _has_any_location_key(location, conflicting_keys):
+        _add_issue(issues, f"{precision} precision cannot include other route location fields", {"position": position})
+    unexpected_keys = sorted(set(location).difference(allowed_keys))
+    if unexpected_keys:
+        _add_issue(
+            issues,
+            f"{precision} precision has unsupported location fields",
+            {"position": position, "keys": unexpected_keys},
+        )
 
 
 def _has_any_location_key(location: dict[str, object], keys: frozenset[str]) -> bool:
@@ -496,8 +644,34 @@ def _valid_positive_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
+def _valid_non_negative_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
 def _valid_nonempty_string(value: object) -> bool:
     return isinstance(value, str) and bool(value)
+
+
+def _valid_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _valid_bbox(value: object) -> bool:
+    return isinstance(value, list) and len(value) == 4 and all(_valid_number(item) for item in value)
+
+
+def _valid_run_range(start: object, end: object) -> bool:
+    return (
+        _valid_non_negative_int(start)
+        and _valid_non_negative_int(end)
+        and isinstance(start, int)
+        and isinstance(end, int)
+        and end >= start
+    )
+
+
+def _valid_xlsx_cell(value: object) -> bool:
+    return isinstance(value, str) and _XLSX_CELL_RE.match(value) is not None
 
 
 def _valid_line_range(start: object, end: object) -> bool:

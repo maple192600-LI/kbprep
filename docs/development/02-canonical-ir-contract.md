@@ -24,7 +24,13 @@ quote, formula, figure, metadata, and transcript cue nodes in source order.
 validated SourceSpan. The current SourceSpan artifact records converted
 Markdown line ranges for every node and transcript cue timing when raw cue
 evidence is available. SourceSpan evidence is schema-checked so arbitrary
-non-empty evidence objects cannot pass the conversion gate.
+non-empty evidence objects cannot pass the conversion gate. The SourceSpan
+schema now accepts route-native precision records only when the corresponding
+location fields are present: PDF page bounding boxes, DOCX paragraph/run
+ranges, PPTX slide shape ids, XLSX cell ranges, and future YouTube cue ids.
+When converters do not provide that native evidence, the writer keeps
+converted-line precision and the coverage report lists the missing native
+precision kinds instead of fabricating coordinates.
 The manifest also embeds `coverage.report`, which records typed-node counts,
 source-span counts, coverage ratio, span precision summaries,
 TransformationLedger availability, and remaining target gaps. The conversion
@@ -33,14 +39,14 @@ incomplete.
 When the coverage report proves complete typed-node and source-span coverage,
 the pre-clean conversion gate can evaluate text quality from typed-node text
 before falling back to converter-provided quality or rendered `converted.md`.
-Route-native fine-grained spans such as PDF bounding boxes, DOCX run ranges,
-PPTX shape ids, XLSX cells, and YouTube cue ids still depend on converters
-emitting that evidence. The TransformationLedger currently records ordered
-conversion-phase evidence for route decisions, converted Markdown, typed nodes,
-and source spans, and the pre-clean conversion gate validates it when the
-manifest claims the artifact. Relationship evidence, assets, annotations,
-route-native fine-grained spans, full route-wide gate use of IR semantics, and
-Markdown regeneration from IR plus accepted changes are still target work.
+Route-native fine-grained spans still depend on converters emitting that
+evidence before they can be considered complete for every route. The
+TransformationLedger currently records ordered conversion-phase evidence for
+route decisions, converted Markdown, typed nodes, and source spans, and the
+pre-clean conversion gate validates it when the manifest claims the artifact.
+Relationship evidence, assets, annotations, full route-wide gate use of IR
+semantics, and Markdown regeneration from IR plus accepted changes are still
+target work.
 
 ## Contract
 

@@ -28,7 +28,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
 | conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, C4 coverage-report claims, and C5 complete-IR text-quality evidence when available; full route-wide IR semantics remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, and pre-clean gate use of complete typed-node/source-span text evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence; route-native fine-grained spans, renderer regeneration, and full fact-layer usage are not shipped. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, and pre-clean gate use of complete typed-node/source-span text evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence. SourceSpan schema now validates route-native precision records when provided and reports missing native precision kinds without fabricating evidence; converter-native extraction, renderer regeneration, and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -125,10 +125,13 @@ Slices:
   when detectable.
 - **C2** Landed base SourceSpan artifact: one validated span per typed node,
   strict evidence schema validation, converted Markdown line ranges for every
-  node, and transcript timing when source cues provide it. Route-native
-  precision such as PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX
-  cells, and YouTube cue ids remains a converter-specific refinement before
-  Phase C can be considered fully implemented.
+  node, and transcript timing when source cues provide it.
+- **C2b** Landed first route-native precision guardrail: SourceSpan validation
+  now accepts PDF bbox, DOCX run-range, PPTX shape-id, XLSX cell-range, and
+  future YouTube cue-id precision only when required native fields are present.
+  Coverage reports list the missing native precision kinds instead of
+  fabricating converter evidence. Converter-native extraction remains required
+  before Phase C can be considered fully implemented.
 - **C3** Landed: `TransformationLedger` append-only record for conversion-phase Canonical IR evidence, referenced by the manifest and validated by the pre-clean conversion gate when claimed.
 - **C4** Landed: complete coverage reporting keeps `typed_nodes_available`,
   `source_spans_available`, and `transformation_ledger_available` tied to
@@ -296,9 +299,10 @@ evidence layer.
 
 Required slices:
 
-- Add route-native SourceSpan precision for PDF bounding boxes, DOCX run
+- Add converter-native SourceSpan extraction for PDF bounding boxes, DOCX run
   ranges, PPTX shape ids, XLSX cells, transcript cue ids, and future YouTube
-  cue ids when that route exists.
+  cue ids when the converter provides that evidence. The schema and coverage
+  gap tracking are in place; converters must still emit real native positions.
 - Add relationship evidence, asset registry evidence, and annotation evidence
   to Canonical IR.
 - Make conversion gates consume complete route-wide IR semantics for every
@@ -348,8 +352,8 @@ Required slices:
   rerun scopes with tests.
 
 Acceptance: `batch_playlist_rerun` moves from `partial` only when playlist and
-selective rerun are implemented or the project intentionally splits playlist
-into a separate target-only capability.
+selective rerun are implemented with evidence, or a concrete dependency blocker
+is documented without overstating completion.
 
 ### 4. Close M6 / Phase F Last
 
@@ -380,8 +384,8 @@ Required slices:
 - Implement the subtitle-first YouTube route in the same development stream as
   that technical contract, then add media-transcript fallback only when
   dependencies are present and the CLI option enables it.
-- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists if
-  in scope, and final source-side publication.
+- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists,
+  and final source-side publication.
 
 Acceptance: `youtube_url_routes` moves from `partial` to `verified` only after
 broader real-network fixtures, dependency variance, timeout behavior, media

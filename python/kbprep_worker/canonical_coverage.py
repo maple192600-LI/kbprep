@@ -16,6 +16,14 @@ _REQUIRED_GAPS = frozenset({
     "annotations",
     "ir_markdown_regeneration",
 })
+_TARGET_NATIVE_PRECISIONS = frozenset({
+    "pdf_bbox",
+    "docx_run_range",
+    "pptx_shape",
+    "xlsx_cell_range",
+    "transcript_cue_id",
+    "youtube_cue_id",
+})
 
 
 @dataclass(frozen=True)
@@ -131,17 +139,23 @@ def _transformation_ledger_section(
 
 def _target_gaps(span_section: dict[str, Any]) -> dict[str, dict[str, Any]]:
     precisions = sorted(str(key) for key in _dict_value(span_section.get("precisions")).keys())
+    missing_native = sorted(_TARGET_NATIVE_PRECISIONS.difference(precisions))
     return {
         "route_native_precision": {
-            "status": "target_work",
+            "status": _route_native_precision_status(precisions),
             "current_precisions": precisions,
-            "missing": ["pdf_boxes", "docx_runs", "pptx_shapes", "xlsx_cells", "youtube_cue_ids"],
+            "missing": missing_native,
         },
         "relationships": {"status": "target_work", "missing": ["links_between_nodes"]},
         "assets": {"status": "target_work", "missing": ["asset_records"]},
         "annotations": {"status": "target_work", "missing": ["annotation_sets"]},
         "ir_markdown_regeneration": {"status": "target_work", "missing": ["renderer_from_ir_plus_changes"]},
     }
+
+
+def _route_native_precision_status(precisions: list[str]) -> str:
+    has_native_precision = any(precision in _TARGET_NATIVE_PRECISIONS for precision in precisions)
+    return "partial" if has_native_precision else "target_work"
 
 
 def _validate_typed_nodes_report(

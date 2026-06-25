@@ -528,6 +528,301 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
 
         self.assertTrue(any("transcript timing requires transcript_cue_timing precision" in issue.message for issue in issues))
 
+    def test_validator_accepts_route_native_precision_locations(self) -> None:
+        cases = [
+            (
+                "pdf",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "page": 1,
+                    "bbox": [0.0, 0.0, 100.0, 20.0],
+                },
+                "pdf_bbox",
+            ),
+            (
+                "docx",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "paragraph_index": 0,
+                    "run_start": 0,
+                    "run_end": 2,
+                },
+                "docx_run_range",
+            ),
+            (
+                "pptx",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "slide": 1,
+                    "shape_id": "title-1",
+                },
+                "pptx_shape",
+            ),
+            (
+                "xlsx",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "sheet": "Sheet1",
+                    "start": "A1",
+                    "end": "C3",
+                },
+                "xlsx_cell_range",
+            ),
+            (
+                "transcript",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "cue_index": 1,
+                    "cue_id": "cue-1",
+                },
+                "transcript_cue_id",
+            ),
+            (
+                "youtube",
+                {
+                    "converted_line_start": 1,
+                    "converted_line_end": 1,
+                    "cue_id": "yt-cue-1",
+                },
+                "youtube_cue_id",
+            ),
+        ]
+        for source_kind, location, precision in cases:
+            with self.subTest(precision=precision):
+                with tempfile.TemporaryDirectory() as tmp:
+                    run_dir = Path(tmp)
+                    converted = run_dir / "converted.md"
+                    converted.write_text("# Native Evidence\n", encoding="utf-8")
+                    typed_nodes = write_typed_nodes_artifact(
+                        run_dir=run_dir,
+                        document_id="doc_test",
+                        converted_path=converted,
+                        source_type="generic_block",
+                    )
+                    source_spans = run_dir / "canonical_ir" / "source_spans.json"
+                    source_spans.write_text(
+                        json.dumps({
+                            "schema": CANONICAL_IR_SOURCE_SPANS_SCHEMA,
+                            "document_id": "doc_test",
+                            "source_artifact": "converted.md",
+                            "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                            "span_count": 1,
+                            "spans": [{
+                                "span_id": "s_000001",
+                                "node_id": "n_000001",
+                                "source_kind": source_kind,
+                                "location": location,
+                                "evidence": {
+                                    "source_type": "generic_block",
+                                    "converter": "test_converter",
+                                    "conversion_route": "test_route",
+                                    "source_kind": source_kind,
+                                    "precision": precision,
+                                },
+                            }],
+                        }),
+                        encoding="utf-8",
+                    )
+
+                    issues = validate_source_spans_artifact(
+                        run_dir=run_dir,
+                        source_spans_path=source_spans,
+                        typed_nodes_path=typed_nodes,
+                        document_id="doc_test",
+                        converted_path=converted,
+                    )
+
+                self.assertEqual(issues, [])
+
+    def test_route_native_precision_rejects_mixed_location_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Native Evidence\n", encoding="utf-8")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="pdf_like",
+            )
+            source_spans = run_dir / "canonical_ir" / "source_spans.json"
+            source_spans.write_text(
+                json.dumps({
+                    "schema": CANONICAL_IR_SOURCE_SPANS_SCHEMA,
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "span_count": 1,
+                    "spans": [{
+                        "span_id": "s_000001",
+                        "node_id": "n_000001",
+                        "source_kind": "pdf",
+                        "location": {
+                            "converted_line_start": 1,
+                            "converted_line_end": 1,
+                            "page": 1,
+                            "bbox": [0.0, 0.0, 100.0, 20.0],
+                            "source_line_start": 1,
+                            "source_line_end": 1,
+                        },
+                        "evidence": {
+                            "source_type": "pdf_like",
+                            "converter": "test_converter",
+                            "conversion_route": "test_route",
+                            "source_kind": "pdf",
+                            "precision": "pdf_bbox",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=source_spans,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        self.assertTrue(any("pdf_bbox precision cannot include other route location fields" in issue.message for issue in issues))
+
+    def test_youtube_cue_id_precision_requires_youtube_source_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# YouTube Cue\n", encoding="utf-8")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="youtube_transcript",
+            )
+            source_spans = run_dir / "canonical_ir" / "source_spans.json"
+            source_spans.write_text(
+                json.dumps({
+                    "schema": CANONICAL_IR_SOURCE_SPANS_SCHEMA,
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "span_count": 1,
+                    "spans": [{
+                        "span_id": "s_000001",
+                        "node_id": "n_000001",
+                        "source_kind": "transcript",
+                        "location": {
+                            "converted_line_start": 1,
+                            "converted_line_end": 1,
+                            "cue_id": "yt-cue-1",
+                        },
+                        "evidence": {
+                            "source_type": "youtube_transcript",
+                            "converter": "test_converter",
+                            "conversion_route": "youtube",
+                            "source_kind": "transcript",
+                            "precision": "youtube_cue_id",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=source_spans,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        self.assertTrue(any("youtube_cue_id precision requires youtube source_kind" in issue.message for issue in issues))
+
+    def test_pdf_bbox_precision_requires_native_pdf_location(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Native Evidence\n", encoding="utf-8")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="pdf_like",
+            )
+            source_spans = run_dir / "canonical_ir" / "source_spans.json"
+            source_spans.write_text(
+                json.dumps({
+                    "schema": CANONICAL_IR_SOURCE_SPANS_SCHEMA,
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "span_count": 1,
+                    "spans": [{
+                        "span_id": "s_000001",
+                        "node_id": "n_000001",
+                        "source_kind": "pdf",
+                        "location": {
+                            "converted_line_start": 1,
+                            "converted_line_end": 1,
+                            "page": 1,
+                        },
+                        "evidence": {
+                            "source_type": "pdf_like",
+                            "converter": "test_converter",
+                            "conversion_route": "test_route",
+                            "source_kind": "pdf",
+                            "precision": "pdf_bbox",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=source_spans,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        self.assertTrue(any("pdf_bbox precision requires page and bbox" in issue.message for issue in issues))
+
+    def test_writer_does_not_invent_pdf_bbox_without_native_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "source.pdf"
+            converted = run_dir / "converted.md"
+            source.write_bytes(b"%PDF placeholder")
+            converted.write_text("# Extracted\n", encoding="utf-8")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="pdf_like",
+            )
+
+            artifact = write_source_spans_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                input_path=source,
+                converted_path=converted,
+                typed_nodes_path=typed_nodes,
+                source_type="pdf_like",
+                converter="pdf_text_layer",
+                conversion_route="pdf_text_layer",
+            )
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["spans"][0]["source_kind"], "pdf")
+        self.assertEqual(payload["spans"][0]["evidence"]["precision"], "converted_line_range")
+        self.assertNotIn("bbox", payload["spans"][0]["location"])
+
 
 if __name__ == "__main__":
     unittest.main()

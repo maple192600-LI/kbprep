@@ -24,7 +24,7 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 ## Target Gaps
 
 - Canonical IR now emits validated typed nodes, source spans, a conversion-phase TransformationLedger, and an embedded coverage report. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete, but Canonical IR is not yet the complete internal fact layer.
-- SourceSpan variants are not yet a full contract across all source kinds; route-native precision such as PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cells, and YouTube cue ids still needs converter-specific evidence.
+- SourceSpan variants validate route-native precision records only when required native fields are present, and the coverage report lists missing native precision kinds. Converter-specific evidence for PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cell ranges, transcript cue ids without timing, and YouTube cue ids still needs to be emitted before Phase C can close.
 - Canonical IR still needs relationships, assets, annotations, full route-wide conversion-gate use of IR evidence, and Markdown regeneration from IR plus accepted changes before Phase C is complete.
 - CleaningPolicySnapshot, CleaningPatch generation, rejected patch reports, Clean View assembly, and DocumentCleaningGate are shipped for the current cleanup path; future cleanup work should focus on broader fixtures, rule quality, and preserving the Phase D contract while finishing the remaining Canonical IR and rerun gaps.
 - Optional media and YouTube routes require capability evidence before promotion.

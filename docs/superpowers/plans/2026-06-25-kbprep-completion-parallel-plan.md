@@ -43,10 +43,11 @@ Current completion state:
 
 The first version was too conservative in three places. Use this revised flow:
 
-- Do not split YouTube into a separate approval-only boundary branch. The boundary is a technical product contract inside the implementation branch: accepted URL shapes, dependency detection, network timeout, cache/artifact policy, no-subtitle fallback, error messages, quality gates, and status evidence. There is no separate non-technical approval gate in front of this route.
+- Do not split YouTube into a separate approval-only boundary branch. Per owner instruction, legal or platform compliance review is not a development gate for this plan. The remaining boundary is only the technical product contract inside the implementation branch: accepted public URL shapes, dependency detection, bounded network timeout, cache/artifact policy, no-subtitle fallback, error messages, quality gates, and status evidence. Do not add credential, cookie, login, DRM, paywall, or secret-handling behavior as part of this route.
 - Do not make all M5 rerun work wait for C3. Split M5B into command/state scaffolding that can run with C1/C2 and final Canonical-IR identity binding that waits for C3.
 - Do not make all Phase F work wait for M2 and M5. F1 local media fixtures, F2 image/legacy fixtures, and the YouTube technical-contract tests can start immediately. Only capability promotion waits for passing fixtures and final gate evidence.
 - Do not run a full reviewer loop for every small doc-only adjustment. Keep reviewer subagents for contract boundaries and merge readiness; use targeted checks during implementation and reserve `npm run dev:full-check` for merge-ready branches.
+- Do not leave playlist as a decision-only tail. For full project completion, playlist support is an implementation slice after the direct YouTube technical contract is stable; it may run in the same YouTube workstream when file ownership and tests overlap.
 
 ## Worktree Setup Pattern
 
@@ -452,7 +453,7 @@ git diff --check
 
 ## Wave 3: Batch, Playlist, And Rerun
 
-Batch selective rerun can start after M5A and M5B1 establish proposal and rerun-plan state. Playlist work is a technical scope decision: keep playlist `design_only` for this release, or include it in the YouTube implementation branch with URL parsing, network timeout, fixture, and status evidence.
+Batch selective rerun can start after M5A and M5B1 establish proposal and rerun-plan state. Playlist is in completion scope, not a decision-only placeholder. Implement it after the direct YouTube URL contract is stable, or fold it into the YouTube implementation branch when URL parsing, network timeout, fixture, and status evidence share the same files.
 
 ### Branch BATCH1: Batch Selective Rerun
 
@@ -488,9 +489,11 @@ npm run dev:check
 git diff --check
 ```
 
-### Branch PLAYLIST1: Playlist Scope Decision
+### Branch PLAYLIST1: Playlist Implementation
 
-**Branch:** `codex/playlist-scope-decision`
+**Parallel:** Can run after F3 proves direct YouTube URL handling, or in the same workstream if the same worker owns YouTube source parsing and converter routing files.
+
+**Branch:** `codex/playlist-route`
 
 **Files:**
 
@@ -498,30 +501,29 @@ git diff --check
 - Modify: `docs/development/11-multimedia-youtube-optional.md`
 - Modify: `docs/development/development-roadmap.md`
 - Modify: `docs/capability-matrix.md`
+- Modify: `python/kbprep_worker/youtube_source.py`
+- Modify: `python/kbprep_worker/converter_registry.py`
+- Modify: `python/kbprep_worker/converters/external_tools.py`
+- Modify: `python/tests/test_media_youtube_routes.py`
 
-- [ ] **Step 1: Document owner-readable decision**
+- [ ] **Step 1: Add failing playlist tests**
 
-Choose one explicit state:
+Require playlist URLs or playlist descriptors to create a bounded parent job with child YouTube video entries, per-child status, and no final parent success claim when every child fails.
 
-```text
-playlist remains design_only and outside current release
-```
+- [ ] **Step 2: Implement playlist route**
 
-or:
+Reuse the same YouTube subtitle-first child route. Keep per-video artifacts auditable and keep parent status honest: all failed means failed, mixed success means completed with warnings.
 
-```text
-playlist enters implementation scope with YouTube URL parsing, network timeout, dependency, fixture, and status evidence
-```
-
-- [ ] **Step 2: Run governance checks**
+- [ ] **Step 3: Verify**
 
 ```powershell
+node scripts/python-venv.mjs -m unittest python.tests.test_media_youtube_routes python.tests.test_batch_status_manifest -v
 npm run check:development-docs
 npm run check:flowchart
 git diff --check
 ```
 
-Expected: docs are aligned and no playlist capability is overstated.
+Expected: playlist capability is implemented or blocked by concrete dependency evidence; it is not left as an unexamined planning tail.
 
 ## Wave 4: M6 / Phase F Optional Routes
 
@@ -649,7 +651,7 @@ Merge order:
 6. M5B2 after C3.
 7. BATCH1 after M5A and M5B1, then resync after M5B2 if it shares rerun state.
 8. F1, F2, and F3 can run in parallel with M2/M5 when file ownership does not overlap.
-9. PLAYLIST1 decision, or fold playlist into F3 if it is in scope.
+9. PLAYLIST1 implementation, or fold playlist into F3 if the same worker owns YouTube source parsing and converter routing.
 
 Final release gate:
 

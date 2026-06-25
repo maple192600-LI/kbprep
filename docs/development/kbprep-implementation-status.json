@@ -55,7 +55,7 @@
       "id": "canonical_ir_contract",
       "label": "Canonical IR contract",
       "status": "partial",
-      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The manifest embeds a coverage report with typed-node counts, source-span counts, coverage ratios, precision summaries, TransformationLedger status, and remaining target gaps. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete. Full route-native span precision, relationship evidence, assets, annotations, Markdown regeneration, and universal fact-layer usage are not shipped.",
+      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The SourceSpan schema validates route-native precision records when converters provide required native fields, including PDF bbox, DOCX run range, PPTX shape id, XLSX cell range, transcript cue id, and YouTube cue id precision. Coverage reports list missing native precision kinds instead of fabricating converter evidence. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete. Converter-native extraction, relationship evidence, assets, annotations, Markdown regeneration, and universal fact-layer usage are not shipped.",
       "evidence": [
         "docs/development/02-canonical-ir-contract.md",
         "python/kbprep_worker/canonical_gate_evidence.py",
@@ -66,6 +66,7 @@
         "python/kbprep_worker/canonical_ir.py",
         "python/tests/test_canonical_ir_ledger.py",
         "python/tests/test_canonical_ir_manifest.py",
+        "python/tests/test_canonical_ir_coverage.py",
         "python/tests/test_canonical_ir_source_spans.py",
         "python/tests/test_canonical_ir_schema.py",
         "python/tests/test_canonical_ir_typed_nodes.py"
