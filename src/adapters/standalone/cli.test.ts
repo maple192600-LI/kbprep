@@ -223,6 +223,40 @@ describe("standalone KBPrep CLI adapter", () => {
     }
   });
 
+  it("maps accepted YouTube URL shapes to stable local descriptors", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-youtube-shapes-"));
+    const cases = [
+      ["https://www.youtube.com/watch?v=ExampleVideo01&t=30s", "ExampleVideo01"],
+      ["https://youtu.be/ExampleVideo02?si=share", "ExampleVideo02"],
+      ["https://www.youtube.com/shorts/ExampleVideo03?feature=share", "ExampleVideo03"],
+      ["https://www.youtube.com/embed/ExampleVideo04?start=12", "ExampleVideo04"],
+      ["https://m.youtube.com/watch?v=ExampleVideo05", "ExampleVideo05"],
+    ];
+    try {
+      for (const [url, videoId] of cases) {
+        const parsed = parseStandaloneArgs(["--input", url, "--output", root]);
+        const plan = buildCliPlan("prepare", parsed.options);
+
+        expect(plan.input.source_url).toBe(url);
+        expect(plan.input.input_path).toContain(join(".kbprep-inputs", "youtube", `${videoId}.url`));
+        expect(readFileSync(plan.input.input_path as string, "utf-8")).toContain(`URL=${url}`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects undocumented YouTube URL shapes as local inputs", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-youtube-unsupported-"));
+    try {
+      const parsed = parseStandaloneArgs(["--input", "https://www.youtube.com/live/ExampleVideo06?v=ExampleVideo06", "--output", root]);
+
+      expect(() => buildCliPlan("prepare", parsed.options)).toThrow("--input must be a file");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("maps explicit YouTube video ids and fallback to the worker command", () => {
     const root = mkdtempSync(join(tmpdir(), "kbprep-cli-youtube-id-"));
     try {

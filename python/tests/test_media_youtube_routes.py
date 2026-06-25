@@ -17,9 +17,48 @@ from kbprep_worker.converters.external_tools import (
 from kbprep_worker.envelope import EnvelopeExit
 from kbprep_worker.stages import external_conversion
 from kbprep_worker.stages.pipeline import run as run_prepare
+from kbprep_worker.youtube_source import is_youtube_url, youtube_url_from_source, youtube_video_id
 
 
 class TestMediaYoutubeRoute(unittest.TestCase):
+    def test_youtube_source_accepts_documented_url_shapes(self) -> None:
+        cases = [
+            ("https://www.youtube.com/watch?v=ExampleVideo01&t=30s", "ExampleVideo01"),
+            ("https://youtu.be/ExampleVideo02?si=share", "ExampleVideo02"),
+            ("https://www.youtube.com/shorts/ExampleVideo03?feature=share", "ExampleVideo03"),
+            ("https://www.youtube.com/embed/ExampleVideo04?start=12", "ExampleVideo04"),
+            ("https://m.youtube.com/watch?v=ExampleVideo05", "ExampleVideo05"),
+        ]
+        for url, video_id in cases:
+            with self.subTest(url=url):
+                self.assertTrue(is_youtube_url(url))
+                self.assertEqual(youtube_video_id(url), video_id)
+
+    def test_youtube_source_rejects_undocumented_youtube_url_shapes(self) -> None:
+        url = "https://www.youtube.com/live/ExampleVideo06?v=ExampleVideo06"
+        self.assertFalse(is_youtube_url(url))
+        self.assertEqual(youtube_video_id(url), "")
+
+    def test_youtube_source_reads_source_url_and_descriptor_shapes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            descriptor = root / "lesson.url"
+            unsupported_url = "https://www.youtube.com/live/ExampleVideo06?v=ExampleVideo06"
+            descriptor.write_text(
+                "[InternetShortcut]\nURL=https://www.youtube.com/shorts/ExampleVideo03?feature=share\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                youtube_url_from_source(root / "ignored.md", {"source_url": "https://youtu.be/ExampleVideo02?si=share"}),
+                "https://youtu.be/ExampleVideo02?si=share",
+            )
+            self.assertEqual(
+                youtube_url_from_source(descriptor),
+                "https://www.youtube.com/shorts/ExampleVideo03?feature=share",
+            )
+            self.assertEqual(youtube_url_from_source(root / "ignored.md", {"source_url": unsupported_url}), "")
+
     def test_local_media_fixture_transcribes_with_command_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

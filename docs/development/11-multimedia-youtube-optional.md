@@ -14,10 +14,12 @@ This stage supports source inspection, route selection, dependency failure repor
 - Media sources must become transcript evidence before classification.
 - YouTube uses available subtitles before media transcript extraction.
 - YouTube support enters through direct URLs, explicit video ids, local `.url` descriptor
-  files, or explicit source identity metadata.
+  files, or explicit source identity metadata. The accepted public URL shapes
+  are `youtube.com/watch?v=...`, `m.youtube.com/watch?v=...`, `youtu.be/...`,
+  `youtube.com/shorts/...`, and `youtube.com/embed/...`.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
-- The YouTube boundary is a technical product contract: accepted public URL shapes, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence. Per owner instruction, legal or platform compliance review is not a development gate for this route. Do not add credential, cookie, login, DRM, paywall, or secret-handling behavior as part of YouTube support.
+- The YouTube boundary is a technical product contract: accepted public URL shapes, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence. Do not add credential, cookie, login, DRM, paywall, or secret-handling behavior as part of YouTube support.
 
 ## Acceptance
 
