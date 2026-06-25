@@ -15,8 +15,9 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - At least one successful child can produce `completed_with_warnings`.
 - All children failed means parent `failed`.
 - Rerun uses existing run metadata only when the source can be safely located.
-- Current public selective rerun execution is single-source feedback rerun only; batch selective rerun and playlist rerun are not shipped.
-- `batch_manifest.json` records parent status, per-file status, skipped unsupported files, artifact paths, and rerun scope.
+- Current public selective rerun execution includes single-source feedback rerun and batch failed/pending rerun from `batch_manifest.json`; playlist rerun is not shipped.
+- `batch_manifest.json` records parent status, per-file status, skipped unsupported files, source hashes, artifact paths, command defaults, and rerun scope.
+- Batch rerun writes `batch_rerun_manifest.json` with selected children, successes, failures, skipped unsupported visibility, and source-manifest evidence.
 - Playlist input expands into bounded child jobs that reuse the YouTube subtitle-first route and keep per-video status visible.
 
 ## Acceptance
@@ -24,7 +25,9 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - Batch failure does not hide successful child deliverables.
 - Child jobs publish source-side results independently.
 - Rerun reports unavailable metadata instead of pretending evidence exists.
-- Single-source feedback rerun can execute one evidence-backed `rules_only` rerun; batch rerun still requires parent-manifest execution evidence.
+- Single-source feedback rerun can execute one evidence-backed `rules_only` rerun.
+- Batch rerun can execute `failed_only`, `pending_only`, `failed_and_pending`, or recommended parent-manifest scope without rerunning unrelated successful children. Policy-affected and Canonical IR id-level batch targeting are separate later work.
+- Batch rerun refuses missing or changed source files and records the failure in `batch_rerun_manifest.json` instead of claiming success.
 - Batch status manifest exists for successful, partially successful, and sample-failed runs.
 - Playlist status records every child video, preserves successful child deliverables, and reports mixed success as completed with warnings.
 

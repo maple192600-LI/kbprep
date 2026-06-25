@@ -325,6 +325,79 @@ describe("standalone KBPrep CLI adapter", () => {
     expect(plan.input.profile).toBe("standard");
   });
 
+  it("maps batch rerun options to the Python prepare_batch worker command", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs([
+        "--rerun",
+        "--batch-manifest",
+        manifest,
+        "--rerun-scope",
+        "failed-and-pending",
+        "--force",
+      ]);
+      const plan = buildCliPlan("prepare_batch", parsed.options);
+
+      expect(plan.command).toBe("prepare_batch");
+      expect(plan.input.rerun).toBe(true);
+      expect(plan.input.batch_manifest_path).toBe(manifest);
+      expect(plan.input.rerun_scope).toBe("failed_and_pending");
+      expect(plan.input.force).toBe(true);
+      expect(plan.input.input_dir).toBeUndefined();
+      expect(plan.input.output_root).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not override batch rerun manifest force defaults unless force is passed", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-force-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs(["--rerun", "--batch-manifest", manifest]);
+      const plan = buildCliPlan("prepare_batch", parsed.options);
+
+      expect(plan.input.force).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects batch rerun when the manifest file is missing", () => {
+    const parsed = parseStandaloneArgs(["--rerun", "--batch-manifest", ".kbprep/missing-batch-manifest.json"]);
+
+    expect(() => buildCliPlan("prepare_batch", parsed.options)).toThrow("--batch-manifest must be a file");
+  });
+
+  it("rejects invalid batch rerun scope values", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-scope-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs(["--rerun", "--batch-manifest", manifest, "--rerun-scope", "all"]);
+
+      expect(() => buildCliPlan("prepare_batch", parsed.options)).toThrow("--rerun-scope must be");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not expose internal affected batch rerun scope as a public CLI option", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-affected-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs(["--rerun", "--batch-manifest", manifest, "--rerun-scope", "affected"]);
+
+      expect(() => buildCliPlan("prepare_batch", parsed.options)).toThrow("--rerun-scope must be");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("maps feedback options to a proposal-only Python worker command", () => {
     const parsed = parseStandaloneArgs([
       "--run-dir",

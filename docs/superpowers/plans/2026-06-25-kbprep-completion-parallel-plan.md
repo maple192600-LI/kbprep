@@ -469,6 +469,7 @@ Batch selective rerun can start immediately because it uses the parent batch man
 
 - Modify: `python/kbprep_worker/batch_manifest.py`
 - Modify: `python/kbprep_worker/prepare_batch.py`
+- Create: `python/kbprep_worker/prepare_batch_rerun.py`
 - Modify: `python/tests/test_batch_status_manifest.py`
 - Modify: `src/test/scenarios/worker-batch-long-docs-part1.test.ts`
 - Modify: `src/test/scenarios/worker-batch-long-docs-part2.test.ts`
@@ -478,11 +479,11 @@ Batch selective rerun can start immediately because it uses the parent batch man
 
 - [ ] **Step 1: Add failing tests**
 
-Require batch rerun scope to select failed, warning, skipped, or policy-affected children without rerunning unrelated successful children.
+Require batch rerun scope to select failed or pending children without rerunning unrelated successful children. Require source hashes in the parent manifest and require rerun to refuse missing or changed source files.
 
 - [ ] **Step 2: Implement rerun scope**
 
-Use `batch_manifest.json`, child run metadata, policy snapshot hash, and source hash. Do not rely on filename-only matching.
+Use `batch_manifest.json`, child run metadata, command defaults, and source hash. Do not rely on filename-only matching.
 
 - [ ] **Step 3: Verify branch**
 
@@ -491,6 +492,39 @@ Run:
 ```powershell
 npm test -- src/test/scenarios/worker-batch-long-docs-part1.test.ts src/test/scenarios/worker-batch-long-docs-part2.test.ts
 node scripts/python-venv.mjs -m unittest python.tests.test_batch_status_manifest -v
+npm run dev:check
+git diff --check
+```
+
+### Branch BATCH2: Policy-Affected Batch Targeting
+
+**Parallel:** Starts after M5B2 and the stable Canonical IR identity binding are merged.
+
+**Branch:** `codex/batch-policy-affected-rerun`
+
+**Files:**
+
+- Modify: `python/kbprep_worker/prepare_batch_rerun.py`
+- Modify: `python/kbprep_worker/feedback/rerun_verification.py`
+- Modify: `python/tests/test_batch_status_manifest.py`
+- Modify: `python/tests/test_feedback.py`
+- Modify: `docs/development/10-batch-playlist-rerun.md`
+- Modify: `docs/development/kbprep-implementation-status.json`
+
+- [ ] **Step 1: Add failing policy-affected tests**
+
+Require accepted-rule or policy snapshot changes to select only children whose run evidence matches the affected policy/source identity.
+
+- [ ] **Step 2: Implement policy/CIR binding**
+
+Use M5B2 evidence binding and Canonical IR ids when available. Keep failed/pending parent-manifest rerun working for older manifests.
+
+- [ ] **Step 3: Verify branch**
+
+Run:
+
+```powershell
+node scripts/python-venv.mjs -m unittest python.tests.test_batch_status_manifest python.tests.test_feedback -v
 npm run dev:check
 git diff --check
 ```
@@ -653,8 +687,9 @@ Merge order:
 2. C1, C2, M5A, M5B1, BATCH1, F1, F2, and F3 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
 3. C3 after C1 and C2.
 4. M5B2 after C3.
-5. PLAYLIST1 implementation, or fold playlist into F3 if the same worker owns YouTube source parsing and converter routing.
-6. Capability-status promotion branches after their implementation evidence exists.
+5. BATCH2 after M5B2 when policy-affected batch targeting needs Canonical IR identity.
+6. PLAYLIST1 implementation, or fold playlist into F3 if the same worker owns YouTube source parsing and converter routing.
+7. Capability-status promotion branches after their implementation evidence exists.
 
 Final release gate:
 

@@ -57,10 +57,11 @@ kbprep-feedback --suggest-dictionary-updates
 kbprep-feedback --promote-dictionary-suggestion --document-type course --confirm-dictionary-update
 kbprep-cleanup --output ./.kbprep/source --action finalize
 kbprep-batch --input ./sources --output ./.kbprep/batch --mode rules_only
+kbprep-batch --rerun --batch-manifest ./.kbprep/batch/batch_manifest.json --rerun-scope failed_and_pending
 ```
 
 Every command supports `--help`.
-Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, and the evidence-backed rerun scope. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
+Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, source hashes, command defaults, and the evidence-backed rerun scope. Use `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` to rerun failed or pending children without rerunning unrelated successful children. Rerun uses the original command defaults from the manifest unless explicit CLI overrides are passed; `--force` is available when you want to force child reruns. Rerun writes `batch_rerun_manifest.json` and refuses missing or changed source files instead of claiming success. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
 
 ## PDF Routing
 
@@ -101,7 +102,7 @@ Use `kbprep-feedback --plan-rerun` when you want selective rerun evidence before
 
 Use `kbprep-feedback --execute-rerun` with the same selectors when you want KBPrep to execute one evidence-backed `rules_only` rerun and return `rerun_verification`. Execution keeps the original plan in the response, adds command evidence with `actually_executed=true` when the worker process starts, and reports the rerun status, output paths, strict errors, and worker error evidence. If metadata is missing or promotion history is blocked, the result stays `status: blocked`, writes `rerun_history.jsonl`, and does not claim execution success.
 
-`canonical_ir_binding.status` is intentionally `pending` until the Canonical IR C3 binding is implemented. The current public selective rerun selectors are run directory, accepted proposal, and document type promotion history; Canonical IR id-level targeting, batch selective rerun, and playlist rerun remain outside the shipped claim.
+`canonical_ir_binding.status` is intentionally `pending` until the Canonical IR C3 binding is implemented. The current public feedback rerun selectors are run directory, accepted proposal, and document type promotion history. Batch selective rerun is handled by `kbprep-batch --rerun` from `batch_manifest.json`. Canonical IR id-level targeting and playlist rerun remain outside the shipped claim.
 
 Dictionary promotion writes to `.kbprep/rules/document_types/` by default. Later `kbprep-prepare` runs automatically load the matching private document-type dictionary for the current project and record its path/hash in the cleaning policy snapshot without copying private rule contents. Passing `--target-rules-dir rules` points at packaged public rules and also requires `--confirm-public-write`; use that only for generic, sanitized rules that are safe to version. Promotion history stays under private `.kbprep/rules/`, including later promotion-history summary and resolution commands for that public target.
 

@@ -34,7 +34,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
 | feedback_rule_learning | partial | Proposal-first model and public single-source selective rerun execution exist; Canonical IR id-level targeting remains pending. |
-| batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and batch selective rerun need more evidence. |
+| batch_playlist_rerun | partial | Batch + parent status manifest and failed/pending batch rerun exist; playlist support still needs implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
 | youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
@@ -368,7 +368,8 @@ executable, inspectable, and recoverable.
 Required slices:
 
 - Add executable selective batch rerun using the parent status manifest and
-  child run evidence.
+  child run evidence. Landed slice: failed/pending parent-manifest rerun,
+  source hash verification, command defaults, and `batch_rerun_manifest.json`.
 - Keep unsupported files visible as skipped, not silent failures.
 - Prove partial batch success, completed-with-warnings, failed children, and
   rerun scopes with tests.

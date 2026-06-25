@@ -211,6 +211,7 @@ def _scan_input_files(input_p: Path) -> tuple[list[Path], dict]:
         }
         if ext in SUPPORTED_EXTENSIONS:
             entry["action"] = "process"
+            entry["source_sha256"] = _file_sha256(file_path)
             files.append(file_path)
         else:
             entry["action"] = "skip"
@@ -254,7 +255,20 @@ def _is_heavy_conversion_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in HEAVY_CONVERSION_EXTENSIONS
 
 
+def _file_sha256(file_path: Path) -> str:
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def run(data: dict) -> None:
+    if data.get("rerun") is True:
+        from .prepare_batch_rerun import run_batch_rerun
+
+        run_batch_rerun(data)
+        return
     config = _batch_config(data)
     input_p, output_p = _batch_paths_or_fail(config)
     files, inventory = _scan_input_files(input_p)
@@ -285,7 +299,7 @@ def run(data: dict) -> None:
     max_workers = _process_light_batch_files(config, light_remaining, output_p, _record_context(
         files, inventory, relative_paths, heavy_files, light_remaining, started_at, results, failures, counters,
     ))
-    manifest_path = _write_batch_complete(output_p, input_p, files, inventory, started_at, results, failures, counters)
+    manifest_path = _write_batch_complete(config, output_p, input_p, files, inventory, started_at, results, failures, counters)
     _emit_batch_result(
         output_p, files, inventory, inventory_path, manifest_path, results, failures, counters, heavy_files, max_workers,
     )
@@ -304,6 +318,18 @@ def _batch_config(data: dict) -> BatchConfig:
         min_free_gb=float(data.get("min_free_memory_gb", DEFAULT_MIN_FREE_GB)),
         convert_jobs=int(data.get("convert_jobs", 1)),
     )
+
+
+def _batch_command_defaults(config: BatchConfig) -> dict:
+    return {
+        "profile": config.profile,
+        "mode": config.mode,
+        "language": config.language,
+        "force": config.force,
+        "artifact_policy": config.artifact_policy,
+        "max_quality_iterations": config.max_quality_iterations,
+        "convert_jobs": config.convert_jobs,
+    }
 
 
 def _batch_paths_or_fail(config: BatchConfig) -> tuple[Path, Path]:
@@ -364,6 +390,7 @@ def _process_batch_sample(
     results.append(sample_entry)
     if not sample_result.get("ok") or sample_result.get("data", {}).get("strict_errors"):
         _stop_after_failed_sample(
+            config,
             output_p,
             input_p,
             files,
@@ -397,6 +424,7 @@ def _write_sample_progress(
 
 
 def _stop_after_failed_sample(
+    config: BatchConfig,
     output_p: Path,
     input_p: Path,
     files: list[Path],
@@ -430,6 +458,7 @@ def _stop_after_failed_sample(
         started_at=started_at,
         stage="stopped_after_sample",
         finished_at=time.time(),
+        command_defaults=_batch_command_defaults(config),
     )
     fail(
         "E_QA_FAILED",
@@ -564,6 +593,7 @@ def _write_batch_progress(output_p: Path, config: BatchConfig, context: dict) ->
 
 
 def _write_batch_complete(
+    config: BatchConfig,
     output_p: Path,
     input_p: Path,
     files: list[Path],
@@ -598,6 +628,7 @@ def _write_batch_complete(
         started_at=started_at,
         stage="complete",
         finished_at=finished_at,
+        command_defaults=_batch_command_defaults(config),
     )
 
 

@@ -76,7 +76,7 @@ It should identify:
 - quality tasks
 - whether publication was blocked
 
-`batch_manifest.json` is the batch parent status summary for multi-file runs. It identifies parent status, per-file status, skipped unsupported files, artifact paths, and rerun scope.
+`batch_manifest.json` is the batch parent status summary for multi-file runs. It identifies parent status, per-file status, skipped unsupported files, source hashes, artifact paths, command defaults, and rerun scope. `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` writes `batch_rerun_manifest.json` for failed/pending reruns and records missing or changed source files as failures instead of claiming success.
 
 Run artifacts should also preserve conversion reports, discarded content, rejected patches, review-needed material, and publish reports when those artifacts exist for the profile.
 `canonical_ir/manifest.json` includes a coverage report for the current

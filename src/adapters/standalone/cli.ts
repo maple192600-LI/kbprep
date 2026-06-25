@@ -67,8 +67,9 @@ const HELP: Record<StandaloneCommand, string> = {
   ].join("\n"),
   prepare_batch: [
     "Usage: kbprep-batch --input <dir> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--max-quality-iterations <n>] [--convert-jobs <n>] [--config-file <file>]",
+    "       kbprep-batch --rerun --batch-manifest <batch_manifest.json> [--rerun-scope failed_only|pending_only|failed_and_pending|recommended] [--force] [--config-file <file>]",
     "",
-    "Processes a directory through the same agent-independent Python worker used by all callers.",
+    "Processes a directory through the same agent-independent Python worker used by all callers. Rerun mode reprocesses only failed or pending children named by an existing batch manifest.",
   ].join("\n"),
 };
 
@@ -218,6 +219,24 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
         timeoutMs: 120_000,
       };
     case "prepare_batch": {
+      if (readBoolean(options, "rerun", false)) {
+        return {
+          command,
+          input: {
+            rerun: true,
+            batch_manifest_path: requireFilePath(options, "batch_manifest"),
+            rerun_scope: readBatchRerunScope(options),
+            force: readOptionalBoolean(options, "force"),
+            profile: readString(options, "profile"),
+            mode: readString(options, "mode"),
+            artifact_policy: readString(options, "artifact_policy"),
+            language: readString(options, "language"),
+            convert_jobs: readNumber(options, "convert_jobs", undefined),
+            max_quality_iterations: readNumber(options, "max_quality_iterations", undefined),
+          },
+          timeoutMs: 10_800_000,
+        };
+      }
       const outputRoot = requireOutputDir(options, "output");
       mkdirSync(outputRoot, { recursive: true });
       return {
@@ -372,6 +391,18 @@ function requirePath(options: Record<string, string | boolean>, key: string): st
   return resolveBoundedPath(value, key);
 }
 
+function requireFilePath(options: Record<string, string | boolean>, key: string): string {
+  const filePath = requirePath(options, key);
+  let stats;
+  try {
+    stats = statSync(filePath);
+  } catch {
+    throw new Error(`--${key.replace(/_/g, "-")} must be a file: ${filePath}`);
+  }
+  if (!stats.isFile()) throw new Error(`--${key.replace(/_/g, "-")} must be a file: ${filePath}`);
+  return filePath;
+}
+
 function requireInputFile(options: Record<string, string | boolean>, key: string): string {
   const value = readString(options, key);
   if (!value) throw new Error(`--${key.replace(/_/g, "-")} is required.`);
@@ -510,6 +541,21 @@ function readBoolean(options: Record<string, string | boolean>, key: string, fal
     throw new Error(`--${key.replace(/_/g, "-")} must be true or false.`);
   }
   return fallback;
+}
+
+function readOptionalBoolean(options: Record<string, string | boolean>, key: string): boolean | undefined {
+  if (!(key in options)) return undefined;
+  return readBoolean(options, key, false);
+}
+
+function readBatchRerunScope(options: Record<string, string | boolean>): string {
+  const raw = readString(options, "rerun_scope") ?? "recommended";
+  const normalized = raw.replace(/-/g, "_");
+  const allowed = new Set(["recommended", "failed_only", "pending_only", "failed_and_pending"]);
+  if (!allowed.has(normalized)) {
+    throw new Error("--rerun-scope must be recommended, failed_only, pending_only, or failed_and_pending.");
+  }
+  return normalized;
 }
 
 function normalizeYouTubeInput(value: string): string | undefined {

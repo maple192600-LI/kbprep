@@ -22,9 +22,13 @@ def write_batch_manifest(
     started_at: float,
     stage: str,
     finished_at: float | None = None,
+    command_defaults: dict[str, Any] | None = None,
 ) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
     items = _manifest_items(inventory, results, failures)
+    rerun = _rerun_scope(items)
+    if command_defaults:
+        rerun["command_defaults"] = _command_defaults(command_defaults)
     payload = {
         "schema": BATCH_MANIFEST_SCHEMA,
         "status": _parent_status(items),
@@ -33,7 +37,7 @@ def write_batch_manifest(
         "output_root": str(output_root),
         "summary": _summary(inventory, results, counters, items),
         "items": items,
-        "rerun": _rerun_scope(items),
+        "rerun": rerun,
         "artifacts": _artifacts(output_root),
         "started_at": started_at,
         "updated_at": finished_at or time.time(),
@@ -42,6 +46,19 @@ def write_batch_manifest(
     path = output_root / "batch_manifest.json"
     atomic_write_json(path, payload, indent=2, trailing_newline=False)
     return path
+
+
+def _command_defaults(command_defaults: dict[str, Any]) -> dict[str, Any]:
+    allowed = {
+        "profile",
+        "mode",
+        "language",
+        "force",
+        "artifact_policy",
+        "max_quality_iterations",
+        "convert_jobs",
+    }
+    return {key: command_defaults[key] for key in allowed if key in command_defaults}
 
 
 def _manifest_items(
@@ -100,6 +117,7 @@ def _pending_item(entry: dict[str, Any], relative_path: str) -> dict[str, Any]:
     return {
         "relative_path": relative_path,
         "file": entry.get("file"),
+        **_source_evidence(entry),
         "status": "pending",
         "reason": "blocked_before_processing",
         "rerunnable": True,
@@ -111,6 +129,7 @@ def _succeeded_item(entry: dict[str, Any], relative_path: str, result: dict[str,
     return {
         "relative_path": relative_path,
         "file": entry.get("file"),
+        **_source_evidence(entry),
         "status": status,
         "run_id": result.get("run_id"),
         "output_root": result.get("output_root"),
@@ -123,12 +142,22 @@ def _failed_item(entry: dict[str, Any], relative_path: str, failure: dict[str, A
     return {
         "relative_path": relative_path,
         "file": entry.get("file"),
+        **_source_evidence(entry),
         "status": "failed",
         "output_root": failure.get("output_root"),
         "failure_code": error.get("code") or "unknown",
         "failure_stage": _failure_stage(error),
         "rerunnable": True,
     }
+
+
+def _source_evidence(entry: dict[str, Any]) -> dict[str, Any]:
+    evidence: dict[str, Any] = {}
+    if entry.get("source_sha256"):
+        evidence["source_sha256"] = entry.get("source_sha256")
+    if entry.get("size_bytes") is not None:
+        evidence["size_bytes"] = entry.get("size_bytes")
+    return evidence
 
 
 def _failure_stage(error: dict[str, Any]) -> str:
