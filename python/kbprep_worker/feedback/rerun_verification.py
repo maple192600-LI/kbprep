@@ -309,6 +309,7 @@ def _run_evidence_from_metadata(run_dir: Path, metadata: dict, quality: dict) ->
             or _optional_string(quality.get("cleaning_policy_snapshot_hash"))
             or ""
         ),
+        "prepare_payload": payload,
     }
 
 
@@ -360,15 +361,36 @@ def _planned_selective_rerun(plan_source: str, run_dir: Path, evidence: dict) ->
 
 
 def _selective_prepare_payload(evidence: dict) -> dict:
+    raw_payload = evidence.get("prepare_payload")
+    original = raw_payload if isinstance(raw_payload, dict) else {}
+    payload = _safe_prepare_payload(original)
+    payload["input_path"] = evidence["input_path"]
+    payload["output_root"] = evidence["output_root"]
+    payload["profile"] = evidence["profile"]
+    payload["mode"] = "rules_only"
+    payload["force"] = True
+    payload.setdefault("language", "auto")
+    payload.setdefault("source_type", "auto")
+    payload.setdefault("splitter", "auto")
+    return payload
+
+
+def _safe_prepare_payload(payload: dict) -> dict:
+    allowed_keys = {
+        "artifact_policy",
+        "language",
+        "source_type",
+        "source_url",
+        "source_domain",
+        "site_name",
+        "allow_youtube_media_fallback",
+        "splitter",
+        "max_quality_iterations",
+    }
     return {
-        "input_path": evidence["input_path"],
-        "output_root": evidence["output_root"],
-        "profile": evidence["profile"],
-        "mode": "rules_only",
-        "language": "auto",
-        "source_type": "auto",
-        "splitter": "auto",
-        "force": True,
+        str(key): value
+        for key, value in payload.items()
+        if key in allowed_keys and value is not None
     }
 
 
@@ -535,16 +557,16 @@ def _rerun_after_accept(accepted: dict, rules_dir: Path, data: dict) -> dict:
 
 
 def _rules_only_payload(rerun_plan: dict) -> dict:
-    return {
-        "input_path": rerun_plan["input_path"],
-        "output_root": rerun_plan["output_root"],
-        "profile": rerun_plan.get("profile") or "standard",
-        "mode": "rules_only",
-        "language": "auto",
-        "source_type": "auto",
-        "splitter": "auto",
-        "force": True,
-    }
+    payload = _safe_prepare_payload(rerun_plan)
+    payload["input_path"] = rerun_plan["input_path"]
+    payload["output_root"] = rerun_plan["output_root"]
+    payload["profile"] = rerun_plan.get("profile") or "standard"
+    payload["mode"] = "rules_only"
+    payload["force"] = True
+    payload.setdefault("language", "auto")
+    payload.setdefault("source_type", "auto")
+    payload.setdefault("splitter", "auto")
+    return payload
 
 
 def _rules_root_env(target_rules_dir: Path) -> dict:

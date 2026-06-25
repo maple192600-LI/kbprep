@@ -33,8 +33,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
-| feedback_rule_learning | partial | Proposal-first model exists; selective rerun evidence partial. |
-| batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
+| feedback_rule_learning | partial | Proposal-first model and public single-source selective rerun execution exist; Canonical IR id-level targeting remains pending. |
+| batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and batch selective rerun need more evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
 | youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
@@ -324,7 +324,9 @@ Required slices:
 
 - Complete rerun scope selection from source evidence, Canonical IR ids,
   document type, and policy snapshot identity.
-- Add executable selective rerun commands for accepted feedback proposals.
+- Extend public selective rerun beyond the current run directory,
+  accepted-proposal, and document-type promotion-history selectors to
+  Canonical IR id-level targeting when C3 binding exists.
 - Preserve failed-promotion history and counterexamples when rerun evidence is
   weak or negative.
 - Prove accepted rules do not silently become broad permanent deletion rules.
@@ -332,8 +334,8 @@ Required slices:
   rerun, and failed-promotion states.
 
 Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
-acceptance, rerun, rejection, and failed-promotion paths have named tests and
-manual operator guidance.
+acceptance, rerun, rejection, and failed-promotion paths have named tests,
+manual operator guidance, and no remaining Canonical IR id-level selector gap.
 
 ### 3. Close Batch / Playlist Rerun Gaps
 

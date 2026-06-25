@@ -139,6 +139,41 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
     }
   }, 30_000);
 
+  it("can execute a selective rerun from run metadata and report verification evidence", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-feedback-rerun-execute-"));
+    try {
+      const inputPath = path.join(root, "source.md");
+      const outputRoot = path.join(root, "output");
+      writeFileSync(inputPath, "# Note\n\n正文段落。\n", "utf8");
+
+      const prepared = runWorker("prepare", {
+        input_path: inputPath,
+        output_root: outputRoot,
+        profile: "standard",
+        mode: "rules_only",
+        language: "zh",
+        force: true,
+      });
+      expect(prepared.ok).toBe(true);
+
+      const executed = runWorker("feedback", {
+        execute_rerun: true,
+        run_dir: prepared.data.run_dir,
+      });
+
+      expect(executed.ok).toBe(true);
+      expect(executed.data.rerun_verification.status).toBe("passed");
+      expect(executed.data.rerun_verification.ok).toBe(true);
+      expect(executed.data.rerun_verification.plan.run_id).toBe(prepared.data.run_id);
+      expect(executed.data.rerun_verification.plan.command_evidence.would_execute).toBe(false);
+      expect(executed.data.rerun_verification.command_evidence.actually_executed).toBe(true);
+      expect(executed.data.rerun_verification.command_evidence.payload.mode).toBe("rules_only");
+      expect(existsSync(executed.data.rerun_verification.cleaned_md)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("defaults feedback proposals to the current project .kbprep rules directory", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-project-feedback-default-"));
     try {
