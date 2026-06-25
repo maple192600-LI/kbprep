@@ -25,7 +25,11 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 
 - Canonical IR now emits validated typed nodes, source spans, a conversion-phase TransformationLedger, and an embedded coverage report. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete, but Canonical IR is not yet the complete internal fact layer.
 - SourceSpan variants validate route-native precision records only when required native fields are present, and the coverage report lists missing native precision kinds. Converter-specific evidence for PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cell ranges, transcript cue ids without timing, and YouTube cue ids still needs to be emitted before Phase C can close.
-- Canonical IR still needs relationships, assets, annotations, full route-wide conversion-gate use of IR evidence, and Markdown regeneration from IR plus accepted changes before Phase C is complete.
+- Canonical IR still needs full route-wide relationship, asset, annotation,
+  conversion-gate, renderer/profile, and universal fact-layer coverage before
+  Phase C is complete. A minimal standard Markdown path can regenerate
+  `cleaned.md` from Canonical IR typed-node text plus Clean View accepted
+  change identity, but that is not full Phase C closure.
 - CleaningPolicySnapshot, CleaningPatch generation, rejected patch reports, Clean View assembly, and DocumentCleaningGate are shipped for the current cleanup path; future cleanup work should focus on broader fixtures, rule quality, and preserving the Phase D contract while finishing the remaining Canonical IR and rerun gaps.
 - Optional media and YouTube routes require capability evidence before promotion.
 - PDF routing now executes the target three-tier design and records route evidence in `pdf_route_diagnostics` and `conversion_report.json.route_decision`; the capability is verified by public route-shape tests, gray-zone threshold regression tests, generated-PDF route tests, and real Vault smoke distribution evidence.

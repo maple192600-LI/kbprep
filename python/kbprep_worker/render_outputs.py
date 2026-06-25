@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from .atomic_io import atomic_write_json, atomic_write_text
+from .ir_markdown_regeneration import regenerate_blocks_from_ir
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,10 @@ def render(
     """
     run_p = Path(run_dir)
     render_blocks = _blocks_from_clean_view(blocks, clean_view)
+    if profile == "standard":
+        ir_blocks = regenerate_blocks_from_ir(run_dir=run_p, blocks=render_blocks, clean_view=clean_view)
+        if ir_blocks is not None:
+            render_blocks = ir_blocks
 
     keep_blocks = [b for b in render_blocks if b.get("status") == "keep"]
     discard_blocks = [b for b in render_blocks if b.get("status") == "discard"]

@@ -53,8 +53,18 @@ content-safe coverage warnings. The coverage report now marks these three gap
 areas as `partial` only when the corresponding artifact has records; empty or
 missing artifacts remain `target_work`. Full route-wide gate use of IR
 semantics, complete route-native relationship and asset semantics, richer
-quality annotations, and Markdown regeneration from IR plus accepted changes
-are still target work.
+quality annotations, and full Markdown regeneration coverage are still target
+work.
+
+The standard Markdown render path now has a minimal IR regeneration slice:
+when a valid `clean_view.json` and `canonical_ir/typed_nodes.json` are present,
+`cleaned.md` defaults to Canonical IR node text in Clean View order, while
+entries carrying accepted patch identity render from the accepted in-memory
+cleanup block content. `cleaning_patches.jsonl` remains content-safe and does
+not copy source text, cleaned text, or private rule bodies. This is not the
+complete Canonical IR contract: converter-native extraction, route-wide
+relationship and asset semantics, richer annotations, every output profile, and
+universal fact-layer usage remain partial or target work.
 
 ## Contract
 

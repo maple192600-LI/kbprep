@@ -57,6 +57,43 @@ class ApplyPatchCoverageTests(unittest.TestCase):
             }),
             encoding="utf-8",
         )
+        (run_dir / "clean_view.json").write_text(
+            json.dumps({
+                "schema": "kbprep.clean_view.v1",
+                "source_artifact": "canonical_ir/typed_nodes.json",
+                "patch_artifact": "cleaning_patches.jsonl",
+                "entry_count": 2,
+                "entries": [
+                    {
+                        "entry_id": "cv_000001",
+                        "ordinal": 1,
+                        "node_id": "n_000001",
+                        "block_id": "b1",
+                        "parent_block_id": "",
+                        "entry_kind": "canonical_node",
+                        "type": "paragraph",
+                        "status": "keep",
+                        "patch_ids": [],
+                        "rule_ids": [],
+                        "location": {"line_start": 1, "line_end": 1, "page_start": None, "page_end": None},
+                    },
+                    {
+                        "entry_id": "cv_000002",
+                        "ordinal": 2,
+                        "node_id": "n_000002",
+                        "block_id": "step1",
+                        "parent_block_id": "",
+                        "entry_kind": "canonical_node",
+                        "type": "operation_step",
+                        "status": "keep",
+                        "patch_ids": [],
+                        "rule_ids": [],
+                        "location": {"line_start": 2, "line_end": 2, "page_start": None, "page_end": None},
+                    },
+                ],
+            }),
+            encoding="utf-8",
+        )
         (run_dir / "diagnosis_report.json").write_text(json.dumps({"split_strategy": "by_heading"}), encoding="utf-8")
         (root / "latest.json").write_text(json.dumps({"input_path": str(root / "source.md")}), encoding="utf-8")
         return run_dir
@@ -91,6 +128,13 @@ class ApplyPatchCoverageTests(unittest.TestCase):
             self.assertTrue(envelope["data"]["published"])
             self.assertIn("cannot discard", json.dumps(envelope["data"]["rejected_details"], ensure_ascii=False))
             render.assert_called_once()
+            self.assertEqual(render.call_args.kwargs["clean_view"]["schema"], "kbprep.clean_view.v1")
+            self.assertEqual(render.call_args.kwargs["clean_view"]["entry_count"], 2)
+            clean_view_entries = render.call_args.kwargs["clean_view"]["entries"]
+            self.assertEqual(clean_view_entries[0]["block_id"], "b1")
+            self.assertEqual(clean_view_entries[0]["status"], "review")
+            self.assertEqual(clean_view_entries[1]["block_id"], "step1")
+            self.assertEqual(clean_view_entries[1]["status"], "keep")
             split.assert_called_once()
             quality.assert_called_once()
             publish.assert_called_once()

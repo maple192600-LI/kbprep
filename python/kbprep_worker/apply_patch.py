@@ -179,6 +179,38 @@ def _read_previous_quality(quality_path: Path) -> dict:
         return {}
 
 
+def _read_clean_view(run_p: Path, blocks: list[dict]) -> dict | None:
+    path = run_p / "clean_view.json"
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != "kbprep.clean_view.v1":
+        return None
+    return _clean_view_with_current_block_status(payload, blocks)
+
+
+def _clean_view_with_current_block_status(clean_view: dict, blocks: list[dict]) -> dict | None:
+    entries = clean_view.get("entries")
+    if not isinstance(entries, list):
+        return None
+    by_id = {str(block.get("block_id") or ""): str(block.get("status") or "") for block in blocks}
+    updated = dict(clean_view)
+    updated_entries = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            return None
+        current = dict(entry)
+        block_id = str(current.get("block_id") or "")
+        if block_id in by_id and by_id[block_id]:
+            current["status"] = by_id[block_id]
+        updated_entries.append(current)
+    updated["entries"] = updated_entries
+    return updated
+
+
 def _profile_for_patch_run(run_p: Path) -> str:
     profile = _profile_from_run_metadata(run_p)
     if profile == "standard" and (run_p / "obsidian").exists():
@@ -202,6 +234,7 @@ def _rerender_after_patch(
         run_id=run_id,
         profile=profile,
         source_title=_source_title_from_previous_quality(previous_quality, run_p),
+        clean_view=_read_clean_view(run_p, blocks),
     )
 
 
