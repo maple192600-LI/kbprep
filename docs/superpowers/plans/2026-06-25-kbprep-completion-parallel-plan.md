@@ -47,7 +47,7 @@ The first version was too conservative in three places. Use this revised flow. T
 - Do not make all M5 rerun work wait for C3. Split M5B into command/state scaffolding that can run with C1/C2 and final Canonical-IR identity binding that waits for C3.
 - Do not make all Phase F work wait for M2 and M5. F1 local media fixtures, F2 image/legacy fixtures, and the YouTube technical-contract tests can start immediately. Only capability promotion waits for passing fixtures and final gate evidence.
 - Do not run a full reviewer loop for every small doc-only adjustment. Keep reviewer subagents for contract boundaries and merge readiness; use targeted checks during implementation and reserve `npm run dev:full-check` for merge-ready branches.
-- Do not leave playlist as a decision-only tail. Explicit playlist input is now an implementation slice on `codex/playlist-route`: it expands YouTube playlists into bounded child jobs and keeps per-video parent status visible. Remaining playlist work is playlist rerun and real-network/dependency/quality evidence before any promotion.
+- Do not leave playlist as a decision-only tail. Explicit playlist input is merged, and playlist rerun now preserves playlist `source_collection` plus child `source_url` evidence in `batch_rerun_manifest.json`. Remaining playlist-adjacent work is policy/CIR affected targeting plus real-network/dependency/quality evidence before any promotion.
 
 Speed correction:
 
@@ -459,7 +459,7 @@ git diff --check
 
 ## Wave 3: Batch, Playlist, And Rerun
 
-Batch selective rerun is merged. Playlist is in completion scope, not a decision-only placeholder; explicit playlist input is active on `codex/playlist-route`. Remaining Wave 3 work after that branch is playlist rerun plus policy/CIR affected batch targeting.
+Batch selective rerun is merged. Playlist is in completion scope, not a decision-only placeholder; explicit playlist input and playlist rerun evidence preservation are merged. Remaining Wave 3 work is policy/CIR affected batch targeting plus real playlist evidence for any promotion.
 
 ### Branch BATCH1: Batch Selective Rerun
 
@@ -693,7 +693,7 @@ Merge order:
 3. C3 after C1 and C2.
 4. M5B2 after C3.
 5. BATCH2 after M5B2 when policy-affected batch targeting needs Canonical IR identity.
-6. PLAYLIST2 playlist rerun and real playlist evidence.
+6. PLAYLIST2 real playlist evidence, with policy/CIR affected batch targeting after M5B2 when needed.
 7. Capability-status promotion branches after their implementation evidence exists.
 
 Final release gate:

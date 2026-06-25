@@ -436,6 +436,69 @@ class BatchStatusManifestTests(unittest.TestCase):
             self.assertEqual(code, 0)
             self.assertEqual(fallback_values, [True])
 
+    def test_playlist_batch_rerun_preserves_playlist_source_collection_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_root = root / "batch"
+            playlist_url = "https://www.youtube.com/playlist?list=ExamplePlaylist01"
+
+            def expand_playlist(source_url: str, output_root_arg: Path, **_kwargs: Any) -> Any:
+                source_dir = output_root_arg / ".kbprep-inputs" / "youtube-playlist" / "ExamplePlaylist01"
+                source_dir.mkdir(parents=True, exist_ok=True)
+                descriptor = source_dir / "001-ExampleVideo01.url"
+                descriptor.write_text(
+                    "[InternetShortcut]\nURL=https://www.youtube.com/watch?v=ExampleVideo01\n",
+                    encoding="utf-8",
+                )
+                return type(
+                    "PlaylistExpansion",
+                    (),
+                    {
+                        "ok": True,
+                        "source_dir": source_dir,
+                        "descriptor_paths": [descriptor],
+                        "report": {
+                            "playlist_url": source_url,
+                            "playlist_id": "ExamplePlaylist01",
+                            "summary": {"selected": 1, "available": 1},
+                        },
+                    },
+                )()
+
+            with (
+                patch.object(prepare_batch, "expand_youtube_playlist_to_descriptors", side_effect=expand_playlist),
+                patch.object(prepare_batch, "_process_one_file", return_value={"ok": False, "error": {"code": "E_TEST"}}),
+            ):
+                _code, first = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "playlist_url": playlist_url,
+                        "output_root": str(output_root),
+                        "force": True,
+                        "min_free_memory_gb": 0,
+                        "convert_jobs": 1,
+                    },
+            )
+            manifest_path = Path(first["error"]["details"]["batch_manifest_json"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["source_collection"]["private_source_text"] = "SECRET_SOURCE_TEXT"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=_successful_child):
+                code, envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {"rerun": True, "batch_manifest_path": str(manifest_path), "min_free_memory_gb": 0},
+                )
+
+            rerun_manifest = json.loads(Path(envelope["data"]["batch_rerun_manifest_json"]).read_text(encoding="utf-8"))
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_manifest["source_collection"]["kind"], "youtube_playlist")
+            self.assertEqual(rerun_manifest["source_collection"]["playlist_url"], playlist_url)
+            self.assertEqual(rerun_manifest["source_collection"]["playlist_id"], "ExamplePlaylist01")
+            self.assertNotIn("private_source_text", rerun_manifest["source_collection"])
+            self.assertEqual(rerun_manifest["results"][0]["source_url"], "https://www.youtube.com/watch?v=ExampleVideo01")
+            self.assertEqual(rerun_manifest["results"][0]["source_sha256"], manifest["items"][0]["source_sha256"])
+
     def test_batch_rerun_reports_missing_sources_without_success_claim(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

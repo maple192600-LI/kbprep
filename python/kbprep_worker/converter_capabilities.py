@@ -286,13 +286,15 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "fallback transcript fixtures",
             "direct CLI URL input tests",
             "playlist expansion and child status tests",
+            "playlist rerun source-collection evidence tests",
             "real YouTube subtitle export fixture",
             "real YouTube playlist expansion fixture",
             "real fallback media transcript acceptance evidence",
             "dependency failure and no-network tests",
         ],
         "promotion_blocker": (
-            "Direct URL, explicit video id, local .url descriptor routing, and playlist expansion are covered with mocked fixtures; "
+            "Direct URL, explicit video id, local .url descriptor routing, playlist expansion, and playlist rerun evidence "
+            "are covered with mocked fixtures; "
             "verified promotion needs real subtitle/fallback/playlist fixtures, dependency variance, timeout handling, "
             "and final quality-gate evidence."
         ),

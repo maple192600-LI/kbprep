@@ -43,6 +43,7 @@ def run_batch_rerun(data: dict[str, Any]) -> None:
         skipped_unsupported=_string_list(_dict_value(manifest.get("rerun")).get("skipped_unsupported")),
         started_at=started_at,
         command_defaults=batch._batch_command_defaults(config),
+        source_collection=_rerun_source_collection_evidence(source_collection),
     )
     _emit_batch_rerun_result(
         status=_batch_rerun_status(results, failures),
@@ -207,7 +208,7 @@ def _execute_batch_rerun_items(
             continue
         output_root = batch._output_root_for_file(output_p, file_path)
         result = batch._process_configured_file(config, file_path, output_root)
-        _append_rerun_result(file_path, relative_path, output_root, result, results, failures)
+        _append_rerun_result(file_path, relative_path, output_root, result, item, results, failures)
     return results, failures
 
 
@@ -292,15 +293,42 @@ def _append_rerun_result(
     relative_path: str,
     output_root: Path,
     result: dict[str, Any],
+    item: dict[str, Any],
     results: list[dict[str, Any]],
     failures: list[dict[str, Any]],
 ) -> None:
     if result.get("ok") and not _dict_value(result.get("data")).get("strict_errors"):
         entry = batch._result_entry(file_path, relative_path, output_root, result)
+        entry.update(_rerun_source_evidence(item))
         entry.update(batch._batch_final_fields_from_result(_dict_value(result.get("data"))))
         results.append(entry)
         return
-    failures.append(batch._failure_entry(file_path, relative_path, output_root, result))
+    failure = batch._failure_entry(file_path, relative_path, output_root, result)
+    failure.update(_rerun_source_evidence(item))
+    failures.append(failure)
+
+
+def _rerun_source_evidence(item: dict[str, Any]) -> dict[str, Any]:
+    evidence: dict[str, Any] = {}
+    if item.get("source_url"):
+        evidence["source_url"] = item.get("source_url")
+    if item.get("source_sha256"):
+        evidence["source_sha256"] = item.get("source_sha256")
+    return evidence
+
+
+def _rerun_source_collection_evidence(source_collection: dict[str, Any]) -> dict[str, Any]:
+    evidence: dict[str, Any] = {}
+    for key in ("kind", "playlist_url", "playlist_id", "playlist_manifest_json"):
+        value = source_collection.get(key)
+        if isinstance(value, str) and value:
+            evidence[key] = value
+    summary = source_collection.get("summary")
+    if isinstance(summary, dict):
+        safe_summary = {str(key): item for key, item in summary.items() if isinstance(item, (bool, int, float))}
+        if safe_summary:
+            evidence["summary"] = safe_summary
+    return evidence
 
 
 def _write_batch_rerun_manifest(
@@ -314,6 +342,7 @@ def _write_batch_rerun_manifest(
     skipped_unsupported: list[str],
     started_at: float,
     command_defaults: dict[str, Any],
+    source_collection: dict[str, Any],
 ) -> Path:
     payload = {
         "schema": BATCH_RERUN_MANIFEST_SCHEMA,
@@ -329,6 +358,8 @@ def _write_batch_rerun_manifest(
         "started_at": started_at,
         "finished_at": time.time(),
     }
+    if source_collection:
+        payload["source_collection"] = source_collection
     path = output_p / "batch_rerun_manifest.json"
     atomic_write_json(path, payload, indent=2, trailing_newline=False)
     return path

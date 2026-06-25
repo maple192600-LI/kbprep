@@ -8,7 +8,7 @@ This file tracks known product and engineering gaps that are not hidden defects.
 - SourceSpan artifact coverage exists for typed nodes, converted Markdown line ranges, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The schema validates route-native precision records and coverage now lists missing native precision kinds, but converters still need to emit real PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cell ranges, transcript cue ids without timing, and YouTube cue ids before Phase C can close.
 - CleaningPolicySnapshot, CleaningPatch generation, rejected patch reporting, Clean View assembly, and DocumentCleaningGate are shipped for the current cleanup path; remaining cleanup risk is rule quality and fixture breadth, not Phase D migration.
 - Optional media and YouTube routes are partial CLI capabilities; verified promotion still needs broader real-sample, dependency, timeout, and transcript-quality evidence.
-- Batch manifests now report evidence-backed rerun scope and executable failed/pending rerun. YouTube playlist input now expands into bounded child jobs with per-video parent status, but playlist rerun and deeper policy-affected or Canonical IR id-level batch targeting remain tied to later M5/C3 work.
+- Batch manifests now report evidence-backed rerun scope and executable failed/pending rerun. YouTube playlist input now expands into bounded child jobs with per-video parent status, and playlist rerun preserves playlist source-collection evidence. Deeper policy-affected or Canonical IR id-level batch targeting remains tied to later M5/C3 work.
 
 ## Closed Workflow Risks
 
