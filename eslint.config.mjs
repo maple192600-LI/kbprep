@@ -5,7 +5,7 @@ import unusedImports from "eslint-plugin-unused-imports";
 export default tseslint.config(
   // 全局忽略：构建产物、本地环境、缓存、Python 源码（不归 ESLint 管）
   {
-    ignores: ["dist/**", ".kbprep/**", "coverage/**", ".coverage", "node_modules/**", "python/**"],
+    ignores: ["dist/**", ".kbprep/**", ".worktrees/**", "coverage/**", ".coverage", "node_modules/**", "python/**"],
   },
   {
     files: ["src/**/*.ts", "src/**/*.mjs", "scripts/**/*.mjs"],
