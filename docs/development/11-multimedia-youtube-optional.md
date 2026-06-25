@@ -22,8 +22,9 @@ This stage supports source inspection, route selection, dependency failure repor
   subtitle-first route and normal quality gates.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
-- The YouTube boundary is an engineering product contract; there is no external compliance approval step in this plan. Implement the requested user-facing capability through accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence.
-- If logged-in, cookie, or credential-based sources are required by the feature, implement them as explicit operator-provided local inputs with deterministic errors; do not silently discover, store, or reuse secrets.
+- Successful YouTube subtitle runs must preserve source URL, recorded-equivalent inventory evidence, selected subtitle language, subtitle artifact path, transcript artifact path, and sanitized command evidence in the conversion report.
+- When no preferred subtitle file is available, the explicit media fallback downloads the video/media through the `yt-dlp` Python package, runs the local transcription route, then feeds the transcript into the same cleanup, quality, and source-side Obsidian Markdown publication chain.
+- YouTube implementation work should focus on the complete local CLI flow: URL/id/playlist input, subtitle inventory, Python-library media download fallback, transcription, cleaning, quality evidence, and final Markdown output.
 
 ## Acceptance
 
@@ -31,7 +32,7 @@ This stage supports source inspection, route selection, dependency failure repor
 - Missing optional dependencies produce clear user-facing errors.
 - Unsupported sources stop before conversion.
 - Failed optional route runs stop before publication and do not update previous successful deliverables.
-- Current media and YouTube support remains partial until real local ASR evidence, real-network YouTube samples, timeout behavior, dependency variance, and transcript-quality checks pass.
+- Current media and YouTube support remains partial until real local ASR evidence, broader real-network YouTube samples, timeout behavior, dependency variance, and transcript-quality checks pass.
 
 ## Risk And Rollback
 

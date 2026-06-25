@@ -52,7 +52,8 @@ describe("kbprep package entry", () => {
       requested_device_override: null,
       actual_device: "cpu",
       python_project: {
-        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2",
+        dependency_spec:
+          "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2;yt-dlp>=2025.1,<2027",
       },
       setup_env: { ok: true, data: { device: "cpu" } },
     };

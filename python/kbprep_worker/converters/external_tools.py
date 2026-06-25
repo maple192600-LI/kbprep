@@ -6,6 +6,7 @@ import shutil
 import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ YOUTUBE_MEDIA_SUFFIX = ".mp4"
 CommandRunner = Callable[[tuple[str, ...], Path | None, int], "ExternalCommandResult"]
 ToolLocator = Callable[[str], str | None]
 ImagePdfRenderer = Callable[[Path, Path], None]
+YoutubeMediaDownloader = Callable[[str, Path, int], "ExternalCommandResult"]
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,13 @@ class ExternalConversionResult:
     ok: bool
     artifact_path: Path | None
     report: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class YoutubeSubtitleInventory:
+    payload: dict[str, Any]
+    payload_path: Path
+    sanitized_command: list[str]
 
 
 def wrap_image_as_pdf(
@@ -131,6 +140,7 @@ def extract_youtube_transcript(
     runner: CommandRunner | None = None,
     timeout_seconds: int = DEFAULT_COMMAND_TIMEOUT_SECONDS,
     allow_media_fallback: bool = False,
+    media_downloader: YoutubeMediaDownloader | None = None,
 ) -> ExternalConversionResult:
     if not is_youtube_url(source_url):
         return _youtube_failure(source_url, "youtube_subtitle", _unsupported_youtube_failure())
@@ -152,7 +162,16 @@ def extract_youtube_transcript(
             _fallback_not_enabled_failure(),
             _youtube_attempt_commands(subtitle.report),
         )
-    return _youtube_media_fallback(source_url, run_dir, env, which, active_runner, timeout_seconds, subtitle.report)
+    return _youtube_media_fallback(
+        source_url,
+        run_dir,
+        env,
+        which,
+        active_runner,
+        timeout_seconds,
+        subtitle.report,
+        media_downloader,
+    )
 
 
 def _try_youtube_subtitle(
@@ -165,7 +184,7 @@ def _try_youtube_subtitle(
     subtitle_dir = Path(run_dir) / "external" / "youtube_subtitle"
     subtitle_dir.mkdir(parents=True, exist_ok=True)
     inventory = _youtube_subtitle_inventory(source_url, subtitle_dir, ytdlp, runner, timeout_seconds)
-    if inventory is not None:
+    if isinstance(inventory, ExternalConversionResult):
         return inventory
     output_template = subtitle_dir / safe_youtube_stem(source_url)
     command = _youtube_subtitle_command(ytdlp, source_url, output_template)
@@ -178,8 +197,15 @@ def _try_youtube_subtitle(
     transcript = output_template.with_suffix(".txt")
     text = normalize_subtitle_transcript(subtitle.read_text(encoding="utf-8", errors="replace"))
     transcript.write_text(text.rstrip() + "\n", encoding="utf-8")
-    report = _youtube_report(source_url, "youtube_subtitle", "success", [sanitized], transcript)
+    sanitized_commands = [sanitized]
+    if isinstance(inventory, YoutubeSubtitleInventory):
+        sanitized_commands = [inventory.sanitized_command, sanitized]
+    report = _youtube_report(source_url, "youtube_subtitle", "success", sanitized_commands, transcript)
     report["subtitle_path"] = str(subtitle)
+    report["subtitle_language"] = _subtitle_language(subtitle)
+    if isinstance(inventory, YoutubeSubtitleInventory):
+        report["subtitle_inventory_path"] = str(inventory.payload_path)
+        report["subtitle_inventory_languages"] = _inventory_languages(inventory.payload)
     return ExternalConversionResult(ok=True, artifact_path=transcript, report=report)
 
 
@@ -189,9 +215,10 @@ def _youtube_subtitle_inventory(
     ytdlp: str,
     runner: CommandRunner,
     timeout_seconds: int,
-) -> ExternalConversionResult | None:
+) -> ExternalConversionResult | YoutubeSubtitleInventory | None:
     command = _youtube_inventory_command(ytdlp, source_url)
-    sanitized = _sanitize_youtube_command(command, source_url, subtitle_dir / "inventory.json")
+    inventory_path = subtitle_dir / "inventory.json"
+    sanitized = _sanitize_youtube_command(command, source_url, inventory_path)
     result = _safe_run(command, subtitle_dir, runner, timeout_seconds)
     if result.returncode != 0:
         return _youtube_failure(source_url, "youtube_subtitle", _command_failure(result), [sanitized])
@@ -199,7 +226,8 @@ def _youtube_subtitle_inventory(
     if payload is None:
         return None
     if _has_preferred_subtitle(payload):
-        return None
+        inventory_path.write_text(json.dumps(_youtube_inventory_evidence(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return YoutubeSubtitleInventory(payload=payload, payload_path=inventory_path, sanitized_command=sanitized)
     return _youtube_failure(source_url, "youtube_subtitle", _subtitle_unavailable_failure(), [sanitized])
 
 
@@ -211,26 +239,56 @@ def _youtube_media_fallback(
     runner: CommandRunner,
     timeout_seconds: int,
     subtitle_report: dict[str, Any],
+    media_downloader: YoutubeMediaDownloader | None,
 ) -> ExternalConversionResult:
-    ytdlp = which("yt-dlp")
     ffmpeg = which("ffmpeg")
     whisper = which("whisper")
-    if not ytdlp:
-        return _youtube_failure(source_url, "youtube_media_transcript", _missing_dependency("yt-dlp"))
+    if media_downloader is None and not _has_ytdlp_python_package():
+        return _youtube_failure(source_url, "youtube_media_transcript", _missing_dependency("yt-dlp Python package"))
     if not ffmpeg:
         return _youtube_failure(source_url, "youtube_media_transcript", _missing_dependency("ffmpeg"))
     if not whisper:
         return _youtube_failure(source_url, "youtube_media_transcript", _missing_dependency("whisper"))
     media = Path(run_dir) / "external" / "youtube_media" / f"{safe_youtube_stem(source_url)}{YOUTUBE_MEDIA_SUFFIX}"
     media.parent.mkdir(parents=True, exist_ok=True)
-    command = _youtube_media_command(ytdlp, source_url, media)
-    sanitized = _sanitize_youtube_command(command, source_url, media)
-    result = _safe_run(command, media.parent, runner, timeout_seconds)
+    sanitized = _youtube_media_library_command()
+    active_downloader = media_downloader or _download_youtube_media_with_ytdlp_python
+    result = active_downloader(source_url, media, timeout_seconds)
     if result.returncode != 0 or not media.is_file():
         failure = _command_failure(result) if result.returncode != 0 else _missing_output_failure(media)
         return _youtube_failure(source_url, "youtube_media_transcript", failure, [sanitized])
     media_result = transcribe_media_with_whisper(media, run_dir, env, which, runner, timeout_seconds)
     return _youtube_fallback_result(source_url, media_result, sanitized, subtitle_report)
+
+
+def _has_ytdlp_python_package() -> bool:
+    return find_spec("yt_dlp") is not None
+
+
+def _download_youtube_media_with_ytdlp_python(
+    source_url: str,
+    media_path: Path,
+    timeout_seconds: int,
+) -> ExternalCommandResult:
+    try:
+        import yt_dlp
+    except ImportError as error:
+        return ExternalCommandResult(1, "", str(error))
+    options: dict[str, Any] = {
+        "format": "bv*+ba/best",
+        "merge_output_format": "mp4",
+        "noplaylist": True,
+        "outtmpl": str(media_path),
+        "quiet": True,
+        "socket_timeout": timeout_seconds,
+    }
+    try:
+        media_path.parent.mkdir(parents=True, exist_ok=True)
+        with yt_dlp.YoutubeDL(options) as downloader:
+            downloader.download([source_url])
+    except Exception as error:
+        return ExternalCommandResult(1, "", str(error))
+    return ExternalCommandResult(0, "", "")
 
 
 def _render_image_with_pymupdf(source_path: Path, target_path: Path) -> None:
@@ -458,8 +516,8 @@ def _youtube_inventory_command(ytdlp: str, source_url: str) -> tuple[str, ...]:
     return (ytdlp, "--dump-single-json", "--skip-download", source_url)
 
 
-def _youtube_media_command(ytdlp: str, source_url: str, media_path: Path) -> tuple[str, ...]:
-    return (ytdlp, "--format", "ba/bestaudio/best", "--output", str(media_path), source_url)
+def _youtube_media_library_command() -> list[str]:
+    return ["yt-dlp-python", "download", "{source_url}", "{artifact_path}"]
 
 
 def _find_subtitle_artifact(subtitle_dir: Path, stem: str) -> Path | None:
@@ -481,6 +539,37 @@ def _preferred_subtitle(files: list[Path]) -> Path | None:
             if marker in name:
                 return path
     return files[0]
+
+
+def _subtitle_language(path: Path) -> str:
+    name = path.name
+    for suffix in (".vtt", ".srt"):
+        if not name.endswith(suffix):
+            continue
+        without_suffix = name[: -len(suffix)]
+        if "." in without_suffix:
+            return without_suffix.rsplit(".", 1)[-1]
+    return ""
+
+
+def _inventory_languages(payload: dict[str, Any]) -> list[str]:
+    languages: set[str] = set()
+    for field in ("subtitles", "automatic_captions"):
+        value = payload.get(field)
+        if isinstance(value, dict):
+            languages.update(str(key) for key in value)
+    return sorted(languages)
+
+
+def _youtube_inventory_evidence(payload: dict[str, Any]) -> dict[str, Any]:
+    subtitles = payload.get("subtitles")
+    automatic_captions = payload.get("automatic_captions")
+    return {
+        "schema": "kbprep.youtube_subtitle_inventory_evidence.v1",
+        "id": str(payload.get("id") or ""),
+        "subtitle_languages": sorted(str(key) for key in subtitles) if isinstance(subtitles, dict) else [],
+        "automatic_caption_languages": sorted(str(key) for key in automatic_captions) if isinstance(automatic_captions, dict) else [],
+    }
 
 
 def _youtube_report(
@@ -524,13 +613,30 @@ def _youtube_fallback_result(
     subtitle_report: dict[str, Any],
 ) -> ExternalConversionResult:
     if not media_result.ok:
-        return media_result
+        report = _youtube_report(
+            source_url,
+            "youtube_media_transcript",
+            "failed",
+            [download_command],
+            None,
+            media_result.report.get("failure_reason") if isinstance(media_result.report, dict) else None,
+        )
+        _add_youtube_fallback_context(report, subtitle_report, media_result.report)
+        return ExternalConversionResult(ok=False, artifact_path=None, report=report)
     report = _youtube_report(source_url, "youtube_media_transcript", "success", [download_command], media_result.artifact_path)
+    _add_youtube_fallback_context(report, subtitle_report, media_result.report)
+    return ExternalConversionResult(ok=True, artifact_path=media_result.artifact_path, report=report)
+
+
+def _add_youtube_fallback_context(
+    report: dict[str, Any],
+    subtitle_report: dict[str, Any],
+    media_report: dict[str, Any],
+) -> None:
     report["route_decision"]["fallback_applied"] = "true"
     report["route_decision"]["fallback_from"] = "youtube_subtitle"
     report["subtitle_attempt"] = subtitle_report
-    report["media_transcript"] = media_result.report
-    return ExternalConversionResult(ok=True, artifact_path=media_result.artifact_path, report=report)
+    report["media_transcript"] = media_report
 
 
 def _sanitize_youtube_command(command: tuple[str, ...], source_url: str, artifact: Path) -> list[str]:

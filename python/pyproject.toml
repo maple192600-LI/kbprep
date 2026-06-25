@@ -8,7 +8,8 @@ dependencies = [
     "PyMuPDF>=1.27,<2",
     "pymupdf4llm>=0.0.27,<1",
     "beautifulsoup4==4.14.3",
-    "lxml==6.0.2"
+    "lxml==6.0.2",
+    "yt-dlp>=2025.1,<2027"
 ]
 
 [project.optional-dependencies]

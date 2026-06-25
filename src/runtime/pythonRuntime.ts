@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ManagedProcessTimeoutError, runManagedProcess } from "./subprocess.js";
 
 const RUNTIME_MARKER_SCHEMA = "kbprep.local_venv.v1";
-const PYTHON_WORKER_DEPENDENCY_SPEC = "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2";
+const PYTHON_WORKER_DEPENDENCY_SPEC =
+  "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2;yt-dlp>=2025.1,<2027";
 
 export type RuntimeConfig = {
   device_override?: "cuda" | "cpu";
@@ -57,6 +58,8 @@ const DEFAULT_RUNTIME_SETUP_STEPS: Array<Omit<RuntimeSetupStep, "timeoutMs"> & {
 ];
 const MIN_RUNTIME_SETUP_TIMEOUT_MS = 30_000;
 const MAX_RUNTIME_SETUP_TIMEOUT_MS = 90 * 60_000;
+const DEV_RUNTIME_LOCK_STALE_MS = runtimeSetupTimeoutMs("KBPREP_VENV_LOCK_STALE_MS", 2 * 60 * 60_000);
+const DEV_RUNTIME_LOCK_TIMEOUT_MS = runtimeSetupTimeoutMs("KBPREP_VENV_LOCK_TIMEOUT_MS", 120_000);
 
 export function resolvePythonPath(_startPath?: string, config?: RuntimeConfig): string {
   const runtimePython = kbprepVenvPythonPath();
@@ -81,45 +84,51 @@ export async function ensurePythonRuntime(config?: RuntimeConfig, onProgress?: R
 
   if (shouldSkipAutoSetupForTests()) return resolvePythonPath(kbprepRootDir(), config);
 
-  const venvDir = kbprepVenvDir();
-  cleanupStaleKbprepRuntime(config);
-  rmSync(kbprepDevVenvReadyMarker(), { force: true });
-  mkdirSync(dirname(venvDir), { recursive: true });
-  const bootstrap = bootstrapPythonCommand(config);
-  const steps = runtimeSetupSteps();
-  await runRuntimeSetupStep(steps[0], onProgress, bootstrap.command, [...bootstrap.args, "-m", "venv", venvDir]);
-  await runRuntimeSetupStep(steps[1], onProgress, pythonPath, ["-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"]);
-  await runRuntimeSetupStep(steps[2], onProgress, pythonPath, ["-m", "pip", "install", "-e", kbprepPythonProjectDir()]);
-  const setupResult = await runRuntimeSetupStep(
-    steps[3],
-    onProgress,
-    pythonPath,
-    ["-m", "kbprep_worker.cli", "setup-env", "--json-stdin"],
-    JSON.stringify({ device_override: config?.device_override }),
-  );
-  const setupEnvelope = parseSetupEnvelope(setupResult.stdout);
-  writeFileSync(
-    kbprepVenvReadyMarker(),
-    JSON.stringify(
-      {
-        schema: RUNTIME_MARKER_SCHEMA,
-        created_at: new Date().toISOString(),
-        kbprep_version: kbprepPackageVersion(),
-        python_executable: pythonPath,
-        requested_device_override: config?.device_override ?? null,
-        actual_device: actualDeviceFromSetupEnvelope(setupEnvelope),
-        python_project: {
-          path: kbprepPythonProjectDir(),
-          dependency_spec: PYTHON_WORKER_DEPENDENCY_SPEC,
+  const releaseLock = acquireDevRuntimeLock();
+  try {
+    if (isKbprepVenvReady(config)) return pythonPath;
+    const venvDir = kbprepVenvDir();
+    cleanupStaleKbprepRuntime(config);
+    rmSync(kbprepDevVenvReadyMarker(), { force: true });
+    mkdirSync(dirname(venvDir), { recursive: true });
+    const bootstrap = bootstrapPythonCommand(config);
+    const steps = runtimeSetupSteps();
+    await runRuntimeSetupStep(steps[0], onProgress, bootstrap.command, [...bootstrap.args, "-m", "venv", venvDir]);
+    await runRuntimeSetupStep(steps[1], onProgress, pythonPath, ["-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"]);
+    await runRuntimeSetupStep(steps[2], onProgress, pythonPath, ["-m", "pip", "install", "-e", kbprepPythonProjectDir()]);
+    const setupResult = await runRuntimeSetupStep(
+      steps[3],
+      onProgress,
+      pythonPath,
+      ["-m", "kbprep_worker.cli", "setup-env", "--json-stdin"],
+      JSON.stringify({ device_override: config?.device_override }),
+    );
+    const setupEnvelope = parseSetupEnvelope(setupResult.stdout);
+    writeFileSync(
+      kbprepVenvReadyMarker(),
+      JSON.stringify(
+        {
+          schema: RUNTIME_MARKER_SCHEMA,
+          created_at: new Date().toISOString(),
+          kbprep_version: kbprepPackageVersion(),
+          python_executable: pythonPath,
+          requested_device_override: config?.device_override ?? null,
+          actual_device: actualDeviceFromSetupEnvelope(setupEnvelope),
+          python_project: {
+            path: kbprepPythonProjectDir(),
+            dependency_spec: PYTHON_WORKER_DEPENDENCY_SPEC,
+          },
+          setup_env: setupEnvelope,
         },
-        setup_env: setupEnvelope,
-      },
-      null,
-      2,
-    ),
-    "utf-8",
-  );
-  return pythonPath;
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    return pythonPath;
+  } finally {
+    releaseLock();
+  }
 }
 
 function runtimeSetupSteps(): RuntimeSetupStep[] {
@@ -195,6 +204,80 @@ function kbprepVenvReadyMarker(): string {
 
 function kbprepDevVenvReadyMarker(): string {
   return join(kbprepRootDir(), ".kbprep", "dev-runtime-ready.json");
+}
+
+function kbprepDevRuntimeLockPath(): string {
+  return join(kbprepRootDir(), ".kbprep", "dev-runtime.lock");
+}
+
+function acquireDevRuntimeLock(): () => void {
+  const lockPath = kbprepDevRuntimeLockPath();
+  const started = Date.now();
+  while (Date.now() - started <= DEV_RUNTIME_LOCK_TIMEOUT_MS) {
+    try {
+      const fd = openSync(lockPath, "wx");
+      writeFileSync(fd, JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() }, null, 2), "utf-8");
+      return () => {
+        closeSync(fd);
+        rmSync(lockPath, { force: true });
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      reclaimStaleDevRuntimeLock(lockPath);
+      sleepSync(250);
+    }
+  }
+  throw new Error(`Timed out waiting for KBPrep venv setup lock: ${lockPath}`);
+}
+
+function reclaimStaleDevRuntimeLock(lockPath: string): void {
+  const lock = readDevRuntimeLock(lockPath);
+  const stale = isDevRuntimeLockStale(lockPath, lock);
+  if (lock?.pid && isProcessAlive(lock.pid) && !stale) return;
+  if (!stale) return;
+  rmSync(lockPath, { force: true });
+}
+
+function readDevRuntimeLock(lockPath: string): { pid: number | null; createdAt: number | null } | null {
+  try {
+    const data = JSON.parse(readFileSync(lockPath, "utf-8")) as Record<string, unknown>;
+    const pid = Number(data.pid);
+    const createdAt = Date.parse(String(data.created_at || ""));
+    return {
+      pid: Number.isInteger(pid) && pid > 0 ? pid : null,
+      createdAt: Number.isFinite(createdAt) ? createdAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isPathOlderThan(path: string, ageMs: number): boolean {
+  try {
+    return Date.now() - statSync(path).mtimeMs > ageMs;
+  } catch {
+    return false;
+  }
+}
+
+function isDevRuntimeLockStale(lockPath: string, lock: { pid: number | null; createdAt: number | null } | null): boolean {
+  if (lock?.createdAt !== null && lock?.createdAt !== undefined) {
+    return Date.now() - lock.createdAt > DEV_RUNTIME_LOCK_STALE_MS;
+  }
+  return isPathOlderThan(lockPath, DEV_RUNTIME_LOCK_STALE_MS);
+}
+
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 function isKbprepVenvReady(config?: RuntimeConfig): boolean {

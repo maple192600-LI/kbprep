@@ -138,6 +138,66 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertEqual(result.report["route_decision"]["fallback_applied"], "false")
             self.assertIn("Keep setup step threshold=0.8.", result.artifact_path.read_text(encoding="utf-8"))
 
+    def test_youtube_subtitle_report_records_inventory_language_and_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            source_url = "https://www.youtube.com/watch?v=ExampleVideo01"
+            inventory_payload = {
+                "id": "ExampleVideo01",
+                "title": "Recorded equivalent lesson",
+                "subtitles": {"en": [{"ext": "vtt"}], "zh-Hans": [{"ext": "vtt"}]},
+                "automatic_captions": {},
+            }
+
+            def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
+                self.assertEqual(timeout_seconds, 9)
+                if "--dump-single-json" in command:
+                    return ExternalCommandResult(0, json.dumps(inventory_payload), "")
+                output_index = command.index("--output") + 1
+                output_template = Path(command[output_index])
+                output_template.parent.mkdir(parents=True, exist_ok=True)
+                output_template.with_name(f"{output_template.name}.en.vtt").write_text(
+                    "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nEnglish fallback subtitle.\n",
+                    encoding="utf-8",
+                )
+                output_template.with_name(f"{output_template.name}.zh-Hans.vtt").write_text(
+                    "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\n保留 API 参数 retry_count=3。\n",
+                    encoding="utf-8",
+                )
+                return ExternalCommandResult(0, "", "")
+
+            result = extract_youtube_transcript(
+                source_url,
+                run_dir,
+                which=lambda tool: tool,
+                runner=runner,
+                timeout_seconds=9,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.report["source_url"], source_url)
+            self.assertEqual(result.report["subtitle_language"], "zh-Hans")
+            self.assertEqual(result.report["route_decision"]["external_route"], "youtube_subtitle")
+            self.assertEqual(result.report["route_decision"]["fallback_applied"], "false")
+            self.assertEqual(len(result.report["sanitized_commands"]), 2)
+            self.assertIn("--dump-single-json", result.report["sanitized_commands"][0])
+            self.assertIn("--skip-download", result.report["sanitized_commands"][1])
+            self.assertIn("{source_url}", result.report["sanitized_commands"][0])
+            self.assertIn("{source_url}", result.report["sanitized_commands"][1])
+
+            inventory_path = Path(result.report["subtitle_inventory_path"])
+            subtitle_path = Path(result.report["subtitle_path"])
+            self.assertTrue(inventory_path.exists())
+            self.assertTrue(subtitle_path.exists())
+            self.assertIn("zh-Hans", subtitle_path.name)
+            inventory_evidence = json.loads(inventory_path.read_text(encoding="utf-8"))
+            self.assertEqual(inventory_evidence["id"], "ExampleVideo01")
+            self.assertEqual(inventory_evidence["subtitle_languages"], ["en", "zh-Hans"])
+            self.assertNotIn("title", inventory_evidence)
+            self.assertEqual(Path(result.report["artifact_path"]), result.artifact_path)
+            self.assertIn("retry_count=3", result.artifact_path.read_text(encoding="utf-8"))
+
     def test_youtube_falls_back_to_media_transcript_when_subtitles_are_unavailable(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -148,10 +208,6 @@ class TestMediaYoutubeRoute(unittest.TestCase):
                     return ExternalCommandResult(0, '{"subtitles":{},"automatic_captions":{}}', "")
                 if "--skip-download" in command:
                     return ExternalCommandResult(1, "", "No subtitles are available for this video")
-                if command[0] == "yt-dlp":
-                    output_index = command.index("--output") + 1
-                    Path(command[output_index]).write_bytes(b"media")
-                    return ExternalCommandResult(0, "", "")
                 if command[0] == "ffmpeg":
                     Path(command[-1]).write_bytes(b"wav")
                     return ExternalCommandResult(0, "", "")
@@ -165,18 +221,133 @@ class TestMediaYoutubeRoute(unittest.TestCase):
                     return ExternalCommandResult(0, "", "")
                 return ExternalCommandResult(1, "", f"unexpected command: {command}")
 
+            def media_downloader(source_url: str, media_path: Path, timeout_seconds: int) -> ExternalCommandResult:
+                self.assertEqual(source_url, "https://youtu.be/ExampleVideo01")
+                self.assertGreater(timeout_seconds, 0)
+                media_path.write_bytes(b"media")
+                return ExternalCommandResult(0, "", "")
+
             result = extract_youtube_transcript(
                 "https://youtu.be/ExampleVideo01",
                 run_dir,
                 which=lambda tool: tool,
                 runner=runner,
                 allow_media_fallback=True,
+                media_downloader=media_downloader,
             )
 
             self.assertTrue(result.ok)
             self.assertEqual(result.report["route_decision"]["external_route"], "youtube_media_transcript")
             self.assertEqual(result.report["route_decision"]["fallback_from"], "youtube_subtitle")
+            self.assertEqual(result.report["sanitized_commands"][0], ["yt-dlp-python", "download", "{source_url}", "{artifact_path}"])
             self.assertIn("Fallback transcript keeps retry_count=3.", result.artifact_path.read_text(encoding="utf-8"))
+
+    def test_youtube_no_subtitle_fallback_uses_python_download_library(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            downloaded: list[Path] = []
+            source_url = "https://www.youtube.com/watch?v=ExampleVideo01"
+
+            def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
+                if "--dump-single-json" in command:
+                    return ExternalCommandResult(0, '{"subtitles":{},"automatic_captions":{}}', "")
+                if command[0] == "ffmpeg":
+                    Path(command[-1]).write_bytes(b"wav")
+                    return ExternalCommandResult(0, "", "")
+                if command[0] == "whisper":
+                    output_dir = Path(command[-1])
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                    (output_dir / "ExampleVideo01.txt").write_text("Python library fallback transcript.\n", encoding="utf-8")
+                    return ExternalCommandResult(0, "", "")
+                return ExternalCommandResult(1, "", f"unexpected command: {command}")
+
+            def media_downloader(actual_url: str, media_path: Path, timeout_seconds: int) -> ExternalCommandResult:
+                self.assertEqual(actual_url, source_url)
+                self.assertEqual(timeout_seconds, 13)
+                media_path.write_bytes(b"video")
+                downloaded.append(media_path)
+                return ExternalCommandResult(0, "", "")
+
+            result = extract_youtube_transcript(
+                source_url,
+                run_dir,
+                which=lambda tool: tool,
+                runner=runner,
+                timeout_seconds=13,
+                allow_media_fallback=True,
+                media_downloader=media_downloader,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(len(downloaded), 1)
+            self.assertEqual(downloaded[0].suffix, ".mp4")
+            self.assertEqual(result.report["route_decision"]["external_route"], "youtube_media_transcript")
+            self.assertEqual(result.report["sanitized_commands"], [["yt-dlp-python", "download", "{source_url}", "{artifact_path}"]])
+            self.assertEqual(result.report["subtitle_attempt"]["failure_reason"]["code"], "E_YOUTUBE_SUBTITLE_UNAVAILABLE")
+            self.assertIn("Python library fallback transcript.", result.artifact_path.read_text(encoding="utf-8"))
+
+    def test_youtube_media_fallback_preserves_context_when_transcription_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+            source_url = "https://www.youtube.com/watch?v=ExampleVideo01"
+
+            def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
+                if "--dump-single-json" in command:
+                    return ExternalCommandResult(0, '{"subtitles":{},"automatic_captions":{}}', "")
+                if command[0] == "ffmpeg":
+                    return ExternalCommandResult(1, "", "ffmpeg decode failed")
+                return ExternalCommandResult(1, "", f"unexpected command: {command}")
+
+            def media_downloader(actual_url: str, media_path: Path, timeout_seconds: int) -> ExternalCommandResult:
+                self.assertEqual(actual_url, source_url)
+                media_path.write_bytes(b"video")
+                return ExternalCommandResult(0, "", "")
+
+            result = extract_youtube_transcript(
+                source_url,
+                run_dir,
+                which=lambda tool: tool,
+                runner=runner,
+                allow_media_fallback=True,
+                media_downloader=media_downloader,
+            )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.report["source_url"], source_url)
+            self.assertEqual(result.report["route_decision"]["external_route"], "youtube_media_transcript")
+            self.assertEqual(result.report["route_decision"]["status"], "failed")
+            self.assertEqual(result.report["route_decision"]["fallback_applied"], "true")
+            self.assertEqual(result.report["route_decision"]["fallback_from"], "youtube_subtitle")
+            self.assertEqual(result.report["failure_reason"]["code"], "E_CONVERT_FAILED")
+            self.assertEqual(result.report["subtitle_attempt"]["failure_reason"]["code"], "E_YOUTUBE_SUBTITLE_UNAVAILABLE")
+            self.assertEqual(result.report["media_transcript"]["route_decision"]["external_route"], "media_to_transcript")
+            self.assertEqual(result.report["sanitized_commands"], [["yt-dlp-python", "download", "{source_url}", "{artifact_path}"]])
+
+    def test_youtube_media_fallback_reports_missing_python_download_library(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_dir = root / "run"
+
+            def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
+                if "--dump-single-json" in command:
+                    return ExternalCommandResult(0, '{"subtitles":{},"automatic_captions":{}}', "")
+                return ExternalCommandResult(1, "", f"unexpected command: {command}")
+
+            with patch("kbprep_worker.converters.external_tools.find_spec", return_value=None):
+                result = extract_youtube_transcript(
+                    "https://www.youtube.com/watch?v=ExampleVideo01",
+                    run_dir,
+                    which=lambda tool: tool,
+                    runner=runner,
+                    allow_media_fallback=True,
+                )
+
+            self.assertFalse(result.ok)
+            self.assertEqual(result.report["route_decision"]["external_route"], "youtube_media_transcript")
+            self.assertEqual(result.report["failure_reason"]["code"], "E_ENV_MISSING")
+            self.assertEqual(result.report["failure_reason"]["dependency"], "yt-dlp Python package")
 
     def test_youtube_fallback_does_not_depend_on_english_subtitle_error_text(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -186,10 +357,6 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
                 if "--dump-single-json" in command:
                     return ExternalCommandResult(0, '{"subtitles":{},"automatic_captions":{}}', "")
-                if command[0] == "yt-dlp":
-                    output_index = command.index("--output") + 1
-                    Path(command[output_index]).write_bytes(b"media")
-                    return ExternalCommandResult(0, "", "")
                 if command[0] == "ffmpeg":
                     Path(command[-1]).write_bytes(b"wav")
                     return ExternalCommandResult(0, "", "")
@@ -200,12 +367,17 @@ class TestMediaYoutubeRoute(unittest.TestCase):
                     return ExternalCommandResult(0, "", "")
                 return ExternalCommandResult(1, "", f"unexpected command: {command}")
 
+            def media_downloader(source_url: str, media_path: Path, timeout_seconds: int) -> ExternalCommandResult:
+                media_path.write_bytes(b"media")
+                return ExternalCommandResult(0, "", "")
+
             result = extract_youtube_transcript(
                 "https://youtu.be/ExampleVideo01",
                 run_dir,
                 which=lambda tool: tool,
                 runner=runner,
                 allow_media_fallback=True,
+                media_downloader=media_downloader,
             )
 
             self.assertTrue(result.ok)
@@ -285,6 +457,9 @@ class TestMediaYoutubeRoute(unittest.TestCase):
 
             self.assertFalse(result.ok)
             self.assertEqual(result.report["failure_reason"]["code"], "E_YOUTUBE_SUBTITLE_UNAVAILABLE")
+            self.assertNotIn("subtitle_inventory_path", result.report)
+            self.assertNotIn("subtitle_path", result.report)
+            self.assertNotIn("subtitle_language", result.report)
             self.assertEqual(len(commands), 1)
             self.assertIn("--dump-single-json", commands[0])
 
@@ -299,6 +474,9 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertEqual(result.report["failure_reason"]["code"], "E_ENV_MISSING")
             self.assertEqual(result.report["failure_reason"]["dependency"], "yt-dlp")
+            self.assertNotIn("subtitle_inventory_path", result.report)
+            self.assertNotIn("subtitle_path", result.report)
+            self.assertNotIn("subtitle_language", result.report)
 
     def test_youtube_route_reports_no_network_before_conversion(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -311,6 +489,9 @@ class TestMediaYoutubeRoute(unittest.TestCase):
 
             self.assertFalse(result.ok)
             self.assertEqual(result.report["failure_reason"]["code"], "E_NETWORK_DISABLED")
+            self.assertNotIn("subtitle_inventory_path", result.report)
+            self.assertNotIn("subtitle_path", result.report)
+            self.assertNotIn("subtitle_language", result.report)
 
     def test_youtube_route_reports_timeout_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -328,6 +509,9 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertEqual(result.report["failure_reason"]["code"], "E_TIMEOUT")
             self.assertIn("yt-dlp", result.report["sanitized_commands"][0][0])
+            self.assertNotIn("subtitle_inventory_path", result.report)
+            self.assertNotIn("subtitle_path", result.report)
+            self.assertNotIn("subtitle_language", result.report)
 
     def test_youtube_playlist_expands_to_bounded_local_descriptors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

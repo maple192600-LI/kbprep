@@ -37,7 +37,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; policy/CIR id-level targeting still needs implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
-| youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
+| youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; successful subtitle reports preserve source URL, recorded-equivalent inventory evidence, selected language, subtitle/transcript artifact paths, and sanitized command evidence. Media fallback is explicit, downloads video/media through the `yt-dlp` Python package, and is covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
 
 ## Guiding Principles
 
@@ -243,8 +243,11 @@ Slices:
   with mocked golden transcript route evidence, command evidence, and dependency
   failure reporting. Verified promotion still requires real local ASR samples.
 - **F2** Landed: direct YouTube URLs, explicit video ids, and local `.url` descriptors
-  use a subtitle-first route. Media fallback is explicit and only runs when
-  enabled. Fixtures mock `yt-dlp`, `ffmpeg`, and Whisper; real-network breadth,
+  use a subtitle-first route. Successful subtitle reports preserve
+  recorded-equivalent inventory evidence, selected language, source URL,
+  subtitle/transcript artifact paths, and sanitized commands. Media fallback is
+  explicit, downloads video/media through the `yt-dlp` Python package, and only runs when enabled.
+  Fixtures mock `yt-dlp`, Python-library media download, `ffmpeg`, and Whisper; real-network breadth,
   timeout behavior, dependency variance, and transcript quality still need
   broader evidence before verified promotion.
 - **F3** Landed: `capability-matrix.md`, status JSON, README/operator guidance,
@@ -408,7 +411,8 @@ Current truth:
   timing-quality evidence are missing.
 - `youtube_url_routes` is partial. Standalone CLI direct URL / explicit video id input,
   descriptor routing, accepted public URL-shape evidence, subtitle extraction,
-  explicit media fallback, and mocked failure fixtures exist; verified promotion
+  subtitle report inventory/language/artifact evidence, explicit media fallback,
+  and mocked failure fixtures exist; verified promotion
   still needs broader real-network, timeout, dependency-variance, fallback, and
   transcript-quality evidence.
 - Image OCR and legacy Office routes are also experimental and need real

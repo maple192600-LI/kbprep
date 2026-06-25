@@ -11,6 +11,7 @@ type RuntimeFileState = {
     env?: NodeJS.ProcessEnv;
     label: string;
   }>;
+  lockOpenPaths: string[];
   setupStdout: string;
 };
 
@@ -18,10 +19,12 @@ const runtimeState = vi.hoisted<RuntimeFileState>(() => ({
   files: new Map(),
   dirs: new Set(),
   calls: [],
+  lockOpenPaths: [],
   setupStdout: JSON.stringify({ ok: true, data: { device: "cpu", actions_taken: [] } }),
 }));
 
 vi.mock("node:fs", () => ({
+  closeSync() {},
   existsSync(pathLike: string) {
     const path = String(pathLike);
     return runtimeState.files.has(path) || runtimeState.dirs.has(path);
@@ -49,6 +52,20 @@ vi.mock("node:fs", () => ({
         runtimeState.files.delete(key);
       }
     }
+  },
+  statSync() {
+    return { mtimeMs: 0 };
+  },
+  openSync(pathLike: string, flag: string) {
+    const path = String(pathLike);
+    if (flag === "wx" && runtimeState.files.has(path)) {
+      const error = new Error("mock lock exists") as NodeJS.ErrnoException;
+      error.code = "EEXIST";
+      throw error;
+    }
+    runtimeState.lockOpenPaths.push(path);
+    runtimeState.files.set(path, "");
+    return path;
   },
   writeFileSync(pathLike: string, data: string) {
     runtimeState.files.set(String(pathLike), String(data));
@@ -83,6 +100,7 @@ describe("python runtime full setup orchestration", () => {
     runtimeState.files.clear();
     runtimeState.dirs.clear();
     runtimeState.calls = [];
+    runtimeState.lockOpenPaths = [];
     runtimeState.setupStdout = JSON.stringify({ ok: true, data: { device: "cpu", actions_taken: [] } });
     delete process.env.VITEST;
     delete process.env.KBPREP_SKIP_AUTO_SETUP;
@@ -134,6 +152,8 @@ describe("python runtime full setup orchestration", () => {
       setup_env: { ok: true, data: { device: "cpu", actions_taken: [] } },
     });
     expect(marker.python_project.dependency_spec).toContain("mineru[all]");
+    expect(runtimeState.lockOpenPaths.some((file) => file.endsWith("dev-runtime.lock"))).toBe(true);
+    expect([...runtimeState.files.keys()].some((file) => file.endsWith("dev-runtime.lock"))).toBe(false);
   });
 
   it("clears stale dev runtime marker when runtime setup rebuilds the shared venv", async () => {
@@ -145,6 +165,19 @@ describe("python runtime full setup orchestration", () => {
     await ensurePythonRuntime();
 
     expect([...runtimeState.files.keys()].some((file) => file.endsWith("dev-runtime-ready.json"))).toBe(false);
+    expect([...runtimeState.files.keys()].some((file) => file.endsWith("runtime-ready.json"))).toBe(true);
+  });
+
+  it("reclaims orphaned shared setup locks before rebuilding the shared venv", async () => {
+    const { ensurePythonRuntime, kbprepVenvPythonPath } = await import("./pythonRuntime.js");
+    const kbprepDir = dirname(dirname(dirname(kbprepVenvPythonPath())));
+    const lockPath = join(kbprepDir, "dev-runtime.lock");
+    runtimeState.files.set(lockPath, JSON.stringify({ pid: 999999, created_at: "2000-01-01T00:00:00.000Z" }));
+
+    await ensurePythonRuntime();
+
+    expect(runtimeState.lockOpenPaths.filter((file) => file.endsWith("dev-runtime.lock")).length).toBe(1);
+    expect([...runtimeState.files.keys()].some((file) => file.endsWith("dev-runtime.lock"))).toBe(false);
     expect([...runtimeState.files.keys()].some((file) => file.endsWith("runtime-ready.json"))).toBe(true);
   });
 

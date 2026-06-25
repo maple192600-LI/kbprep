@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -55,7 +56,8 @@ describe("python runtime setup ergonomics", () => {
       python_executable: kbprepVenvPythonPath(),
       requested_device_override: "cpu",
       python_project: {
-        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2",
+        dependency_spec:
+          "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2;yt-dlp>=2025.1,<2027",
       },
       setup_env: {
         ok: true,
@@ -88,7 +90,8 @@ describe("python runtime setup ergonomics", () => {
       python_executable: kbprepVenvPythonPath(),
       device_override: "cuda",
       python_project: {
-        dependency_spec: "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2",
+        dependency_spec:
+          "mineru[all]>=3.2.1,<4;PyMuPDF>=1.27,<2;pymupdf4llm>=0.0.27,<1;beautifulsoup4==4.14.3;lxml==6.0.2;yt-dlp>=2025.1,<2027",
       },
       setup_env: {
         ok: true,
@@ -232,9 +235,15 @@ describe("python runtime setup ergonomics", () => {
     expect(wrapper).toContain('"pymupdf4llm>=0.0.27,<1"');
     expect(wrapper).toContain('"beautifulsoup4==4.14.3"');
     expect(wrapper).toContain('"lxml==6.0.2"');
+    expect(wrapper).toContain('"yt-dlp>=2025.1,<2027"');
     expect(wrapper).toContain('"setuptools<82"');
     expect(wrapper).toContain('stdio: "pipe"');
     expect(wrapper).toContain("process.stderr.write(output)");
+    expect(wrapper).toContain("dev-runtime.lock");
+    expect(wrapper).toContain("acquireDevRuntimeLock");
+    expect(wrapper).toContain("reclaimStaleDevRuntimeLock");
+    expect(wrapper).toContain('"wx"');
+    expect(wrapper).toContain("KBPREP_VENV_LOCK_TIMEOUT_MS");
     expect(wrapper).not.toContain('python) + "[dev]"');
 
     const nestedCheckScripts = ["scripts/checks/capability-matrix.mjs", "scripts/checks/cleaning-hardcodes.mjs"];
@@ -261,6 +270,33 @@ describe("python runtime setup ergonomics", () => {
       restoreEnv("KBPREP_SKIP_AUTO_SETUP", originalSkip);
       restoreEnv("KBPREP_PYTHON", originalKbprepPython);
       restoreEnv("PYTHON", originalPython);
+    }
+  });
+
+  it("recovers stale dev runtime locks before running Python commands", () => {
+    const lockPath = path.join(repoRoot, ".kbprep", "dev-runtime.lock");
+    const markerPath = path.join(repoRoot, ".kbprep", "dev-runtime-ready.json");
+    const originalMarker = existsSync(markerPath) ? readFileSync(markerPath, "utf8") : null;
+    try {
+      mkdirSync(path.dirname(lockPath), { recursive: true });
+      rmSync(markerPath, { force: true });
+      writeFileSync(lockPath, JSON.stringify({ pid: process.pid, created_at: "2000-01-01T00:00:00.000Z" }), "utf8");
+
+      const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "python-venv.mjs"), "-c", "print('lock-check')"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: { ...process.env, KBPREP_VENV_LOCK_STALE_MS: "1", KBPREP_VENV_LOCK_TIMEOUT_MS: "2000" },
+        timeout: 120_000,
+      });
+
+      expect(result.status, result.stderr || result.stdout).toBe(0);
+      expect(result.stdout).toContain("lock-check");
+      expect(existsSync(lockPath)).toBe(false);
+    } finally {
+      rmSync(lockPath, { force: true });
+      if (originalMarker !== null && !existsSync(markerPath)) {
+        writeFileSync(markerPath, originalMarker, "utf8");
+      }
     }
   });
 });

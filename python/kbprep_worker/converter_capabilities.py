@@ -271,7 +271,7 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "source_type": "remote_url",
         "extensions": sorted(URL_DESCRIPTOR_EXTENSIONS),
         "route": "youtube_subtitle_then_media_transcript",
-        "dependencies": ["yt-dlp", "ffmpeg and local Whisper CLI for media fallback"],
+        "dependencies": ["yt-dlp subtitle route", "yt-dlp Python package media fallback", "ffmpeg and local Whisper CLI"],
         "fallback": (
             "Download or export a local subtitle, transcript, Markdown, text, PDF, "
             "or media file before running KBPrep."
