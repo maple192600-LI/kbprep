@@ -21,9 +21,10 @@ Feedback creates proposals with:
 - risk note
 - confirmation requirement
 - owner confirmation status
+- lifecycle status and lifecycle history
 - created-from-run reference
 
-Accepted proposals become deterministic rules only after explicit `confirm_rule_acceptance` confirmation. Rejected proposals are remembered but not loaded by cleanup.
+Accepted proposals become deterministic rules only after explicit `confirm_rule_acceptance` confirmation. Rejected proposals are remembered but not loaded by cleanup. The `status` field remains the load-bearing proposal state (`proposed`, `accepted`, or `rejected`); rerun and promotion safety states are recorded in `lifecycle_status` and `lifecycle_history`.
 
 ## Acceptance
 
@@ -31,6 +32,7 @@ Accepted proposals become deterministic rules only after explicit `confirm_rule_
 - Proposal acceptance validates examples and counterexamples.
 - Proposal acceptance refuses promotion until owner confirmation is recorded.
 - Rerun verification reports whether the accepted rule helped.
+- Failed rerun or promotion evidence is visible as `rerun_failed` or `promotion_blocked` without changing the accepted-rule loading contract.
 
 ## Risk And Rollback
 

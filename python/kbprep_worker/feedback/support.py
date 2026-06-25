@@ -65,6 +65,22 @@ def _append_jsonl_locked(path: Path, payload: dict) -> None:
             fh.write(line)
 
 
+def _replace_jsonl_record_locked(path: Path, record_id: str, payload: dict) -> None:
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    with _JsonlFileLock(lock_path):
+        rows = _read_jsonl(path) if path.exists() else []
+        replaced = False
+        for idx, row in enumerate(rows):
+            if row.get("id") == record_id:
+                rows[idx] = payload
+                replaced = True
+                break
+        if not replaced:
+            rows.append(payload)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows), encoding="utf-8")
+
+
 def _read_jsonl(path: Path) -> list[dict]:
     rows: list[dict] = []
     with path.open("r", encoding="utf-8") as fh:

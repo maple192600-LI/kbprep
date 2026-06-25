@@ -39,6 +39,7 @@ def _promotion_history_risk(*, target_rules_dir: Path, document_type: str) -> di
     if counts["unresolved_failed"] > 0:
         return {
             "status": "blocked",
+            "lifecycle_status": "promotion_blocked",
             "history_path": str(history_path),
             "summary": summary,
             "failed_samples": _failed_sample_references(entries),
@@ -153,6 +154,7 @@ def _promotion_history_document_summary(document_type: str, entries: list[dict])
             last_failure_reason=last_failure_reason,
         ),
     }
+
 
 def _resolve_promotion_failures(data: dict) -> None:
     if not _has_failure_resolution_confirmation(data):

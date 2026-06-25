@@ -17,6 +17,7 @@ from .support import (
     _matching_snippets,
     _optional_string,
     _read_jsonl,
+    _replace_jsonl_record_locked,
     _rules_dir,
     _string_list,
 )
@@ -53,12 +54,15 @@ def _accept_proposal(data: dict) -> None:
         return
 
     validation = _validated_acceptance_or_fail(selected, proposed_path)
-    accepted = _accepted_proposal_payload(selected, validation)
+    accepted = _accepted_proposal_payload(selected, validation, rerun_requested=data.get("rerun_after_accept") is True)
     validate_rule_proposal(accepted, "accepted feedback")
     rules_dir.mkdir(parents=True, exist_ok=True)
     _append_jsonl_locked(accepted_path, accepted)
 
     rerun_verification = _rerun_after_accept(accepted, rules_dir, data)
+    accepted = _accepted_payload_after_rerun(accepted, rerun_verification, rerun_requested=data.get("rerun_after_accept") is True)
+    validate_rule_proposal(accepted, "accepted feedback")
+    _replace_jsonl_record_locked(accepted_path, str(accepted["id"]), accepted)
 
     ok(data={
         "accepted": accepted,
@@ -105,16 +109,48 @@ def _validated_acceptance_or_fail(selected: dict, proposed_path: Path) -> dict:
     return validation
 
 
-def _accepted_proposal_payload(selected: dict, validation: dict) -> dict:
+def _accepted_proposal_payload(selected: dict, validation: dict, *, rerun_requested: bool) -> dict:
+    lifecycle_history = ["accepted"]
+    lifecycle_status = "accepted"
+    if rerun_requested:
+        lifecycle_history.append("rerun_pending")
+        lifecycle_status = "rerun_pending"
     return {
         **selected,
         "status": "accepted",
+        "lifecycle_status": lifecycle_status,
+        "lifecycle_history": lifecycle_history,
         "accepted_at": datetime.now(timezone.utc).isoformat(),
         "accepted_rule_id": f"user-feedback-{selected['id']}",
         "acceptance_validation": validation,
         "owner_confirmation_status": "confirmed",
         "requires_confirmation": True,
     }
+
+
+def _accepted_payload_after_rerun(accepted: dict, rerun_verification: dict, *, rerun_requested: bool) -> dict:
+    if not rerun_requested:
+        return accepted
+    lifecycle_status = _lifecycle_status_from_rerun(rerun_verification)
+    history = _proposal_string_list(accepted.get("lifecycle_history"))
+    if history and history[-1] == lifecycle_status:
+        lifecycle_history = history
+    else:
+        lifecycle_history = [*history, lifecycle_status]
+    return {
+        **accepted,
+        "lifecycle_status": lifecycle_status,
+        "lifecycle_history": lifecycle_history,
+    }
+
+
+def _lifecycle_status_from_rerun(rerun_verification: dict) -> str:
+    status = _optional_string(rerun_verification.get("status")) or ""
+    if rerun_verification.get("ok") is True or status == "passed":
+        return "rerun_passed"
+    if status in {"unavailable", "not_requested", "skipped"}:
+        return "rerun_pending"
+    return "rerun_failed"
 
 
 def _has_rule_acceptance_confirmation(data: dict) -> bool:
@@ -161,6 +197,8 @@ def _reject_proposal(data: dict) -> None:
     rejected = {
         **selected,
         "status": "rejected",
+        "lifecycle_status": "rejected",
+        "lifecycle_history": ["rejected"],
         "rejected_at": datetime.now(timezone.utc).isoformat(),
         "reject_reason": _optional_string(data.get("reject_reason")) or "Rejected by user or reviewing agent.",
         "owner_confirmation_status": "rejected",
@@ -376,6 +414,8 @@ def _literal_narrowed_payload(
         **proposal,
         "id": _new_proposal_id(),
         "status": "proposed",
+        "lifecycle_status": "proposed",
+        "lifecycle_history": ["proposed"],
         "pattern": narrowed_pattern[:120],
         "match": "literal",
         "examples": _dedupe_strings([narrowed_pattern, *candidates])[:8],
@@ -411,6 +451,8 @@ def _regex_narrowed_from_examples(
         **proposal,
         "id": f"proposal-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}",
         "status": "proposed",
+        "lifecycle_status": "proposed",
+        "lifecycle_history": ["proposed"],
         "pattern": pattern,
         "match": "regex",
         "examples": _dedupe_strings(examples)[:8],

@@ -15,6 +15,16 @@ ALLOWED_RULE_ACTIONS = {"discard", "review", "protect"}
 ALLOWED_MATCH_TYPES = {"regex", "literal"}
 ALLOWED_RULE_SCOPES = {"global", "user", "project", "document_type", "source_pattern"}
 ALLOWED_OWNER_CONFIRMATION_STATUSES = {"pending", "confirmed", "rejected"}
+ALLOWED_RULE_PROPOSAL_STATUSES = {"proposed", "accepted", "rejected"}
+ALLOWED_RULE_LIFECYCLE_STATUSES = {
+    "proposed",
+    "accepted",
+    "rejected",
+    "rerun_pending",
+    "rerun_passed",
+    "rerun_failed",
+    "promotion_blocked",
+}
 
 
 @dataclass(frozen=True)
@@ -73,6 +83,7 @@ class RuleProposal:
     created_from_run: str
     requires_confirmation: bool
     owner_confirmation_status: str
+    lifecycle_status: str | None = None
 
 
 def validate_rule_file(data: object, source: str) -> CleaningRuleSet:
@@ -155,17 +166,51 @@ def validate_rule_proposal(data: object, source: str) -> RuleProposal:
     if data.get("schema") != ALLOWED_RULE_PROPOSAL_SCHEMA:
         raise ValueError(f"{source}: schema must be {ALLOWED_RULE_PROPOSAL_SCHEMA}")
 
-    proposal_id = _required_top_string(data, "id", source)
-    action = _required_top_string(data, "action", source)
-    scope = _required_top_string(data, "scope", source)
-    match = _required_top_string(data, "match", source)
-    pattern = _required_top_string(data, "pattern", source)
-    reason = _required_top_string(data, "reason", source)
-    risk_note = _required_top_string(data, "risk_note", source)
-    created_from_run = _required_top_string(data, "created_from_run", source)
-    owner_confirmation_status = _required_top_string(data, "owner_confirmation_status", source)
+    fields = _proposal_string_fields(data, source)
     requires_confirmation = data.get("requires_confirmation")
+    lifecycle_status = _optional_lifecycle_status(data, source)
+    _validate_rule_proposal_contract(data, source, fields, requires_confirmation)
 
+    return RuleProposal(
+        proposal_id=fields["proposal_id"],
+        action=fields["action"],
+        scope=fields["scope"],
+        match=fields["match"],
+        pattern=fields["pattern"],
+        reason=fields["reason"],
+        risk_note=fields["risk_note"],
+        created_from_run=fields["created_from_run"],
+        requires_confirmation=True,
+        owner_confirmation_status=fields["owner_confirmation_status"],
+        lifecycle_status=lifecycle_status,
+    )
+
+
+def _proposal_string_fields(data: dict, source: str) -> dict[str, str]:
+    return {
+        "proposal_id": _required_top_string(data, "id", source),
+        "action": _required_top_string(data, "action", source),
+        "scope": _required_top_string(data, "scope", source),
+        "match": _required_top_string(data, "match", source),
+        "pattern": _required_top_string(data, "pattern", source),
+        "reason": _required_top_string(data, "reason", source),
+        "risk_note": _required_top_string(data, "risk_note", source),
+        "created_from_run": _required_top_string(data, "created_from_run", source),
+        "owner_confirmation_status": _required_top_string(data, "owner_confirmation_status", source),
+    }
+
+
+def _validate_rule_proposal_contract(
+    data: dict,
+    source: str,
+    fields: dict[str, str],
+    requires_confirmation: object,
+) -> None:
+    action = fields["action"]
+    scope = fields["scope"]
+    match = fields["match"]
+    pattern = fields["pattern"]
+    owner_confirmation_status = fields["owner_confirmation_status"]
     if action not in ALLOWED_RULE_ACTIONS:
         raise ValueError(f"{source}: action must be one of {sorted(ALLOWED_RULE_ACTIONS)}")
     if scope not in ALLOWED_RULE_SCOPES:
@@ -186,19 +231,6 @@ def validate_rule_proposal(data: object, source: str) -> RuleProposal:
     _validate_owner_confirmation_status(data, owner_confirmation_status, source)
     _validate_required_string_list(data.get("examples"), "examples", source)
     _validate_required_string_list(data.get("counterexamples"), "counterexamples", source)
-
-    return RuleProposal(
-        proposal_id=proposal_id,
-        action=action,
-        scope=scope,
-        match=match,
-        pattern=pattern,
-        reason=reason,
-        risk_note=risk_note,
-        created_from_run=created_from_run,
-        requires_confirmation=requires_confirmation,
-        owner_confirmation_status=owner_confirmation_status,
-    )
 
 
 def _required_string(raw_rule: dict, key: str, source: str, idx: int) -> str:
@@ -232,6 +264,8 @@ def _validate_owner_confirmation_status(data: dict, owner_confirmation_status: s
         )
     raw_status = data.get("status")
     status = raw_status if isinstance(raw_status, str) else ""
+    if status not in ALLOWED_RULE_PROPOSAL_STATUSES:
+        raise ValueError(f"{source}: status must be one of {sorted(ALLOWED_RULE_PROPOSAL_STATUSES)}")
     expected_by_status = {
         "proposed": "pending",
         "accepted": "confirmed",
@@ -240,6 +274,49 @@ def _validate_owner_confirmation_status(data: dict, owner_confirmation_status: s
     expected = expected_by_status.get(status)
     if expected and owner_confirmation_status != expected:
         raise ValueError(f"{source}: owner_confirmation_status must be {expected} when status is {status}")
+
+
+def _optional_lifecycle_status(data: dict, source: str) -> str | None:
+    value = data.get("lifecycle_status")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{source}: lifecycle_status must be a non-empty string when provided")
+    if value not in ALLOWED_RULE_LIFECYCLE_STATUSES:
+        raise ValueError(f"{source}: lifecycle_status must be one of {sorted(ALLOWED_RULE_LIFECYCLE_STATUSES)}")
+    history = data.get("lifecycle_history")
+    if history is not None:
+        _validate_lifecycle_history(history, source)
+    _validate_lifecycle_matches_status(data, value, source)
+    return value
+
+
+def _validate_lifecycle_history(value: object, source: str) -> None:
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{source}: lifecycle_history must be a non-empty list when provided")
+    for idx, item in enumerate(value):
+        if item not in ALLOWED_RULE_LIFECYCLE_STATUSES:
+            raise ValueError(
+                f"{source}: lifecycle_history[{idx}] must be one of {sorted(ALLOWED_RULE_LIFECYCLE_STATUSES)}"
+            )
+
+
+def _validate_lifecycle_matches_status(data: dict, lifecycle_status: str, source: str) -> None:
+    raw_status = data.get("status")
+    status = raw_status if isinstance(raw_status, str) else ""
+    allowed_by_status = {
+        "proposed": {"proposed"},
+        "accepted": {"accepted", "rerun_pending", "rerun_passed", "rerun_failed"},
+        "rejected": {"rejected"},
+    }
+    allowed = allowed_by_status.get(status)
+    if allowed is None:
+        return
+    if lifecycle_status not in allowed:
+        raise ValueError(f"{source}: lifecycle_status {lifecycle_status!r} is invalid when status is {status!r}")
+    history = data.get("lifecycle_history")
+    if isinstance(history, list) and history[-1] != lifecycle_status:
+        raise ValueError(f"{source}: lifecycle_history must end with lifecycle_status")
 
 
 def _validate_regex_pattern(match: str, pattern: str, source: str) -> None:

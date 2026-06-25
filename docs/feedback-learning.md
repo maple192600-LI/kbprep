@@ -43,6 +43,8 @@ Each proposal should contain:
 - `confidence`: numeric score or enum
 - `owner_confirmation_status`: `pending`, `confirmed`, or `rejected`
 - `requires_confirmation`: always true before promotion
+- `lifecycle_status`: current feedback lifecycle state. `status` stays load-bearing (`proposed`, `accepted`, or `rejected`), while `lifecycle_status` can record `proposed`, `accepted`, `rejected`, `rerun_pending`, `rerun_passed`, `rerun_failed`, or `promotion_blocked`.
+- `lifecycle_history`: ordered lifecycle states already reached, used to show whether a confirmed rule still needs rerun evidence or has failed promotion history.
 
 ## Storage Direction
 
@@ -98,6 +100,7 @@ Implemented behavior includes:
 - broad discard proposals can be rejected or narrowed
 - accepted proposals are copied to accepted rules only when `confirm_rule_acceptance=true`
 - rejected proposals are remembered but never loaded by deterministic cleanup
+- proposal, accepted, and rejected records preserve lifecycle status and history without changing the load-bearing `status: accepted` contract
 - source-specific accepted rules match explicit source identity fields
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
@@ -107,6 +110,7 @@ Implemented behavior includes:
 - private document-type dictionary rules participate in later cleanup and policy snapshots without copying private rule contents into public artifacts
 - promotion history records pass, fail, or unverified outcomes; failed history blocks new promotion by default
 - overriding failed promotion history requires an explicit flag and reports the failed sample evidence in the response
+- failed promotion history is surfaced as `lifecycle_status: promotion_blocked` so users can see that more rules should not be promoted until representative samples pass again
 
 AI review should start in `shadow` mode for any new external model. Shadow suggestions do not mutate final Markdown; apply mode still routes through worker `apply_review` and the quality gates.
 

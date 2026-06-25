@@ -70,6 +70,8 @@ def _create_feedback_proposal(data: dict) -> tuple[dict, object]:
         "schema": "kbprep.rule_proposal.v1",
         "id": f"proposal-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}",
         "status": "proposed",
+        "lifecycle_status": "proposed",
+        "lifecycle_history": ["proposed"],
         "action": action,
         **scope_payload,
         "document_type": _optional_string(data.get("document_type")),
