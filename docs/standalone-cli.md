@@ -50,6 +50,8 @@ kbprep-prepare --youtube-video-id ExampleVideo01 --output ./.kbprep/youtube --al
 kbprep-apply-review --run-dir ./.kbprep/source/runs/<run-id> --patch-file ./review.patch.json
 kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --feedback-text "下次删除「关注公众号」这种污染"
 kbprep-feedback --accept-proposal latest --confirm-rule-acceptance
+kbprep-feedback --plan-rerun --accepted-proposal latest
+kbprep-feedback --plan-rerun --run-dir ./.kbprep/source/runs/<run-id>
 kbprep-feedback --suggest-dictionary-updates
 kbprep-feedback --promote-dictionary-suggestion --document-type course --confirm-dictionary-update
 kbprep-cleanup --output ./.kbprep/source --action finalize
@@ -93,6 +95,8 @@ Use `kbprep-cleanup --action finalize` only after checking `quality_report.json`
 `kbprep-feedback` writes proposed rules first. Only an explicit accept command with `--confirm-rule-acceptance` promotes a proposal into accepted rules.
 
 Use source-specific scope only when the cleanup should be limited to a known source family. Accepted source-specific rules match recorded source identity fields, not arbitrary body text.
+
+Use `kbprep-feedback --plan-rerun` when you want selective rerun evidence before actually running the source again. It can start from `--accepted-proposal`, `--run-dir`, or promotion history for `--document-type`. A planned result records the run id, source identity, document type, policy snapshot hash when available, and command evidence. `canonical_ir_binding.status` is intentionally `pending` until the Canonical IR C3 binding is implemented. A blocked result writes `rerun_history.jsonl` and does not claim rerun verification.
 
 Dictionary promotion writes to `.kbprep/rules/document_types/` by default. Later `kbprep-prepare` runs automatically load the matching private document-type dictionary for the current project and record its path/hash in the cleaning policy snapshot without copying private rule contents. Passing `--target-rules-dir rules` points at packaged public rules and also requires `--confirm-public-write`; use that only for generic, sanitized rules that are safe to version. Promotion history stays under private `.kbprep/rules/`, including later promotion-history summary and resolution commands for that public target.
 

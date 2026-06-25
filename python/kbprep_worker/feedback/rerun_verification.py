@@ -4,11 +4,149 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
-from .support import _matches_pattern, _optional_string, _read_json_file, _string_list
+from .support import (
+    _append_jsonl_locked,
+    _matches_pattern,
+    _optional_string,
+    _promotion_history_rules_dir,
+    _read_json_file,
+    _read_jsonl,
+    _rules_dir,
+    _string_list,
+    _target_rules_dir,
+)
 
 RERUN_TIMEOUT_SECONDS = 120
+
+
+def _selective_rerun_plan(data: dict) -> dict:
+    if _optional_string(data.get("accepted_proposal")):
+        plan = _selective_plan_from_accepted_proposal(data)
+    elif _optional_string(data.get("run_dir")):
+        plan = _selective_plan_from_run_dir(Path(str(data["run_dir"])).expanduser().resolve(), "run_metadata")
+    elif not _optional_string(data.get("document_type")):
+        plan = _blocked_plan(
+            plan_source="selector",
+            reason="plan_rerun requires run_dir, accepted_proposal, or document_type.",
+            missing_evidence=["rerun_selector"],
+        )
+    else:
+        plan = _selective_plan_from_promotion_history(data)
+    if plan.get("status") == "blocked":
+        _append_blocked_rerun_history(data, plan)
+    return plan
+
+
+def _selective_plan_from_accepted_proposal(data: dict) -> dict:
+    rules_dir = _rules_dir(data)
+    accepted_path = rules_dir / "accepted_rules.jsonl"
+    proposal = _selected_accepted_proposal(accepted_path, str(data.get("accepted_proposal") or ""))
+    if not proposal:
+        return _blocked_plan(
+            plan_source="accepted_proposal",
+            reason=f"accepted proposal not found in {accepted_path}",
+            missing_evidence=["accepted_proposal"],
+        )
+    run_dir = _optional_string(proposal.get("created_from_run")) or ""
+    if not run_dir:
+        return _blocked_plan(
+            plan_source="accepted_proposal",
+            reason="accepted proposal does not include created_from_run evidence",
+            accepted_proposal_id=_optional_string(proposal.get("id")) or "",
+            missing_evidence=["created_from_run"],
+        )
+    plan = _selective_plan_from_run_dir(Path(run_dir).expanduser().resolve(), "accepted_proposal")
+    plan["accepted_proposal_id"] = _optional_string(proposal.get("id")) or ""
+    if plan.get("status") == "planned":
+        plan["command_evidence"] = _command_evidence(plan["prepare_payload"], {"KBPREP_USER_RULES_DIR": str(rules_dir)})
+    return plan
+
+
+def _selected_accepted_proposal(path: Path, wanted: str) -> dict | None:
+    if not path.exists():
+        return None
+    proposals = _read_jsonl(path)
+    if wanted == "latest" and proposals:
+        return proposals[-1]
+    return next((item for item in proposals if item.get("id") == wanted), None)
+
+
+def _selective_plan_from_promotion_history(data: dict) -> dict:
+    history_path = _promotion_history_path(data)
+    document_type = _optional_string(data.get("document_type"))
+    if not history_path.exists():
+        return _blocked_plan(
+            plan_source="promotion_history",
+            reason=f"promotion_history.jsonl does not exist: {history_path}",
+            missing_evidence=["promotion_history"],
+        )
+    entries = _promotion_history_entries(history_path, document_type)
+    if not entries:
+        return _blocked_plan(
+            plan_source="promotion_history",
+            reason="No promotion history entries matched the requested document_type.",
+            missing_evidence=["promotion_history_entry"],
+        )
+    return _plan_from_latest_promotion_entry(entries[-1], history_path.parent)
+
+
+def _promotion_history_path(data: dict) -> Path:
+    explicit = _optional_string(data.get("promotion_history_file"))
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    history_rules_dir = _promotion_history_rules_dir(_target_rules_dir(data))
+    return history_rules_dir / "promotion_history.jsonl"
+
+
+def _promotion_history_entries(path: Path, document_type: str | None) -> list[dict]:
+    entries = [
+        item for item in _read_jsonl(path)
+        if item.get("schema") in {"kbprep.dictionary_promotion_history.v1", "kbprep.dictionary_promotion_resolution.v1"}
+    ]
+    if not document_type:
+        return entries
+    return [item for item in entries if item.get("document_type") == document_type]
+
+
+def _plan_from_latest_promotion_entry(entry: dict, rules_root: Path) -> dict:
+    verification = entry.get("regression_verification")
+    verification = verification if isinstance(verification, dict) else {}
+    status = _optional_string(verification.get("status")) or "unknown"
+    samples = _promotion_samples(verification)
+    if status == "failed":
+        sample = next((item for item in samples if item.get("ok") is False), samples[0] if samples else {})
+        return _blocked_plan(
+            plan_source="promotion_history",
+            reason=_promotion_sample_reason(sample) or "Failed promotion history blocks selective rerun planning.",
+            run_dir=_optional_string(sample.get("run_dir")) or "",
+            document_type=_optional_string(entry.get("document_type")) or "",
+            promotion_history_status=status,
+            missing_evidence=["passing_promotion_history"],
+        )
+    if not samples:
+        return _blocked_plan(
+            plan_source="promotion_history",
+            reason="Promotion history did not record representative run samples.",
+            document_type=_optional_string(entry.get("document_type")) or "",
+            promotion_history_status=status,
+            missing_evidence=["representative_run_dir"],
+        )
+    run_dir = _optional_string(samples[0].get("run_dir")) or ""
+    plan = _selective_plan_from_run_dir(Path(run_dir).expanduser().resolve(), "promotion_history")
+    plan["promotion_history_status"] = status
+    if plan.get("status") == "planned":
+        plan["command_evidence"] = _command_evidence(plan["prepare_payload"], {"KBPREP_RULES_ROOT": str(rules_root)})
+    return plan
+
+
+def _promotion_samples(verification: dict) -> list[dict]:
+    samples = verification.get("samples")
+    if not isinstance(samples, list):
+        return []
+    return [item for item in samples if isinstance(item, dict)]
 
 
 def _rerun_after_dictionary_promotion(
@@ -127,6 +265,202 @@ def _rerun_representative_source(
 def _rerun_plan_from_run_dir(run_dir: Path) -> dict:
     proposal_like = {"created_from_run": str(run_dir)}
     return _rerun_plan_from_proposal(proposal_like)
+
+
+def _selective_plan_from_run_dir(run_dir: Path, plan_source: str) -> dict:
+    if not run_dir.exists():
+        return _blocked_plan(
+            plan_source=plan_source,
+            reason=f"run_dir does not exist: {run_dir}",
+            run_dir=str(run_dir),
+            missing_evidence=["run_dir"],
+        )
+    metadata = _read_json_file(run_dir / "run_metadata.json")
+    quality = _read_json_file(run_dir / "quality_report.json")
+    evidence = _run_evidence_from_metadata(run_dir, metadata, quality)
+    missing = _missing_rerun_evidence(evidence)
+    if missing:
+        return _blocked_plan(
+            plan_source=plan_source,
+            reason=f"Run metadata is missing required rerun evidence: {', '.join(missing)}.",
+            run_dir=str(run_dir),
+            run_id=evidence.get("run_id", ""),
+            document_type=evidence.get("document_type", ""),
+            missing_evidence=missing,
+        )
+    return _planned_selective_rerun(plan_source, run_dir, evidence)
+
+
+def _run_evidence_from_metadata(run_dir: Path, metadata: dict, quality: dict) -> dict:
+    payload = metadata.get("prepare_payload")
+    payload = payload if isinstance(payload, dict) else {}
+    source_identity = metadata.get("source_identity")
+    source_identity = source_identity if isinstance(source_identity, dict) else {}
+    input_path = _optional_string(payload.get("input_path")) or ""
+    return {
+        "run_id": _optional_string(metadata.get("run_id")) or run_dir.name,
+        "input_path": input_path,
+        "output_root": _optional_string(payload.get("output_root")) or _default_output_root(run_dir),
+        "profile": _optional_string(payload.get("profile")) or _optional_string(quality.get("profile")) or "standard",
+        "source_identity": _source_identity_for_plan(source_identity, input_path),
+        "document_type": _optional_string(metadata.get("document_type")) or _optional_string(quality.get("document_type")) or "unknown",
+        "policy_snapshot_hash": (
+            _optional_string(metadata.get("cleaning_policy_snapshot_hash"))
+            or _optional_string(quality.get("cleaning_policy_snapshot_hash"))
+            or ""
+        ),
+    }
+
+
+def _default_output_root(run_dir: Path) -> str:
+    if run_dir.parent.name == "runs":
+        return str(run_dir.parent.parent)
+    return str(run_dir.parent)
+
+
+def _source_identity_for_plan(source_identity: dict, input_path: str) -> dict:
+    identity = dict(source_identity)
+    if input_path:
+        identity.setdefault("input_path", input_path)
+        identity.setdefault("source_path", input_path)
+        identity.setdefault("source_name", Path(input_path).name)
+    return identity
+
+
+def _missing_rerun_evidence(evidence: dict) -> list[str]:
+    missing = []
+    input_path = _optional_string(evidence.get("input_path")) or ""
+    output_root = _optional_string(evidence.get("output_root")) or ""
+    if not input_path:
+        missing.append("input_path")
+    elif not Path(input_path).exists():
+        missing.append("input_path_exists")
+    if not output_root:
+        missing.append("output_root")
+    return missing
+
+
+def _planned_selective_rerun(plan_source: str, run_dir: Path, evidence: dict) -> dict:
+    payload = _selective_prepare_payload(evidence)
+    return {
+        "schema": "kbprep.selective_rerun_plan.v1",
+        "ok": True,
+        "status": "planned",
+        "plan_source": plan_source,
+        "run_id": evidence["run_id"],
+        "run_dir": str(run_dir),
+        "source_identity": evidence["source_identity"],
+        "source_path": evidence["input_path"],
+        "document_type": evidence["document_type"],
+        "policy_snapshot_hash": evidence["policy_snapshot_hash"],
+        "canonical_ir_binding": _pending_canonical_ir_binding(),
+        "prepare_payload": payload,
+        "command_evidence": _command_evidence(payload, {}),
+    }
+
+
+def _selective_prepare_payload(evidence: dict) -> dict:
+    return {
+        "input_path": evidence["input_path"],
+        "output_root": evidence["output_root"],
+        "profile": evidence["profile"],
+        "mode": "rules_only",
+        "language": "auto",
+        "source_type": "auto",
+        "splitter": "auto",
+        "force": True,
+    }
+
+
+def _pending_canonical_ir_binding() -> dict:
+    return {
+        "status": "pending",
+        "canonical_ir_id": None,
+        "reason": "Canonical IR id binding is pending until the C3 contract is implemented.",
+    }
+
+
+def _command_evidence(payload: dict, env: dict[str, str]) -> dict:
+    return {
+        "would_execute": False,
+        "standalone_command": [
+            "kbprep-prepare",
+            "--input",
+            payload["input_path"],
+            "--output",
+            payload["output_root"],
+            "--profile",
+            payload["profile"],
+            "--mode",
+            "rules_only",
+            "--force",
+        ],
+        "worker_command": ["python", "-m", "kbprep_worker.cli", "prepare", "--json-stdin"],
+        "environment": env,
+        "payload": payload,
+    }
+
+
+def _blocked_plan(
+    *,
+    plan_source: str,
+    reason: str,
+    missing_evidence: list[str],
+    run_dir: str = "",
+    run_id: str = "",
+    document_type: str = "",
+    accepted_proposal_id: str = "",
+    promotion_history_status: str = "",
+) -> dict:
+    plan = {
+        "schema": "kbprep.selective_rerun_plan.v1",
+        "ok": False,
+        "status": "blocked",
+        "plan_source": plan_source,
+        "reason": reason,
+        "missing_evidence": missing_evidence,
+        "run_dir": run_dir,
+        "run_id": run_id or (Path(run_dir).name if run_dir else ""),
+        "document_type": document_type,
+        "canonical_ir_binding": _pending_canonical_ir_binding(),
+    }
+    _add_optional_blocked_fields(plan, accepted_proposal_id, promotion_history_status)
+    return plan
+
+
+def _add_optional_blocked_fields(plan: dict, accepted_proposal_id: str, promotion_history_status: str) -> None:
+    if accepted_proposal_id:
+        plan["accepted_proposal_id"] = accepted_proposal_id
+    if promotion_history_status:
+        plan["promotion_history_status"] = promotion_history_status
+
+
+def _append_blocked_rerun_history(data: dict, plan: dict) -> None:
+    history_path = _rules_dir(data) / "rerun_history.jsonl"
+    entry = {
+        "schema": "kbprep.selective_rerun_history.v1",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "blocked",
+        "plan_source": plan.get("plan_source"),
+        "run_id": plan.get("run_id"),
+        "run_dir": plan.get("run_dir"),
+        "document_type": plan.get("document_type"),
+        "reason": plan.get("reason"),
+        "missing_evidence": plan.get("missing_evidence", []),
+        "promotion_history_status": plan.get("promotion_history_status"),
+    }
+    _append_jsonl_locked(history_path, entry)
+
+
+def _promotion_sample_reason(sample: dict) -> str:
+    worker_error = sample.get("worker_error")
+    worker_error = worker_error if isinstance(worker_error, dict) else {}
+    return (
+        _optional_string(sample.get("reason"))
+        or _optional_string(sample.get("error"))
+        or _optional_string(worker_error.get("code"))
+        or ""
+    )
 
 def _verify_promoted_rules_after_rerun(promoted_rules: list[dict], sample: dict) -> dict:
     cleaned_path = sample.get("cleaned_md")

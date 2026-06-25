@@ -59,6 +59,7 @@ Each proposal should contain:
       accepted_rules.jsonl
       rejected_rules.jsonl
       dictionary_suggestions.jsonl
+      rerun_history.jsonl
       protected_terms.jsonl
 
 rules/
@@ -84,6 +85,7 @@ user feedback
 -> validate examples and counterexamples before acceptance
 -> accept with `confirm_rule_acceptance=true` or reject the proposal
 -> write accepted rules only after approval
+-> optionally generate a selective rerun plan from accepted proposal, promotion history, or run metadata
 -> optionally rerun the affected source when run metadata can locate it
 -> report whether rerun evidence supports the change
 ```
@@ -104,6 +106,8 @@ Implemented behavior includes:
 - source-specific accepted rules match explicit source identity fields
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
+- selective rerun planning can emit command evidence without executing the rerun; the plan records run id, source identity, document type, policy snapshot hash when available, and `canonical_ir_binding.status: pending`
+- blocked selective rerun planning is recorded in `rerun_history.jsonl` so missing metadata or failed promotion history remains visible
 - dictionary suggestions require explicit confirmation before promotion
 - dictionary suggestion thresholds are scope-based: user/project/source-pattern evidence can start lower, document-type promotion needs more evidence, and global/public-style promotion needs the highest evidence count
 - dictionary promotion defaults to private project rules and requires a second explicit confirmation before writing packaged public rules

@@ -104,6 +104,41 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
     }
   }, 30_000);
 
+  it("can generate a selective rerun plan without executing the rerun", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-feedback-rerun-plan-"));
+    try {
+      const inputPath = path.join(root, "source.md");
+      const outputRoot = path.join(root, "output");
+      writeFileSync(inputPath, "# Note\n\n正文段落。\n", "utf8");
+
+      const prepared = runWorker("prepare", {
+        input_path: inputPath,
+        output_root: outputRoot,
+        profile: "standard",
+        mode: "rules_only",
+        language: "zh",
+        force: true,
+      });
+      expect(prepared.ok).toBe(true);
+
+      const plan = runWorker("feedback", {
+        plan_rerun: true,
+        run_dir: prepared.data.run_dir,
+      });
+
+      expect(plan.ok).toBe(true);
+      expect(plan.data.rerun_plan.status).toBe("planned");
+      expect(plan.data.rerun_plan.run_id).toBe(prepared.data.run_id);
+      expect(plan.data.rerun_plan.document_type).toBeTruthy();
+      expect(plan.data.rerun_plan.policy_snapshot_hash).toBeTruthy();
+      expect(plan.data.rerun_plan.canonical_ir_binding.status).toBe("pending");
+      expect(plan.data.rerun_plan.command_evidence.standalone_command[0]).toBe("kbprep-prepare");
+      expect(plan.data.rerun_plan.command_evidence.payload.mode).toBe("rules_only");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it("defaults feedback proposals to the current project .kbprep rules directory", () => {
     const root = mkdtempSync(path.join(tmpdir(), "kbprep-project-feedback-default-"));
     try {

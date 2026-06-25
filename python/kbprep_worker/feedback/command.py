@@ -8,6 +8,7 @@ from ..rule_schema import validate_rule_proposal
 from .dictionary_suggestions import _promote_dictionary_suggestion, _suggest_dictionary_updates
 from .promotion_history import _resolve_promotion_failures, _summarize_promotion_history
 from .proposals import _accept_proposal, _confidence, _counterexamples, _examples, _reason, _reject_proposal, _risk_note
+from .rerun_verification import _selective_rerun_plan
 from .support import (
     _action,
     _append_jsonl_locked,
@@ -34,6 +35,9 @@ def run(data: dict) -> None:
 
 
 def _dispatch_special_action(data: dict) -> bool:
+    if data.get("plan_rerun") is True:
+        ok(data={"rerun_plan": _selective_rerun_plan(data)})
+        return True
     if data.get("resolve_promotion_failures") is True:
         _resolve_promotion_failures(data)
         return True

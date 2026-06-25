@@ -329,6 +329,29 @@ describe("standalone KBPrep CLI adapter", () => {
     expect(plan.input.rules_dir).toContain(join(".kbprep", "rules", "user"));
   });
 
+  it("maps feedback selective rerun planning options", () => {
+    const parsed = parseStandaloneArgs([
+      "--plan-rerun",
+      "--accepted-proposal",
+      "latest",
+      "--rules-dir",
+      ".kbprep/rules/user",
+      "--target-rules-dir",
+      ".kbprep/rules",
+      "--document-type",
+      "course",
+    ]);
+    const plan = buildCliPlan("feedback", parsed.options);
+
+    expect(plan.command).toBe("feedback");
+    expect(plan.input.run_dir).toBeUndefined();
+    expect(plan.input.plan_rerun).toBe(true);
+    expect(plan.input.accepted_proposal).toBe("latest");
+    expect(plan.input.rules_dir).toContain(join(".kbprep", "rules", "user"));
+    expect(plan.input.target_rules_dir).toContain(join(".kbprep", "rules"));
+    expect(plan.input.document_type).toBe("course");
+  });
+
   it("maps feedback proposal rejection without requiring a run directory", () => {
     const parsed = parseStandaloneArgs([
       "--reject-proposal",
