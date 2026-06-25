@@ -334,8 +334,9 @@ executable, inspectable, and recoverable.
 
 Required slices:
 
-- Implement playlist input only after the URL/network/copyright boundary is
-  explicitly approved and represented in capability status.
+- Implement playlist input only after the YouTube URL technical contract is
+  represented in capability status: URL parsing, network timeout, dependency
+  behavior, fixture evidence, and failure messages.
 - Add executable selective batch rerun using the parent status manifest and
   child run evidence.
 - Keep unsupported files visible as skipped, not silent failures.
@@ -367,10 +368,12 @@ Required slices:
   timing evidence, dependency failure tests, and final-output quality checks.
 - Promote local media only after those fixtures pass and the capability matrix
   changes from experimental toward partial or verified.
-- Design and approve the YouTube URL input boundary, including network,
-  copyright, dependency, timeout, and no-subtitle fallback behavior.
-- Implement subtitle-first YouTube route, then media-transcript fallback only
-  when dependencies and owner-approved risk boundaries are satisfied.
+- Define the YouTube URL technical contract, including accepted URL shapes,
+  network timeout, dependency detection, artifact evidence, and no-subtitle
+  fallback behavior.
+- Implement the subtitle-first YouTube route in the same development stream as
+  that technical contract, then add media-transcript fallback only when
+  dependencies are present and the CLI option enables it.
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists if
   in scope, and final source-side publication.
 

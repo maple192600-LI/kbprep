@@ -276,7 +276,7 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "status": "design_only",
         "test_evidence": [],
         "required_evidence": [
-            "owner-approved YouTube URL input contract",
+            "documented YouTube URL technical contract",
             "subtitle-first golden fixtures",
             "fallback transcript fixtures",
             "dependency failure and no-network tests",
@@ -285,7 +285,10 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "No standalone CLI URL route, subtitle extraction, media download, or verified fixture support is shipped."
         ),
         "preserves": ["target: subtitle order", "target: transcript text", "target: source URL evidence"],
-        "risk": "URL processing can create network, copyright, dependency, and quality risks; it stays target-only.",
+        "risk": (
+            "URL processing depends on network behavior, subtitle availability, external dependencies, "
+            "timeout handling, and transcript quality; it stays target-only."
+        ),
     },
     {
         "id": "mobi_unsupported",
@@ -352,7 +355,7 @@ def _default_required_evidence(capability: Capability) -> list[str]:
     if status == "partial":
         return ["golden fixtures", "source-to-Markdown preservation checks"]
     if status == "design_only":
-        return ["owner-approved route design", "subtitle-first fixtures", "dependency failure tests"]
+        return ["documented technical route design", "subtitle-first fixtures", "dependency failure tests"]
     return ["explicit dependency/conversion route", "end-to-end fixture proving safe Markdown output"]
 
 

@@ -37,7 +37,16 @@ Current completion state:
 - Do not let two branches edit the same status rows in `kbprep-implementation-status.json` or `docs/capability-matrix.md` at the same time.
 - The branch merged second must rebase or fast-forward onto latest `main`, rerun affected checks, and rerun `npm run dev:check`.
 - `npm run dev:full-check` is the final merge-readiness gate for runtime, route, quality gate, cleanup lifecycle, feedback promotion, publication, dependency, and release-level behavior.
-- Reviewer subagents are mandatory before merging any branch that changes Canonical IR, conversion gates, feedback promotion, batch/rerun behavior, or optional route status.
+- Reviewer subagents are mandatory before merging any branch that changes Canonical IR, conversion gates, feedback promotion, batch/rerun behavior, optional route behavior, or optional route status. Small documentation wording fixes only need main-agent review plus the relevant governance check.
+
+## Second Review Speed Revision
+
+The first version was too conservative in three places. Use this revised flow:
+
+- Do not split YouTube into a separate approval-only boundary branch. The boundary is a technical product contract inside the implementation branch: accepted URL shapes, dependency detection, network timeout, cache/artifact policy, no-subtitle fallback, error messages, quality gates, and status evidence. There is no separate non-technical approval gate in front of this route.
+- Do not make all M5 rerun work wait for C3. Split M5B into command/state scaffolding that can run with C1/C2 and final Canonical-IR identity binding that waits for C3.
+- Do not make all Phase F work wait for M2 and M5. F1 local media fixtures, F2 image/legacy fixtures, and the YouTube technical-contract tests can start immediately. Only capability promotion waits for passing fixtures and final gate evidence.
+- Do not run a full reviewer loop for every small doc-only adjustment. Keep reviewer subagents for contract boundaries and merge readiness; use targeted checks during implementation and reserve `npm run dev:full-check` for merge-ready branches.
 
 ## Worktree Setup Pattern
 
@@ -325,7 +334,7 @@ Reviewer verifies M2 completion evidence, no fabricated source spans, no target-
 
 ## Wave 2: M5 Feedback And Selective Rerun
 
-Wave 2 can start in parallel with C1/C2 for read-only exploration and proposal-state hardening. Executable rerun must wait until the Canonical IR ids and policy snapshot identity from Wave 1 are stable.
+Wave 2 starts in parallel with C1/C2. Proposal-state hardening and rerun command scaffolding do not need to wait for C3. Only the final affected-scope binding to Canonical IR ids and policy snapshot identity waits until C3 is stable.
 
 ### Branch M5A: Feedback Proposal State Hardening
 
@@ -362,11 +371,11 @@ Keep one-sentence feedback proposal-first. Do not promote a permanent rule witho
 
 Reviewer checks that no broad deletion rule can be promoted from a single sentence.
 
-### Branch M5B: Executable Selective Rerun
+### Branch M5B1: Selective Rerun Command Scaffolding
 
-**Parallel:** Starts after C3 merges.
+**Parallel:** Can run with C1/C2 and M5A.
 
-**Branch:** `codex/m5-selective-rerun`
+**Branch:** `codex/m5-rerun-command`
 
 **Files:**
 
@@ -378,11 +387,10 @@ Reviewer checks that no broad deletion rule can be promoted from a single senten
 - Modify: `python/tests/test_feedback.py`
 - Modify: `docs/feedback-learning.md`
 - Modify: `docs/standalone-cli.md`
-- Modify: `docs/development/kbprep-implementation-status.json`
 
 - [ ] **Step 1: Add failing CLI and Python tests**
 
-Require `kbprep-feedback` to run an accepted proposal against only affected run ids, source ids, document type, and policy snapshot hash.
+Require `kbprep-feedback` to build a rerun plan for accepted proposals using run ids, source ids, document type, and policy snapshot hash when available.
 
 Run:
 
@@ -395,7 +403,39 @@ Expected before implementation: selective rerun command or evidence fails.
 
 - [ ] **Step 2: Implement rerun command**
 
-Use source evidence, Canonical IR ids, document type, and policy snapshot identity. Preserve failed promotion history when rerun evidence is weak.
+Use source evidence, document type, and policy snapshot identity. Preserve failed promotion history when rerun evidence is weak. Leave Canonical IR id matching behind an explicit pending field when C3 has not landed.
+
+- [ ] **Step 3: Verify branch**
+
+Run:
+
+```powershell
+npm test -- src/test/scenarios/worker-feedback-rules-part1.test.ts src/test/scenarios/worker-feedback-rules-part2.test.ts
+node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
+npm run dev:check
+git diff --check
+```
+
+### Branch M5B2: Selective Rerun Evidence Binding
+
+**Parallel:** Starts after C3 merges.
+
+**Branch:** `codex/m5-rerun-evidence-binding`
+
+**Files:**
+
+- Modify: `python/kbprep_worker/feedback/rerun_verification.py`
+- Modify: `python/tests/test_feedback.py`
+- Modify: `docs/feedback-learning.md`
+- Modify: `docs/development/kbprep-implementation-status.json`
+
+- [ ] **Step 1: Add failing evidence-binding tests**
+
+Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and Canonical IR ids.
+
+- [ ] **Step 2: Implement final binding**
+
+Use C3's stable Canonical IR ids to avoid filename-only or document-wide reruns when the changed rule affects only a known source span or cleaning unit.
 
 - [ ] **Step 3: Promote M5 status only if complete**
 
@@ -412,7 +452,7 @@ git diff --check
 
 ## Wave 3: Batch, Playlist, And Rerun
 
-Batch selective rerun can run after M5B. Playlist work must not start implementation until URL/network/copyright scope is approved and reflected in capability status.
+Batch selective rerun can start after M5A and M5B1 establish proposal and rerun-plan state. Playlist work is a technical scope decision: keep playlist `design_only` for this release, or include it in the YouTube implementation branch with URL parsing, network timeout, fixture, and status evidence.
 
 ### Branch BATCH1: Batch Selective Rerun
 
@@ -470,7 +510,7 @@ playlist remains design_only and outside current release
 or:
 
 ```text
-playlist enters implementation scope with URL/network/copyright boundary and fixtures
+playlist enters implementation scope with YouTube URL parsing, network timeout, dependency, fixture, and status evidence
 ```
 
 - [ ] **Step 2: Run governance checks**
@@ -485,7 +525,7 @@ Expected: docs are aligned and no playlist capability is overstated.
 
 ## Wave 4: M6 / Phase F Optional Routes
 
-Wave 4 should run after M2 and M5 are stable. Local media fixture work can prepare in parallel, but capability promotion waits for real evidence.
+Wave 4 starts now in parallel with M2 and M5 for fixture, dependency, and route-contract work. Capability promotion waits for real evidence, but implementation and tests do not need to wait for M2 or M5 unless they edit the same status row.
 
 ### Branch F1: Local Media ASR Fixtures
 
@@ -542,37 +582,9 @@ Add image OCR and legacy Office fixtures only when local dependencies are availa
 
 If fixtures are mocked or dependency-only, keep status `experimental`.
 
-### Branch F3: YouTube URL Route Boundary
+### Branch F3: YouTube Subtitle-First Route
 
-**Branch:** `codex/f-youtube-boundary`
-
-**Files:**
-
-- Modify: `docs/development/11-multimedia-youtube-optional.md`
-- Modify: `docs/capability-matrix.md`
-- Modify: `docs/development/development-roadmap.md`
-- Modify: `docs/standalone-cli.md`
-
-- [ ] **Step 1: Define boundary before code**
-
-Document:
-
-```text
-Input: YouTube URL or video id
-Preferred route: subtitle-first
-Fallback route: media transcript only when dependencies are installed
-Network behavior: explicit user-approved route, timeout, no hidden cost
-Copyright behavior: user-provided or owner-approved content only
-Failure mode: unsupported or dependency error before conversion
-```
-
-- [ ] **Step 2: Owner authorization gate**
-
-Do not implement URL fetching, subtitle extraction, or media download until this boundary is explicitly accepted.
-
-### Branch F4: YouTube Implementation
-
-**Parallel:** Starts only after F3 is accepted.
+**Parallel:** Can start now. Merge after route tests, status evidence, and reviewer checks pass.
 
 **Branch:** `codex/f-youtube-route`
 
@@ -584,18 +596,38 @@ Do not implement URL fetching, subtitle extraction, or media download until this
 - Create: `python/tests/test_youtube_converter.py`
 - Modify: `src/adapters/standalone/cli.ts`
 - Modify: `src/test/scenarios/worker-local-formats.test.ts`
+- Modify: `docs/development/11-multimedia-youtube-optional.md`
 - Modify: `docs/capability-matrix.md`
+- Modify: `docs/development/development-roadmap.md`
+- Modify: `docs/standalone-cli.md`
 - Modify: `docs/development/kbprep-implementation-status.json`
 
-- [ ] **Step 1: Add failing tests**
+- [ ] **Step 1: Add failing technical-contract tests**
 
-Require subtitle-first fixture, no-subtitle fallback, dependency failure, timeout failure, and no-network rejection.
+Require subtitle-first fixture, no-subtitle fallback, dependency failure, timeout failure, no-network rejection when network is disabled, and source URL evidence in artifacts.
 
-- [ ] **Step 2: Implement subtitle-first route**
+- [ ] **Step 2: Implement the route contract**
+
+Document:
+
+```text
+Input: YouTube URL or video id
+Preferred route: subtitle-first
+Fallback route: media transcript only when dependencies are installed
+Network behavior: explicit CLI URL route, timeout, deterministic failure messages, no hidden cost
+Artifact behavior: preserve source URL evidence, subtitle order, transcript text, dependency report, and route decision
+Failure mode: unsupported or dependency error before conversion
+```
+
+- [ ] **Step 3: Implement subtitle-first route**
 
 Do not download media unless fallback is explicitly enabled and dependencies are present.
 
-- [ ] **Step 3: Verify branch**
+- [ ] **Step 4: Promote status only from evidence**
+
+Move `youtube_url_routes` out of `design_only` only if CLI behavior, fixtures, dependency failures, and quality gates pass.
+
+- [ ] **Step 5: Verify branch**
 
 Run:
 
@@ -613,12 +645,11 @@ Merge order:
 2. C1 and C2 in either order, with second branch synchronized to latest `main`.
 3. C3 after C1 and C2.
 4. M5A.
-5. M5B after C3.
-6. BATCH1 after M5B.
-7. PLAYLIST1 decision.
-8. F1 and F2 fixture branches.
-9. F3 YouTube boundary.
-10. F4 YouTube implementation only after F3 is accepted.
+5. M5B1 can merge before C3 if its pending Canonical IR binding is explicit.
+6. M5B2 after C3.
+7. BATCH1 after M5A and M5B1, then resync after M5B2 if it shares rerun state.
+8. F1, F2, and F3 can run in parallel with M2/M5 when file ownership does not overlap.
+9. PLAYLIST1 decision, or fold playlist into F3 if it is in scope.
 
 Final release gate:
 

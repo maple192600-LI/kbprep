@@ -15,6 +15,7 @@ This stage supports source inspection, route selection, dependency failure repor
 - YouTube uses available subtitles before media transcript extraction.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
+- The YouTube boundary is a technical product contract: accepted URL shapes, dependency detection, network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence. There is no separate non-technical approval gate in front of this route.
 
 ## Acceptance
 
