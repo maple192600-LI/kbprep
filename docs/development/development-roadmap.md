@@ -271,8 +271,17 @@ Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
 - Phase D depends on Phase C (patches target typed nodes; Clean View assembles
   from Canonical IR).
 - Phase E can run in parallel with C/D (status machine is independent).
-- Phase F depends on a stable B/C/D core and on Phase A's honest status surface.
+- Phase F implementation can run in parallel with M2/M5 once Phase A's honest
+  status surface exists. Phase F capability promotion depends on stable route
+  evidence, dependency behavior, quality gates, and status docs.
 - Phase A should go first so later phases cannot ship overstated claims.
+
+Development execution is parallel where file ownership and contracts do not
+collide. Capability promotion and final release acceptance remain evidence
+gated. That means M2, M5, batch rerun, media fixtures, YouTube route hardening,
+and playlist implementation can be developed in parallel slices, but a status
+row moves out of `partial` only after its code, tests, docs, and sample evidence
+agree.
 
 ## Alignment With Implementation Plan M1–M6
 
@@ -297,7 +306,7 @@ This is the ordered path from the current repository state to the completed
 protected design. Status must move only when `kbprep-implementation-status.json`,
 `docs/capability-matrix.md`, code, and named tests agree.
 
-### 1. Close M2 / Phase C First
+### 1. Close M2 / Phase C
 
 Goal: make Canonical IR the complete internal fact layer instead of a partial
 evidence layer.
@@ -317,6 +326,10 @@ Required slices:
   and IR ordering stay coherent.
 - Promote `canonical_ir_contract` and `conversion_quality_gate` only after
   named tests cover the above across representative routes.
+
+Execution: run C1 route-native SourceSpan precision and C2 relationships/assets/
+annotations in parallel when they avoid overlapping files. Run C3 render/gate
+completion after C1 and C2 merge.
 
 Acceptance: `canonical_ir_contract` and `conversion_quality_gate` can move from
 `partial` to `implemented`; no route claims complete IR coverage without tests.
@@ -339,6 +352,10 @@ Required slices:
 - Update operator docs so a non-developer can see proposed, accepted, rejected,
   rerun, and failed-promotion states.
 
+Execution: proposal-state hardening and public rerun command scaffolding can run
+in parallel with M2. Canonical IR id-level targeting waits for the stable M2/C3
+identity contract.
+
 Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
 acceptance, rerun, rejection, and failed-promotion paths have named tests,
 manual operator guidance, and no remaining Canonical IR id-level selector gap.
@@ -350,20 +367,21 @@ executable, inspectable, and recoverable.
 
 Required slices:
 
-- Implement playlist input only after the YouTube URL technical contract is
-  represented in capability status: URL parsing, network timeout, dependency
-  behavior, fixture evidence, and failure messages.
 - Add executable selective batch rerun using the parent status manifest and
   child run evidence.
 - Keep unsupported files visible as skipped, not silent failures.
 - Prove partial batch success, completed-with-warnings, failed children, and
   rerun scopes with tests.
+- Implement playlist input in the same YouTube workstream when URL parsing,
+  timeout behavior, dependency handling, fixture evidence, and failure messages
+  touch the same files. If split, start playlist immediately after the direct
+  YouTube technical contract is stable.
 
 Acceptance: `batch_playlist_rerun` moves from `partial` only when playlist and
 selective rerun are implemented with evidence, or a concrete dependency blocker
 is documented without overstating completion.
 
-### 4. Close M6 / Phase F Last
+### 4. Close M6 / Phase F
 
 Goal: optional media and YouTube routes become real product promises only after
 dependency setup, fixtures, quality gates, and status promotion are complete.
@@ -392,6 +410,11 @@ Required slices:
   route.
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists,
   and final source-side publication.
+
+Execution: start local media fixtures, image/legacy format fixtures, and YouTube
+technical-contract work now in parallel with M2/M5/batch work when file ownership
+does not collide. Do not wait for M2 or M5 to begin implementation. Wait only
+before promoting the capability status to `verified` or final complete.
 
 Acceptance: `youtube_url_routes` moves from `partial` to `verified` only after
 broader real-network fixtures, dependency variance, timeout behavior, media

@@ -19,7 +19,8 @@ This stage supports source inspection, route selection, dependency failure repor
   `youtube.com/shorts/...`, and `youtube.com/embed/...`.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
-- The YouTube boundary is a technical product contract: accepted public URL shapes, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence. Do not add credential, cookie, login, DRM, paywall, or secret-handling behavior as part of YouTube support.
+- The YouTube boundary is a technical product contract, not a legal or platform-compliance approval gate. Implement the requested user-facing capability through accepted URL/id inputs, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence.
+- The route handles public URL or explicit video-id inputs through normal local dependencies. It does not add account login, cookie import, credential storage, DRM circumvention, paywall bypass, or other secret-handling behavior.
 
 ## Acceptance
 
