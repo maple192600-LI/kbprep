@@ -56,29 +56,30 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 
 ### Phase A — Status Surface And Governance Depth
 
-Goal: make the status surface report the real capability boundary, and make
-governance checks catch missing coverage. This phase ships no user-facing
-feature; it unblocks trust in every later phase.
+Status: completed. This phase made the status surface report the real
+capability boundary and made governance checks catch missing coverage. It
+should not be restarted as a future implementation phase unless a new drift
+regression appears.
 
 Slices:
 
-- **A1** Add `document_type_classification` as its own capability in
+- **A1** Landed: `document_type_classification` is its own capability in
   `kbprep-implementation-status.json` (partial), with evidence pointing at the
   classification code and tests.
-- **A2** Keep `media_local_transcript` and `youtube_url_routes` separate in
+- **A2** Landed: `media_local_transcript` and `youtube_url_routes` are separate in
   the status JSON.
-- **A3** Add an explicit target-only YouTube row in `capability-matrix.md`
-  while keeping the route unsupported/design-only until evidence exists.
-- **A4** Strengthen governance: `implementation-status.mjs` checks required
+- **A3** Landed: YouTube is represented in `capability-matrix.md` as a
+  partial optional route with named current evidence and promotion blockers.
+- **A4** Landed: `implementation-status.mjs` checks required
   capability coverage and requires implemented/partial status evidence to
   reference code or tests.
-- **A5** Document the two batch manifest names (`batch_manifest.json` run list
+- **A5** Landed: the two batch manifest names (`batch_manifest.json` run list
   vs `kbprep_batch_manifest.json` cleanup retention) in README and
   `docs/standalone-cli.md`.
 
-Acceptance: `npm run dev:check` passes; status JSON lists classification and
-the split media/YouTube capabilities; capability matrix has a YouTube row;
-governance catches a planted missing-coverage case.
+Acceptance now means keeping those surfaces aligned during later work:
+`npm run check:development-docs`, `npm run check:flowchart`, and
+`npm run dev:check` must pass after status or planning changes.
 
 ### Phase B — PDF Three-Tier Routing
 
@@ -147,10 +148,12 @@ Slices:
   cleanup block content, while `cleaning_patches.jsonl` remains content-safe
   and does not carry source or cleaned text.
 
-Phase C remains partial until route-native spans, relationships, assets,
-annotations, full renderer/profile coverage, and universal fact-layer use are
-implemented with named evidence. Only then can `canonical_ir_contract` move
-from partial to implemented.
+Phase C remains partial until converter-native SourceSpan extraction,
+route-wide relationship/asset semantics, richer annotations,
+full renderer/profile coverage, and universal fact-layer use are implemented
+with named evidence. Content-safe relationship, asset, and annotation artifacts
+already exist; the remaining work is breadth and semantics. Only then can
+`canonical_ir_contract` move from partial to implemented.
 
 ### Phase D — CleaningPolicySnapshot, CleaningPatch, Clean View
 
@@ -253,28 +256,29 @@ without named tests; dependency failure messages are explicit.
 ## Dependency Order
 
 ```text
-Phase A (status + governance) ── unblocks honest reporting for all later phases
+Completed baseline: Phase A status/governance, Phase B PDF routing,
+Phase D cleanup, Phase E job status, and M4 source-side publication.
+
+Current critical path:
+
+Phase C / M2 remaining IR fact-layer work
       │
-      ▼
-Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
-                               │
-                               ▼
-                        Phase D (Snapshot + Patch + Clean View)
-                               │
-                               ▼
-                        Phase E (completed_with_warnings generalization)
-                               │
-                               ▼
-                        Phase F (media + YouTube optional)
+      ├── M5 affected-scope feedback/rerun binding
+      │       └── BATCH2 policy/CIR affected batch targeting
+      │
+      └── optional-route evidence work can run in parallel:
+          media ASR fixtures, image/legacy fixtures, YouTube/playlist evidence
 ```
 
-- Phase D depends on Phase C (patches target typed nodes; Clean View assembles
-  from Canonical IR).
-- Phase E can run in parallel with C/D (status machine is independent).
-- Phase F implementation can run in parallel with M2/M5 once Phase A's honest
-  status surface exists. Phase F capability promotion depends on stable route
-  evidence, dependency behavior, quality gates, and status docs.
-- Phase A should go first so later phases cannot ship overstated claims.
+- Phase D is implemented against the current Canonical IR artifacts. Full
+  project completion still requires M2 to close the remaining IR fact-layer
+  gaps.
+- Phase E is implemented.
+- Phase F implementation and evidence work can run in parallel with M2/M5.
+  Phase F capability promotion depends on stable route evidence, dependency
+  behavior, quality gates, and status docs.
+- Phase A remains the completed governance baseline; later work must keep it
+  aligned instead of treating it as an open phase.
 
 Development execution is parallel where file ownership and contracts do not
 collide. Capability promotion and final release acceptance remain evidence
@@ -287,7 +291,7 @@ sample evidence agree.
 
 | Plan milestone | Roadmap phase | Status |
 | --- | --- | --- |
-| M1 Design Source Aligned | Phase A (ongoing) | implemented, kept aligned |
+| M1 Design Source Aligned | Phase A | implemented, kept aligned |
 | M2 Canonical IR Contract | Phase C | in progress (partial) |
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
@@ -317,8 +321,10 @@ Required slices:
   ranges, PPTX shape ids, XLSX cells, transcript cue ids, and future YouTube
   cue ids when the converter provides that evidence. The schema and coverage
   gap tracking are in place; converters must still emit real native positions.
-- Add relationship evidence, asset registry evidence, and annotation evidence
-  to Canonical IR.
+- Harden route-wide relationship evidence, asset registry evidence, and
+  annotation evidence. Content-safe artifacts already exist; the remaining work
+  is semantic breadth and representative route coverage, not creating those
+  files from scratch.
 - Make conversion gates consume complete route-wide IR semantics for every
   verified or promoted route.
 - Extend Markdown regeneration from the minimal standard path to all required
@@ -327,9 +333,10 @@ Required slices:
 - Promote `canonical_ir_contract` and `conversion_quality_gate` only after
   named tests cover the above across representative routes.
 
-Execution: run C1 route-native SourceSpan precision and C2 relationships/assets/
-annotations in parallel when they avoid overlapping files. Run C3 render/gate
-completion after C1 and C2 merge.
+Execution: run converter-native SourceSpan extraction and Canonical IR
+relationship/asset/annotation semantics hardening in parallel when they avoid
+overlapping files. Run full IR fact-layer closure after those evidence branches
+merge.
 
 Acceptance: `canonical_ir_contract` and `conversion_quality_gate` can move from
 `partial` to `implemented`; no route claims complete IR coverage without tests.
@@ -345,16 +352,18 @@ Required slices:
   document type, and policy snapshot identity.
 - Extend public selective rerun beyond the current run directory,
   accepted-proposal, and document-type promotion-history selectors to
-  Canonical IR id-level targeting when C3 binding exists.
+  Canonical IR id-level or cleaning-unit targeting when stable identity
+  evidence exists.
 - Preserve failed-promotion history and counterexamples when rerun evidence is
   weak or negative.
 - Prove accepted rules do not silently become broad permanent deletion rules.
 - Update operator docs so a non-developer can see proposed, accepted, rejected,
   rerun, and failed-promotion states.
 
-Execution: proposal-state hardening and public rerun command scaffolding can run
-in parallel with M2. Canonical IR id-level targeting waits for the stable M2/C3
-identity contract.
+Execution: proposal-state hardening and public rerun command scaffolding are
+already landed; only add regression guards for proven gaps. Affected-scope
+identity binding can start with current run/source/policy evidence and finishes
+when stable Canonical IR or cleaning-unit identity is available.
 
 Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
 acceptance, rerun, rejection, and failed-promotion paths have named tests,

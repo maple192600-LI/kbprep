@@ -42,8 +42,12 @@ Standalone commands:
 kbprep-preflight --help
 kbprep-analyze --input ./source.pdf --output ./.kbprep/analyze
 kbprep-prepare --input ./source.pdf --output ./.kbprep/source --force
+kbprep-prepare --input https://www.youtube.com/watch?v=ExampleVideo01 --output ./.kbprep/youtube --force
+kbprep-prepare --youtube-video-id ExampleVideo01 --output ./.kbprep/youtube --allow-youtube-media-fallback --force
 kbprep-apply-review --run-dir ./.kbprep/source/runs/<run-id> --patch-file review.patch.json
 kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --feedback-text "下次删除「关注公众号」这种污染"
+kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --plan-rerun
+kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --execute-rerun
 kbprep-feedback --accept-proposal latest --confirm-rule-acceptance
 kbprep-cleanup --output ./.kbprep/source --dry-run
 kbprep-batch --input ./sources --output ./.kbprep/batch

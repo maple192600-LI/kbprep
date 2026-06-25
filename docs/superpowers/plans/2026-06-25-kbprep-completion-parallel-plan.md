@@ -27,7 +27,7 @@ Current completion state:
 - M4 is implemented.
 - Phase E / `job_status_envelope` is implemented.
 - M5 is partial.
-- M6 / Phase F is incomplete: local media and YouTube are `partial`, image OCR and legacy Office are `experimental`.
+- M6 / Phase F is not closed: local media and YouTube are implemented as `partial` optional routes, image OCR and legacy Office remain `experimental`, and MOBI stays explicitly `unsupported` unless the owner reopens that scope.
 
 ## Parallelization Rules
 
@@ -51,9 +51,50 @@ The first version was too conservative in three places. Use this revised flow. T
 
 Speed correction:
 
-- Start C1, C2, M5A, M5B1, F1, F2, and F3 as soon as their worktrees are clean and file ownership does not collide. BATCH1 is merged; PLAYLIST1 is the active Wave 3 implementation slice.
-- Hold only C3, M5B2 final Canonical IR identity binding, playlist capability promotion, and final status promotion for dependency completion.
+- Do not restart landed C2 artifact work, landed playlist implementation, or landed YouTube URL routing as fresh implementation branches. Convert those plan entries into evidence hardening, route-native extraction, real-sample verification, or status-promotion work.
+- Start the next independent branches immediately when file ownership does not collide: C-native SourceSpan extraction, Canonical IR route-semantics hardening, M5 affected-scope identity binding prep, real media fixtures, image/legacy fixture evidence, and YouTube real-network/dependency/timeout evidence.
+- Hold only final capability promotion and final project-complete status for complete evidence. Do not hold implementation, fixture creation, timeout handling, or reviewer checks behind unrelated M2 or M5 completion.
 - Merge small, verified branches frequently. The second branch touching status docs must synchronize with latest `main` and rerun the affected checks before merge.
+
+## Third Review: No Duplicate Implementation
+
+This review removes overcautious slices that would waste time by rebuilding shipped work.
+
+- **C1/C2/C3/C4/C5/C6 naming:** Typed nodes, SourceSpan artifacts, TransformationLedger, coverage reporting, complete typed-node/source-span gate evidence, minimal IR Markdown regeneration, and content-safe relationships/assets/annotations artifacts are already present in current status evidence. Remaining M2 work is not "create C2 artifacts"; it is converter-native precision extraction, route-wide relationship/asset semantics, richer annotations, full renderer/profile coverage, and universal fact-layer use.
+- **M5A/M5B1:** Proposal state hardening, public single-source selective rerun planning/execution, proposal risk notes, owner confirmation status, counterexamples, and failed-promotion blocking already exist. Remaining M5 work is affected-scope identity binding: source ids, policy snapshot identity, document type, Canonical IR ids or cleaning-unit identity, and reliable rerun evidence.
+- **Playlist:** Explicit playlist input and playlist rerun evidence preservation are merged. The next playlist branch is real-network/dependency/quality evidence plus optional capability promotion, not another playlist implementation branch.
+- **YouTube:** Direct URL, explicit video id, local `.url` descriptor, subtitle-first route, explicit media fallback, and playlist input are implemented through the existing `youtube_source`, `youtube_playlist`, external conversion, and CLI descriptor path. The next YouTube branch must harden evidence around real network samples, bounded timeout behavior, dependency variance, no-subtitle fallback, cache/artifact behavior, and transcript quality. Do not create a duplicate `converters/youtube.py` route unless current code evidence proves the existing architecture cannot support the required behavior.
+- **Boundary:** There is no external YouTube compliance approval gate in this plan. The only boundaries are engineering/product boundaries: no hidden credentials or cookie scraping, no secret handling added implicitly, no quality-gate bypass, no unbounded network work, no silent dependency cost, no private/source-body leakage, and no verified status without real evidence.
+
+## Immediate Parallel Work Sets
+
+Use these write sets to maximize speed without creating merge conflicts. Status
+docs should be updated at the end of each branch only after evidence exists; if
+two branches need the same status row, the second branch must synchronize with
+latest `main` before editing it.
+
+- **Set A: Canonical IR native precision emitters.** Owns
+  `python/kbprep_worker/canonical_spans.py`,
+  `python/tests/test_canonical_ir_source_spans.py`, and
+  `python/tests/test_canonical_ir_coverage.py`. Goal: turn validator-only native
+  precision into real converter-emitted evidence where available.
+- **Set B: M5 affected-scope feedback rerun binding.** Owns
+  `python/kbprep_worker/feedback/rerun_verification.py`,
+  `python/kbprep_worker/feedback/selective_rerun_execution.py`,
+  `python/tests/test_feedback.py`, and
+  `src/test/scenarios/worker-feedback-rules-part2.test.ts`. Do not touch batch
+  rerun files in this branch.
+- **Set C: Batch policy/CIR affected rerun.** Owns
+  `python/kbprep_worker/prepare_batch_rerun.py` and
+  `python/tests/test_batch_status_manifest.py`. Avoid public CLI changes unless
+  the branch intentionally exposes an `affected` scope.
+- **Set D: YouTube and playlist real-evidence hardening.** Owns
+  `python/tests/test_media_youtube_routes.py`,
+  `src/adapters/standalone/cli.test.ts`,
+  `src/test/scenarios/worker-core-runtime-part2.test.ts`, relevant golden
+  fixture metadata, and route docs. It may touch `youtube_source.py`,
+  `youtube_playlist.py`, or external conversion modules only to fix evidence,
+  timeout, dependency, fallback, artifact, or quality gaps.
 
 ## Worktree Setup Pattern
 
@@ -102,76 +143,30 @@ Main agent responsibility:
 - Run final branch checks.
 - Merge only after no Critical or Important reviewer findings remain.
 
-## Wave 0: Close Current Documentation And Local Tail
+## Wave 0: Completed Documentation And Local Tail
 
-Can run now in the current checkout because it only cleans status and planning residue.
+Wave 0 is closed. Do not create another Wave 0 implementation branch unless a
+new regression appears. Current repository evidence already has:
 
-**Files:**
+- `.gitignore` keeping `SESSION_START.md` trackable.
+- `SESSION_START.md` with agent-neutral verification wrapper commands.
+- `scripts/verify-kbprep.ps1` as the sole `verify-*.ps1` script.
+- Development docs, known issues, architecture report, status governance, and
+  worker governance tests aligned with the current status surface.
 
-- Modify: `.gitignore`
-- Create: `SESSION_START.md`
-- Create: `scripts/verify-kbprep.ps1`
-- Modify: `docs/development/00-current-state-and-gap.md`
-- Modify: `docs/development/development-roadmap.md`
-- Modify: `docs/development/kbprep-implementation-status.json`
-- Modify: `docs/known-issues.md`
-- Modify: `docs/reports/kbprep-current-architecture.html`
-- Modify: `scripts/checks/implementation-status.mjs`
-- Modify: `src/test/scenarios/worker-governance-guards.test.ts`
-
-- [x] **Step 1: Keep `SESSION_START.md` tracked**
-
-Ensure `.gitignore` contains:
-
-```gitignore
-!/SESSION_START.md
-```
-
-- [x] **Step 2: Keep verification wrapper agent-neutral**
-
-Ensure `SESSION_START.md` references:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-kbprep.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-kbprep.ps1 -Full
-```
-
-- [x] **Step 3: Remove old agent-specific wrapper**
-
-Run:
-
-```powershell
-Get-ChildItem scripts -Filter "verify-*.ps1" | Select-Object -ExpandProperty Name
-```
-
-Expected: `verify-kbprep.ps1`.
-
-- [x] **Step 4: Verify**
-
-Run:
-
-```powershell
-node scripts/checks/implementation-status.mjs
-npm run check:development-docs
-npm run check:flowchart
-npm run dev:check
-npm run python:test
-npm run python:ruff
-npm run python:typecheck
-git diff --check
-```
-
-Expected: all commands pass.
+Future doc-only drift fixes should be handled as small governance branches with
+`npm run check:development-docs`, `npm run check:flowchart`, `npm run dev:check`,
+and `git diff --check`, not as a repeated Wave 0 implementation.
 
 ## Wave 1: M2 / Phase C Completion
 
 Wave 1 is the highest priority. Phase D can stay implemented only because it uses the current Canonical IR artifacts; full project completion still requires M2 to close.
 
-### Branch C1: Route-Native SourceSpan Precision
+### Branch C1R: Converter-Native SourceSpan Extraction
 
-**Parallel:** Can run in parallel with C2 only if C1 owns `canonical_spans.py` route precision fields and C2 owns asset/relationship contracts. Avoid simultaneous edits to `canonical_coverage.py`.
+**Parallel:** Can run in parallel with Canonical IR route-semantics hardening if it owns converter extraction and SourceSpan mapping only. Coordinate any final `canonical_coverage.py` wording after whichever branch merges first.
 
-**Branch:** `codex/c-route-native-spans`
+**Branch:** `codex/c-native-span-extraction`
 
 **Files:**
 
@@ -186,11 +181,11 @@ Wave 1 is the highest priority. Phase D can stay implemented only because it use
 
 - [ ] **Step 1: Explorer evidence**
 
-Explorer returns current SourceSpan schema, missing precision kinds, and tests that already cover converted line ranges and transcript cue timing.
+Explorer returns current SourceSpan schema, existing precision validators, missing converter-emitted precision kinds, and tests that already cover converted line ranges and transcript cue timing.
 
 - [ ] **Step 2: Worker adds failing tests**
 
-Add tests that require:
+Do not test merely that these precision kinds are accepted by schema; that is already landed. Add tests that require the relevant converter path to emit native evidence when the source artifact contains it:
 
 ```python
 {"kind": "pdf_bbox", "page": 1, "bbox": [0.0, 0.0, 100.0, 20.0]}
@@ -205,11 +200,11 @@ Run:
 node scripts/python-venv.mjs -m unittest python.tests.test_canonical_ir_source_spans python.tests.test_canonical_ir_schema -v
 ```
 
-Expected before implementation: tests fail on unsupported precision kinds.
+Expected before implementation: tests fail because converters still report missing native precision kinds or fall back to converted Markdown line ranges.
 
-- [ ] **Step 3: Worker implements minimal schema and extraction**
+- [ ] **Step 3: Worker implements minimal extraction**
 
-Implement precision kinds only where the converter has evidence. If a converter cannot provide native evidence, record a precise gap in `coverage.report` instead of inventing positions.
+Emit precision kinds only where the converter has evidence. If a converter cannot provide native evidence, record a precise gap in `coverage.report` instead of inventing positions.
 
 - [ ] **Step 4: Verify branch**
 
@@ -226,31 +221,31 @@ git diff --check
 
 Reviewer checks that no route-native span is fabricated, no optional YouTube evidence is claimed before route support exists, and status remains partial unless all required evidence is present.
 
-### Branch C2: Relationships, Assets, And Annotations
+### Branch C2R: Relationship, Asset, And Annotation Semantics
 
-**Parallel:** Can run with C1 if it avoids `canonical_spans.py` and coordinates final `canonical_coverage.py` updates after C1 merges.
+**Parallel:** Can run with C1R if it avoids `canonical_spans.py` and owns only route-wide semantics and fixture coverage for already-created relationship, asset, and annotation artifacts.
 
-**Branch:** `codex/c-ir-relationships-assets`
+**Branch:** `codex/c-ir-semantics-hardening`
 
 **Files:**
 
-- Create: `python/kbprep_worker/canonical_relationships.py`
-- Create: `python/kbprep_worker/canonical_assets.py`
-- Create: `python/kbprep_worker/canonical_annotations.py`
+- Modify: `python/kbprep_worker/canonical_relationships.py`
+- Modify: `python/kbprep_worker/canonical_assets.py`
+- Modify: `python/kbprep_worker/canonical_annotations.py`
 - Modify: `python/kbprep_worker/canonical_ir.py`
 - Modify: `python/kbprep_worker/canonical_coverage.py`
-- Create: `python/tests/test_canonical_ir_relationships.py`
-- Create: `python/tests/test_canonical_ir_assets.py`
-- Create: `python/tests/test_canonical_ir_annotations.py`
+- Modify: `python/tests/test_canonical_ir_relationships.py`
+- Modify: `python/tests/test_canonical_ir_assets.py`
+- Modify: `python/tests/test_canonical_ir_annotations.py`
 - Modify: `docs/development/02-canonical-ir-contract.md`
 
 - [ ] **Step 1: Explorer evidence**
 
-Explorer maps current image handling, link handling, figure nodes, table nodes, and metadata nodes.
+Explorer maps current relationship, asset, and annotation artifact records, then identifies which route semantics are still shallow or missing.
 
 - [ ] **Step 2: Worker adds failing tests**
 
-Tests require:
+Do not add tests that only prove artifact files exist; that is already landed. Add tests that require route-wide semantics, such as:
 
 ```python
 relationship = {"type": "contains", "from_node_id": "section-1", "to_node_id": "paragraph-1"}
@@ -264,11 +259,11 @@ Run:
 node scripts/python-venv.mjs -m unittest python.tests.test_canonical_ir_relationships python.tests.test_canonical_ir_assets python.tests.test_canonical_ir_annotations -v
 ```
 
-Expected before implementation: tests fail because artifacts do not exist.
+Expected before implementation: tests fail because existing artifacts do not yet prove all required route-wide semantics.
 
-- [ ] **Step 3: Worker implements artifacts**
+- [ ] **Step 3: Worker hardens semantics**
 
-Write content-safe JSON artifacts under `canonical_ir/` and reference them from the manifest. Do not copy private source text into relationship, asset, or annotation records.
+Keep the content-safe JSON artifact contract and manifest references. Expand only evidence-backed relationships, asset references, and annotations. Do not copy private source text into relationship, asset, or annotation records.
 
 - [ ] **Step 4: Verify branch**
 
@@ -285,11 +280,11 @@ git diff --check
 
 Reviewer checks content safety, manifest consistency, and no status overpromotion.
 
-### Branch C3: IR-Based Rendering And Conversion Gate Completion
+### Branch C7: Full IR Fact-Layer Closure
 
-**Parallel:** Must wait until C1 and C2 are merged.
+**Parallel:** Must wait until C1R and C2R merge because it promotes the shared `canonical_ir_contract` and `conversion_quality_gate` status rows.
 
-**Branch:** `codex/c-ir-render-gate`
+**Branch:** `codex/c-ir-fact-layer-closure`
 
 **Files:**
 
@@ -306,7 +301,7 @@ Reviewer checks content safety, manifest consistency, and no status overpromotio
 
 - [ ] **Step 1: Worker adds failing tests**
 
-Add tests proving cleaned Markdown can be rendered from Canonical IR plus accepted patches, and conversion gate blocks a route that claims complete IR coverage while missing required artifacts.
+Add tests proving every promoted route can use Canonical IR as the complete fact layer: route-native spans, relationships, assets, annotations, accepted changes, renderer/profile coverage, and conversion gate blocking when a route claims complete IR coverage while missing required artifacts.
 
 Run:
 
@@ -314,15 +309,15 @@ Run:
 node scripts/python-venv.mjs -m unittest python.tests.test_conversion_gate python.tests.test_clean_view python.tests.test_core_processing_paths -v
 ```
 
-Expected before implementation: IR-regeneration and strict complete-IR gate tests fail.
+Expected before implementation: full fact-layer coverage fails even though the narrow standard Markdown regeneration path already exists.
 
-- [ ] **Step 2: Worker implements minimal IR render path**
+- [ ] **Step 2: Worker completes route-wide IR use**
 
-Use the assembled Clean View backed by Canonical IR artifacts. Keep existing fallback only for routes whose capability status remains partial or experimental.
+Use the assembled Clean View and Canonical IR artifacts across the required output profiles and route cases. Keep existing fallback only for routes whose capability status remains partial or experimental.
 
 - [ ] **Step 3: Promote status only if evidence is complete**
 
-Change `canonical_ir_contract` and `conversion_quality_gate` from `partial` to `implemented` only when every required C1-C3 test passes and capability matrix claims remain honest.
+Change `canonical_ir_contract` and `conversion_quality_gate` from `partial` to `implemented` only when every required C1R, C2R, and C7 test passes and capability matrix claims remain honest.
 
 - [ ] **Step 4: Verify branch**
 
@@ -341,13 +336,13 @@ Reviewer verifies M2 completion evidence, no fabricated source spans, no target-
 
 ## Wave 2: M5 Feedback And Selective Rerun
 
-Wave 2 starts in parallel with C1/C2. Proposal-state hardening and rerun command scaffolding do not need to wait for C3. Only the final affected-scope binding to Canonical IR ids and policy snapshot identity waits until C3 is stable.
+Proposal state hardening and public single-source selective rerun scaffolding are already in the current implementation evidence. Wave 2 now focuses on affected-scope identity binding and promotion evidence; do not rebuild proposal states or the public rerun command unless current tests prove a regression.
 
-### Branch M5A: Feedback Proposal State Hardening
+### Branch M5A: Feedback Proposal State Regression Guard
 
-**Parallel:** Can run with C1 and C2.
+**Parallel:** Can run with C1R, C2R, F1, F2, or YouTube evidence work because it is test/documentation focused and should not edit Canonical IR core files.
 
-**Branch:** `codex/m5-feedback-state`
+**Branch:** `codex/m5-feedback-regression-guard`
 
 **Files:**
 
@@ -358,9 +353,9 @@ Wave 2 starts in parallel with C1/C2. Proposal-state hardening and rerun command
 - Modify: `docs/feedback-learning.md`
 - Modify: `docs/development/09-feedback-rule-learning.md`
 
-- [ ] **Step 1: Add failing tests**
+- [ ] **Step 1: Audit existing state coverage**
 
-Require proposal records to include `proposed`, `accepted`, `rejected`, `rerun_pending`, `rerun_passed`, `rerun_failed`, and `promotion_blocked` states.
+Confirm existing tests cover `proposed`, `accepted`, `rejected`, `rerun_pending`, `rerun_passed`, `rerun_failed`, `promotion_blocked`, owner-confirmation status, risk notes, counterexamples, and failed-promotion blocking. Add a failing regression test only for an actually missing transition or unsafe promotion path.
 
 Run:
 
@@ -368,9 +363,9 @@ Run:
 node scripts/python-venv.mjs -m unittest python.tests.test_feedback_proposals python.tests.test_feedback_promotion -v
 ```
 
-Expected before implementation: missing states or transitions fail.
+Expected before implementation: only a real missing transition or unsafe broad-promotion path fails. If current coverage is sufficient, record the evidence and do not add redundant implementation.
 
-- [ ] **Step 2: Implement state transitions**
+- [ ] **Step 2: Fix only proven gaps**
 
 Keep one-sentence feedback proposal-first. Do not promote a permanent rule without owner confirmation, positive examples, counterexamples, and rerun evidence.
 
@@ -378,11 +373,11 @@ Keep one-sentence feedback proposal-first. Do not promote a permanent rule witho
 
 Reviewer checks that no broad deletion rule can be promoted from a single sentence.
 
-### Branch M5B1: Selective Rerun Command Scaffolding
+### Branch M5B1: Selective Rerun Command Regression Guard
 
-**Parallel:** Can run with C1/C2 and M5A.
+**Parallel:** Can run with M5A and optional-route evidence work. Do not edit Canonical IR identity contracts in this branch.
 
-**Branch:** `codex/m5-rerun-command`
+**Branch:** `codex/m5-rerun-command-guard`
 
 **Files:**
 
@@ -395,9 +390,9 @@ Reviewer checks that no broad deletion rule can be promoted from a single senten
 - Modify: `docs/feedback-learning.md`
 - Modify: `docs/standalone-cli.md`
 
-- [ ] **Step 1: Add failing CLI and Python tests**
+- [ ] **Step 1: Audit existing CLI and Python tests**
 
-Require `kbprep-feedback` to build a rerun plan for accepted proposals using run ids, source ids, document type, and policy snapshot hash when available.
+Confirm existing `kbprep-feedback` and Python rerun verification tests cover accepted-proposal rerun planning/execution, run directory scope, source/document-type selectors, policy snapshot identity when available, and failed-promotion history. Add a failing test only for a missing selector or stale operator claim.
 
 Run:
 
@@ -406,9 +401,9 @@ npm test -- src/test/scenarios/worker-feedback-rules-part1.test.ts src/test/scen
 node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
 ```
 
-Expected before implementation: selective rerun command or evidence fails.
+Expected before implementation: only an actually missing command/evidence path fails. If current coverage is already present, update status docs instead of rebuilding the command.
 
-- [ ] **Step 2: Implement rerun command**
+- [ ] **Step 2: Fix only proven command gaps**
 
 Use source evidence, document type, and policy snapshot identity. Preserve failed promotion history when rerun evidence is weak. Leave Canonical IR id matching behind an explicit pending field when C3 has not landed.
 
@@ -423,9 +418,9 @@ npm run dev:check
 git diff --check
 ```
 
-### Branch M5B2: Selective Rerun Evidence Binding
+### Branch M5B2: Affected-Scope Evidence Binding
 
-**Parallel:** Starts after C3 merges.
+**Parallel:** Prep can start now by auditing existing proposal/run evidence and adding tests around current stable ids. Final Canonical IR or cleaning-unit id-level promotion waits for C1R/C2R/C7 identity semantics if those ids are required.
 
 **Branch:** `codex/m5-rerun-evidence-binding`
 
@@ -436,13 +431,13 @@ git diff --check
 - Modify: `docs/feedback-learning.md`
 - Modify: `docs/development/kbprep-implementation-status.json`
 
-- [ ] **Step 1: Add failing evidence-binding tests**
+- [ ] **Step 1: Add failing affected-scope tests**
 
-Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and Canonical IR ids.
+Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and Canonical IR ids or cleaning-unit ids when available.
 
 - [ ] **Step 2: Implement final binding**
 
-Use C3's stable Canonical IR ids to avoid filename-only or document-wide reruns when the changed rule affects only a known source span or cleaning unit.
+Use stable Canonical IR ids or cleaning-unit ids to avoid filename-only or document-wide reruns when the changed rule affects only a known source span or cleaning unit.
 
 - [ ] **Step 3: Promote M5 status only if complete**
 
@@ -459,7 +454,7 @@ git diff --check
 
 ## Wave 3: Batch, Playlist, And Rerun
 
-Batch selective rerun is merged. Playlist is in completion scope, not a decision-only placeholder; explicit playlist input and playlist rerun evidence preservation are merged. Remaining Wave 3 work is policy/CIR affected batch targeting plus real playlist evidence for any promotion.
+Batch selective rerun is merged. Explicit playlist input and playlist rerun evidence preservation are merged. Remaining Wave 3 work is policy/CIR affected batch targeting plus real playlist evidence for any promotion.
 
 ### Branch BATCH1: Batch Selective Rerun
 
@@ -529,11 +524,11 @@ npm run dev:check
 git diff --check
 ```
 
-### Branch PLAYLIST1: Playlist Implementation
+### Branch PLAYLIST2: Real Playlist Evidence And Hardening
 
-**Parallel:** Active slice. It can proceed without waiting for M2 or M5 because it reuses the existing partial YouTube URL route and does not promote capability status to verified.
+**Parallel:** Can run with F3 YouTube evidence work if write sets are coordinated. Do not rebuild playlist expansion or rerun evidence preservation; both are merged.
 
-**Branch:** `codex/playlist-route`
+**Branch:** `codex/playlist-real-evidence`
 
 **Files:**
 
@@ -542,7 +537,7 @@ git diff --check
 - Modify: `docs/development/development-roadmap.md`
 - Modify: `docs/capability-matrix.md`
 - Modify: `python/kbprep_worker/youtube_source.py`
-- Create: `python/kbprep_worker/youtube_playlist.py`
+- Modify: `python/kbprep_worker/youtube_playlist.py`
 - Modify: `python/kbprep_worker/prepare_batch.py`
 - Modify: `python/kbprep_worker/prepare_batch_rerun.py`
 - Modify: `python/kbprep_worker/batch_manifest.py`
@@ -551,15 +546,15 @@ git diff --check
 - Modify: `src/adapters/standalone/cli.ts`
 - Modify: `src/adapters/standalone/cli.test.ts`
 
-- [x] **Step 1: Add failing playlist tests**
+- [ ] **Step 1: Add real evidence tests or fixtures**
 
-Require playlist URLs to create a bounded parent job with child YouTube video entries, per-child status, and no final parent success claim when every child fails.
+Require real-network or recorded-equivalent playlist evidence for bounded expansion, dependency failures, timeout behavior, per-video parent status, and source-side publication outcomes.
 
-- [x] **Step 2: Implement playlist route**
+- [ ] **Step 2: Harden only missing behavior**
 
-Reuse the same YouTube subtitle-first child route through generated local `.url` descriptors. Keep per-video artifacts auditable and keep parent status honest: all failed means failed, mixed success means completed with warnings.
+Reuse the existing YouTube subtitle-first child route through generated local `.url` descriptors. Fix only real evidence gaps, timeout/dependency behavior, or artifact/status issues found by Step 1.
 
-- [x] **Step 3: Verify**
+- [ ] **Step 3: Verify**
 
 ```powershell
 node scripts/python-venv.mjs -m unittest python.tests.test_media_youtube_routes python.tests.test_batch_status_manifest -v
@@ -568,7 +563,7 @@ npm run check:flowchart
 git diff --check
 ```
 
-Expected: playlist capability is implemented or blocked by concrete dependency evidence; it is not left as an unexamined planning tail.
+Expected: playlist implementation remains present and the remaining blocker is only real evidence or dependency quality, not missing core playlist code.
 
 ## Wave 4: M6 / Phase F Optional Routes
 
@@ -629,31 +624,34 @@ Add image OCR and legacy Office fixtures only when local dependencies are availa
 
 If fixtures are mocked or dependency-only, keep status `experimental`.
 
-### Branch F3: YouTube Subtitle-First Route
+### Branch F3: YouTube Real Evidence And Route Hardening
 
-**Parallel:** Can start now. Merge after route tests, status evidence, and reviewer checks pass.
+**Parallel:** Can start now. Coordinate write sets with PLAYLIST2. Do not create a duplicate converter route unless current code evidence proves the existing `youtube_source` / external conversion path cannot support the requirement.
 
-**Branch:** `codex/f-youtube-route`
+**Branch:** `codex/f-youtube-evidence-hardening`
 
 **Files:**
 
-- Modify: `python/kbprep_worker/diagnose/format_detect.py`
-- Modify: `python/kbprep_worker/converter_registry.py`
-- Create: `python/kbprep_worker/converters/youtube.py`
-- Create: `python/tests/test_youtube_converter.py`
+- Modify: `python/kbprep_worker/youtube_source.py`
+- Modify: `python/kbprep_worker/youtube_playlist.py`
+- Modify: `python/kbprep_worker/converters/external_tools.py`
+- Modify: `python/kbprep_worker/stages/external_conversion.py`
+- Modify: `python/tests/test_media_youtube_routes.py`
 - Modify: `src/adapters/standalone/cli.ts`
-- Modify: `src/test/scenarios/worker-local-formats.test.ts`
+- Modify: `src/adapters/standalone/cli.test.ts`
+- Modify: `src/test/scenarios/worker-core-runtime-part2.test.ts`
+- Modify: `python/tests/golden/formats/manifest.json`
 - Modify: `docs/development/11-multimedia-youtube-optional.md`
 - Modify: `docs/capability-matrix.md`
 - Modify: `docs/development/development-roadmap.md`
 - Modify: `docs/standalone-cli.md`
 - Modify: `docs/development/kbprep-implementation-status.json`
 
-- [ ] **Step 1: Add failing technical-contract tests**
+- [ ] **Step 1: Add failing evidence-hardening tests**
 
-Require subtitle-first fixture, no-subtitle fallback, dependency failure, timeout failure, no-network rejection when network is disabled, and source URL evidence in artifacts.
+Require real-network or recorded-equivalent subtitle fixture evidence, no-subtitle fallback, dependency failure, bounded timeout failure, no-network rejection when network is disabled, cache/artifact behavior, transcript-quality checks, and source URL evidence in artifacts.
 
-- [ ] **Step 2: Implement the route contract**
+- [ ] **Step 2: Confirm the route contract**
 
 Document:
 
@@ -666,9 +664,9 @@ Artifact behavior: preserve source URL evidence, subtitle order, transcript text
 Failure mode: unsupported or dependency error before conversion
 ```
 
-- [ ] **Step 3: Implement subtitle-first route**
+- [ ] **Step 3: Harden the existing subtitle-first route**
 
-Do not download media unless fallback is explicitly enabled and dependencies are present.
+Do not download media unless fallback is explicitly enabled and dependencies are present. Fix only missing timeout, dependency, fallback, artifact, quality, or status evidence behavior.
 
 - [ ] **Step 4: Promote status only from evidence**
 
@@ -688,12 +686,11 @@ git diff --check
 
 Merge order:
 
-1. Wave 0 cleanup.
-2. C1, C2, M5A, M5B1, BATCH1, F1, F2, and F3 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
-3. C3 after C1 and C2.
-4. M5B2 after C3.
-5. BATCH2 after M5B2 when policy-affected batch targeting needs Canonical IR identity.
-6. PLAYLIST2 real playlist evidence, with policy/CIR affected batch targeting after M5B2 when needed.
+1. Wave 0 is already closed; skip it unless a new regression is found.
+2. C1R, C2R, M5A regression guard, M5B1 regression guard, F1, F2, F3, and PLAYLIST2 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
+3. C7 full IR fact-layer closure after C1R and C2R.
+4. M5B2 affected-scope evidence binding after the required Canonical IR or cleaning-unit identity semantics are stable.
+5. BATCH2 after M5B2 when policy-affected batch targeting needs that identity binding.
 7. Capability-status promotion branches after their implementation evidence exists.
 
 Final release gate:
