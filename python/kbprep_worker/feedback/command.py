@@ -9,6 +9,7 @@ from .dictionary_suggestions import _promote_dictionary_suggestion, _suggest_dic
 from .promotion_history import _resolve_promotion_failures, _summarize_promotion_history
 from .proposals import _accept_proposal, _confidence, _counterexamples, _examples, _reason, _reject_proposal, _risk_note
 from .rerun_verification import _selective_rerun_plan
+from .selective_rerun_execution import _execute_selective_rerun
 from .support import (
     _action,
     _append_jsonl_locked,
@@ -35,6 +36,9 @@ def run(data: dict) -> None:
 
 
 def _dispatch_special_action(data: dict) -> bool:
+    if data.get("execute_rerun") is True:
+        ok(data={"rerun_verification": _execute_selective_rerun(data)})
+        return True
     if data.get("plan_rerun") is True:
         ok(data={"rerun_plan": _selective_rerun_plan(data)})
         return True

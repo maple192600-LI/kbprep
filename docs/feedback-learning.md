@@ -86,7 +86,7 @@ user feedback
 -> accept with `confirm_rule_acceptance=true` or reject the proposal
 -> write accepted rules only after approval
 -> optionally generate a selective rerun plan from accepted proposal, promotion history, or run metadata
--> optionally rerun the affected source when run metadata can locate it
+-> optionally execute one selective `rules_only` rerun when run metadata can locate the source
 -> report whether rerun evidence supports the change
 ```
 
@@ -107,6 +107,7 @@ Implemented behavior includes:
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
 - selective rerun planning can emit command evidence without executing the rerun; the plan records run id, source identity, document type, policy snapshot hash when available, and `canonical_ir_binding.status: pending`
+- selective rerun execution can use the same selectors as planning (`accepted_proposal`, `run_dir`, or promotion history by `document_type`) to execute one `rules_only` rerun and return verification evidence with `actually_executed=true`
 - blocked selective rerun planning is recorded in `rerun_history.jsonl` so missing metadata or failed promotion history remains visible
 - dictionary suggestions require explicit confirmation before promotion
 - dictionary suggestion thresholds are scope-based: user/project/source-pattern evidence can start lower, document-type promotion needs more evidence, and global/public-style promotion needs the highest evidence count

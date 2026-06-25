@@ -51,6 +51,7 @@ const HELP: Record<StandaloneCommand, string> = {
     "Usage: kbprep-feedback --run-dir <dir> (--feedback-text <text>|--feedback-file <file>) [--action discard|review|protect] [--scope user|project|document_type|source_pattern|global] [--source-pattern <text>] [--risk-note <text>] [--rules-dir <dir>] [--config-file <file>]",
     "       kbprep-feedback --accept-proposal <id|latest> --confirm-rule-acceptance [--rerun-after-accept] [--rules-dir <dir>] [--config-file <file>]",
     "       kbprep-feedback --plan-rerun (--run-dir <dir>|--accepted-proposal <id|latest>|--document-type <type>) [--rules-dir <dir>] [--target-rules-dir <dir>] [--promotion-history-file <file>] [--config-file <file>]",
+    "       kbprep-feedback --execute-rerun (--run-dir <dir>|--accepted-proposal <id|latest>|--document-type <type>) [--rules-dir <dir>] [--target-rules-dir <dir>] [--promotion-history-file <file>] [--config-file <file>]",
     "       kbprep-feedback --reject-proposal <id|latest> [--reject-reason <text>] [--rules-dir <dir>] [--config-file <file>]",
     "       kbprep-feedback --suggest-dictionary-updates [--min-feedback-count <n>] [--rules-dir <dir>] [--config-file <file>]",
     "       kbprep-feedback --promote-dictionary-suggestion --document-type <type> --confirm-dictionary-update [--confirm-public-write] [--rerun-after-promotion] [--allow-failed-promotion-history] [--representative-run-dir <dir>] [--rules-dir <dir>] [--target-rules-dir <dir>] [--config-file <file>]",
@@ -173,6 +174,7 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
           accepted_proposal: readString(options, "accepted_proposal"),
           confirm_rule_acceptance: readBoolean(options, "confirm_rule_acceptance", false),
           plan_rerun: readBoolean(options, "plan_rerun", false),
+          execute_rerun: readBoolean(options, "execute_rerun", false),
           rerun_after_accept: readBoolean(options, "rerun_after_accept", false),
           reject_proposal: readString(options, "reject_proposal"),
           reject_reason: readString(options, "reject_reason"),
@@ -344,6 +346,7 @@ function isRunDirOptionalFeedback(options: Record<string, string | boolean>): bo
     readString(options, "accept_proposal") ||
     readString(options, "accepted_proposal") ||
     readBoolean(options, "plan_rerun", false) ||
+    readBoolean(options, "execute_rerun", false) ||
     readString(options, "reject_proposal") ||
     readBoolean(options, "suggest_dictionary_updates", false) ||
     readBoolean(options, "promote_dictionary_suggestion", false) ||

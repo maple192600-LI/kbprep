@@ -157,15 +157,21 @@
       "id": "feedback_rule_learning",
       "label": "Proposal-first feedback learning",
       "status": "partial",
-      "scope": "Feedback proposals, acceptance, rejection, rerun evidence, proposal risk notes, explicit owner confirmation status, scope-based dictionary suggestion thresholds, stronger body-text counterexamples, and failed-promotion-history blocking exist; the target design keeps this proposal-first model.",
+      "scope": "Feedback proposals, acceptance, rejection, public single-source selective rerun planning and execution, proposal risk notes, explicit owner confirmation status, scope-based dictionary suggestion thresholds, stronger body-text counterexamples, and failed-promotion-history blocking exist; Canonical IR id-level rerun targeting remains pending.",
       "evidence": [
         "docs/feedback-learning.md",
         "docs/development/09-feedback-rule-learning.md",
+        "python/kbprep_worker/feedback/command.py",
+        "python/kbprep_worker/feedback/rerun_verification.py",
+        "python/kbprep_worker/feedback/selective_rerun_execution.py",
         "python/kbprep_worker/feedback/proposals.py",
         "python/kbprep_worker/feedback/dictionary_suggestions.py",
         "python/kbprep_worker/feedback/promotion_history.py",
+        "python/tests/test_feedback.py",
         "python/tests/test_feedback_proposals.py",
         "python/tests/test_round2_coverage_feedback_promotions.py",
+        "src/adapters/standalone/cli.test.ts",
+        "src/test/scenarios/worker-feedback-rules-part2.test.ts",
         "src/test/scenarios/worker-feedback-proposals-part1.test.ts"
       ],
       "prohibitedClaims": [
@@ -176,7 +182,7 @@
       "id": "batch_playlist_rerun",
       "label": "Batch, Playlist, and rerun",
       "status": "partial",
-      "scope": "Batch behavior exists for local sources and writes a parent status manifest with evidence-backed rerun scope; Playlist and executable selective rerun still require additional implementation and evidence.",
+      "scope": "Batch behavior exists for local sources and writes a parent status manifest with evidence-backed rerun scope; single-source feedback selective rerun execution exists. Playlist and batch selective rerun still require additional implementation and evidence.",
       "evidence": [
         "docs/development/10-batch-playlist-rerun.md",
         "python/kbprep_worker/batch_manifest.py",

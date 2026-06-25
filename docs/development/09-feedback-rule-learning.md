@@ -32,6 +32,7 @@ Accepted proposals become deterministic rules only after explicit `confirm_rule_
 - Proposal acceptance validates examples and counterexamples.
 - Proposal acceptance refuses promotion until owner confirmation is recorded.
 - Rerun verification reports whether the accepted rule helped.
+- Public selective rerun can be planned or executed from an accepted proposal, a run directory, or document-type promotion history when run metadata is sufficient.
 - Failed rerun or promotion evidence is visible as `rerun_failed` or `promotion_blocked` without changing the accepted-rule loading contract.
 
 ## Risk And Rollback
