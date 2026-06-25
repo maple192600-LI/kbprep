@@ -64,7 +64,7 @@ class IrMarkdownRegenerationTests(unittest.TestCase):
                 "entries": [_entry("cv_000001", 1, "n_000001", "b_000001", "keep", [])],
             }
 
-            render(blocks, str(run_dir), "source", "run", profile="curated_obsidian_kb", clean_view=clean_view)
+            render(blocks, str(run_dir), "source", "run", profile="curated_obsidian_kb", render_obsidian=False, clean_view=clean_view)
 
             cleaned = (run_dir / "cleaned.md").read_text(encoding="utf-8")
 
