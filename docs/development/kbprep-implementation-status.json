@@ -199,7 +199,7 @@
       "id": "youtube_url_routes",
       "label": "YouTube URL route",
       "status": "partial",
-      "scope": "Local YouTube .url descriptors can route through subtitle-first extraction and fall back to local media transcription when subtitles are unavailable. Tests use mocked yt-dlp, ffmpeg, and Whisper behavior; real account, cookie, paid, or unclear-copyright downloads are not part of the verified evidence.",
+      "scope": "Direct YouTube URLs, explicit video ids, and local .url descriptors can route through subtitle-first extraction. Media fallback is explicit and only runs when allow_youtube_media_fallback is true. Tests use mocked yt-dlp, ffmpeg, and Whisper behavior; verified promotion still needs broader real-network, dependency, timeout, and transcript-quality evidence.",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
         "docs/capability-matrix.md",
@@ -211,7 +211,7 @@
       ],
       "prohibitedClaims": [
         "YouTube input is a verified real-network capability",
-        "YouTube support works with account login, cookies, paid content, or unclear-copyright downloads"
+        "YouTube media fallback runs without explicit user request"
       ]
     }
   ]

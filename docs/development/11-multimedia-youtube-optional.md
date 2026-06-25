@@ -10,12 +10,11 @@ This stage supports source inspection, route selection, dependency failure repor
 
 ## Contract
 
-- Local files are the maintained CLI path today.
+- Local files remain the stable core CLI path; YouTube direct URL and explicit `--youtube-video-id` inputs are normalized into controlled local descriptors before entering the same quality pipeline.
 - Media sources must become transcript evidence before classification.
 - YouTube uses available subtitles before media transcript extraction.
-- YouTube support currently enters through local `.url` descriptor files or
-  explicit source identity metadata, not account login, cookies, paid services,
-  or direct real-network verification claims.
+- YouTube support enters through direct URLs, explicit video ids, local `.url` descriptor
+  files, or explicit source identity metadata.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
 - The YouTube boundary is a technical product contract: accepted URL shapes, dependency detection, network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence. There is no separate non-technical approval gate in front of this route.
@@ -26,7 +25,7 @@ This stage supports source inspection, route selection, dependency failure repor
 - Missing optional dependencies produce clear user-facing errors.
 - Unsupported sources stop before conversion.
 - Failed optional route runs stop before publication and do not update previous successful deliverables.
-- Current media and YouTube support remains partial until real local ASR and owner-approved YouTube samples pass.
+- Current media and YouTube support remains partial until real local ASR evidence, real-network YouTube samples, timeout behavior, dependency variance, and transcript-quality checks pass.
 
 ## Risk And Rollback
 

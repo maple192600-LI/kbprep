@@ -160,8 +160,9 @@ Append these tests inside the existing `describe("kbprep worker governance guard
             statusCapability("media_local_transcript", "partial", [
               "src/test/scenarios/worker-core-runtime-part2.test.ts",
             ]),
-            statusCapability("youtube_url_routes", "design_only", [
-              "docs/development/11-multimedia-youtube-optional.md",
+            statusCapability("youtube_url_routes", "partial", [
+              "src/test/scenarios/worker-core-runtime-part2.test.ts",
+              "python/tests/test_media_youtube_routes.py",
             ]),
           ],
         }, null, 2),
@@ -622,7 +623,7 @@ def _default_required_evidence(capability: Capability) -> list[str]:
     if status == "partial":
         return ["golden fixtures", "source-to-Markdown preservation checks"]
     if status == "design_only":
-        return ["owner-approved route design", "subtitle-first fixtures", "dependency failure tests"]
+        return ["accepted route contract", "subtitle-first fixtures", "dependency failure tests"]
     return ["explicit dependency/conversion route", "end-to-end fixture proving safe Markdown output"]
 ```
 
@@ -635,20 +636,20 @@ Add this capability after `media_local_transcript` and before `mobi_unsupported`
         "id": "youtube_url_routes",
         "source_type": "remote_url",
         "extensions": [],
-        "route": "unsupported",
-        "dependencies": ["target-only: subtitle fetcher", "target-only: media transcript fallback"],
+        "route": "youtube_subtitle_then_media_transcript",
+        "dependencies": ["yt-dlp subtitles", "explicit media transcript fallback"],
         "fallback": "Download or export a local subtitle, transcript, Markdown, text, PDF, or media file before running KBPrep.",
-        "status": "design_only",
+        "status": "partial",
         "test_evidence": [],
         "required_evidence": [
-            "owner-approved YouTube URL input contract",
+            "YouTube URL input contract",
             "subtitle-first golden fixtures",
             "fallback transcript fixtures",
             "dependency failure and no-network tests",
         ],
-        "promotion_blocker": "No standalone CLI URL route, subtitle extraction, media download, or verified fixture support is shipped.",
-        "preserves": ["target: subtitle order", "target: transcript text", "target: source URL evidence"],
-        "risk": "URL processing can create network, copyright, dependency, and quality risks; it stays target-only.",
+        "promotion_blocker": "Direct URL routing is partial and still needs real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence before verified promotion.",
+        "preserves": ["subtitle order", "transcript text", "source URL evidence"],
+        "risk": "URL processing creates network, dependency, timeout, and quality risks until the remaining evidence is in place.",
     },
 ```
 
@@ -665,7 +666,7 @@ In `docs/capability-matrix.md`, update the status list to include:
 Add this row before `mobi_unsupported`:
 
 ```markdown
-| youtube_url_routes | YouTube URLs | unsupported | design_only | target: subtitle order, transcript text, source URL evidence | none | URL processing can create network, copyright, dependency, and quality risks; it stays target-only until the owner approves the route and fixtures prove it. |
+| youtube_url_routes | YouTube URLs and `.url` descriptors | youtube_subtitle_then_media_transcript | partial | subtitle order, transcript text, source URL evidence | mocked subtitle and fallback fixtures | URL processing depends on accepted URL shapes, network timeout handling, subtitle availability, external dependencies, transcript quality, and final quality gates; current evidence is not enough for verified real YouTube support. |
 ```
 
 - [x] **Step 5: Run capability matrix checks**
@@ -722,7 +723,7 @@ Replace the old combined media/YouTube snapshot row with:
 
 ```markdown
 | media_local_transcript | partial status surface; experimental route matrix | Local media detection and failure reporting exist; real ASR fixtures are still required before route promotion. |
-| youtube_url_routes | design_only | YouTube is visible as a target-only matrix row; no URL input route is shipped. |
+| youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
 ```
 
 - [x] **Step 4: Update Phase A wording**
@@ -735,8 +736,9 @@ Replace the Phase A slices list with:
   classification code and tests.
 - **A2** Keep `media_local_transcript` and `youtube_url_routes` separate in
   the status JSON.
-- **A3** Add an explicit target-only YouTube row in `capability-matrix.md`
-  while keeping the route unsupported/design-only until evidence exists.
+- **A3** Keep the YouTube row in `capability-matrix.md` as `partial` after
+  direct URL / explicit video-id routing lands, and block `verified` promotion
+  until real-network, timeout, dependency, and transcript-quality evidence exists.
 - **A4** Strengthen governance: `implementation-status.mjs` checks required
   capability coverage and requires implemented/partial status evidence to
   reference code or tests.
@@ -835,7 +837,7 @@ Expected: branch pushes cleanly. Do not merge or release.
 - `document_type_classification` appears in implementation status with partial status and code/test evidence.
 - The old combined optional-media status ID is gone from implementation status.
 - `media_local_transcript` and `youtube_url_routes` are separate status capabilities.
-- `docs/capability-matrix.md` has an explicit YouTube row that is target-only and not shipped.
+- `docs/capability-matrix.md` has an explicit YouTube row that is partial and not promoted to verified.
 - `scripts/checks/implementation-status.mjs` fails when required capabilities are missing.
 - `scripts/checks/implementation-status.mjs` fails when implemented/partial capabilities cite only prose docs.
 - README and standalone CLI docs distinguish `batch_manifest.json` from `kbprep_batch_manifest.json`.
@@ -846,4 +848,4 @@ Expected: branch pushes cleanly. Do not merge or release.
 - Spec coverage: all Phase A slices A1-A5 from `docs/development/development-roadmap.md` are covered by Tasks 1-5.
 - Placeholder scan: no `TBD`, `TODO`, `implement later`, or "similar to" instructions are used as work steps.
 - Type consistency: `document_type_classification`, `media_local_transcript`, and `youtube_url_routes` use the same IDs across status JSON, governance checks, roadmap, and capability matrix.
-- Risk boundary: YouTube remains target-only; no URL route, dependency, network behavior, or cost is introduced.
+- Risk boundary: YouTube remains partial; direct URL and explicit video-id routing exist, but verified promotion still requires real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence.

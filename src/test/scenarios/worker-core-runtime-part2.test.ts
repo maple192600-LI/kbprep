@@ -141,6 +141,8 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
         "assert media_result.ok, media_result.report",
         "assert media_result.report['route_decision']['external_route'] == 'media_to_transcript', media_result.report",
         "def youtube_runner(command, cwd, timeout_seconds):",
+        "    if '--dump-single-json' in command:",
+        '        return ExternalCommandResult(0, \'{"subtitles":{"en":[{}]},"automatic_captions":{}}\', \'\')',
         "    if '--skip-download' in command:",
         "        out = Path(command[command.index('--output') + 1]); out.parent.mkdir(parents=True, exist_ok=True)",
         "        out.with_name(out.name + '.en.vtt').write_text('WEBVTT\\n\\n00:00:00.000 --> 00:00:02.000\\nKeep setup step threshold=0.8.\\n', encoding='utf-8')",

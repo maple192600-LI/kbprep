@@ -27,7 +27,7 @@ Current completion state:
 - M4 is implemented.
 - Phase E / `job_status_envelope` is implemented.
 - M5 is partial.
-- M6 / Phase F is incomplete: local media is route-level `experimental`, YouTube is `design_only`, image OCR and legacy Office are `experimental`.
+- M6 / Phase F is incomplete: local media and YouTube are `partial`, image OCR and legacy Office are `experimental`.
 
 ## Parallelization Rules
 
@@ -625,7 +625,7 @@ Do not download media unless fallback is explicitly enabled and dependencies are
 
 - [ ] **Step 4: Promote status only from evidence**
 
-Move `youtube_url_routes` out of `design_only` only if CLI behavior, fixtures, dependency failures, and quality gates pass.
+Move `youtube_url_routes` from `partial` toward `verified` only if CLI behavior, real fixtures, dependency failures, timeout handling, and quality gates pass.
 
 - [ ] **Step 5: Verify branch**
 

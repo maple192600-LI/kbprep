@@ -10,7 +10,9 @@ describe("standalone KBPrep CLI adapter", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain("Usage: kbprep-prepare");
-    expect(result.output).toContain("--input <file|youtube.url>");
+    expect(result.output).toContain("--input <file|youtube.url|youtube-url>");
+    expect(result.output).toContain("--youtube-video-id <id>");
+    expect(result.output).toContain("--allow-youtube-media-fallback");
     expect(result.output).toContain("Default profile standard");
     expect(result.output).toContain("compatibility template");
     expect(result.output).not.toContain("legacy course/self-media");
@@ -203,6 +205,47 @@ describe("standalone KBPrep CLI adapter", () => {
     expect(plan.input.source_url).toBe("https://example.com/course/lesson-1");
     expect(plan.input.source_domain).toBe("example.com");
     expect(plan.input.site_name).toBe("Example Course");
+  });
+
+  it("maps direct YouTube URL input to a local descriptor without enabling media fallback by default", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-youtube-"));
+    try {
+      const parsed = parseStandaloneArgs(["--input", "https://www.youtube.com/watch?v=ExampleVideo01", "--output", root]);
+      const plan = buildCliPlan("prepare", parsed.options);
+
+      expect(plan.command).toBe("prepare");
+      expect(plan.input.source_url).toBe("https://www.youtube.com/watch?v=ExampleVideo01");
+      expect(plan.input.input_path).toContain(join(".kbprep-inputs", "youtube", "ExampleVideo01.url"));
+      expect(readFileSync(plan.input.input_path as string, "utf-8")).toContain("URL=https://www.youtube.com/watch?v=ExampleVideo01");
+      expect(plan.input.allow_youtube_media_fallback).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("maps explicit YouTube video ids and fallback to the worker command", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-youtube-id-"));
+    try {
+      const parsed = parseStandaloneArgs(["--youtube-video-id", "ExampleVideo01", "--output", root, "--allow-youtube-media-fallback"]);
+      const plan = buildCliPlan("prepare", parsed.options);
+
+      expect(plan.input.source_url).toBe("https://www.youtube.com/watch?v=ExampleVideo01");
+      expect(plan.input.input_path).toContain(join(".kbprep-inputs", "youtube", "ExampleVideo01.url"));
+      expect(plan.input.allow_youtube_media_fallback).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("does not mistake a missing local filename for a YouTube video id", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-missing-local-"));
+    try {
+      const parsed = parseStandaloneArgs(["--input", "chapter01", "--output", root]);
+
+      expect(() => buildCliPlan("prepare", parsed.options)).toThrow(/must be a file/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it("maps cleanup dry-run options to the Python cleanup worker command", () => {

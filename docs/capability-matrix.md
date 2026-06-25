@@ -60,5 +60,5 @@ blocker. Package checks validate that every non-verified capability appears in
 this gap report, so new file routes cannot silently imply full support before
 fixtures prove them.
 
-1. Add real image OCR, legacy Office, media ASR, and owner-approved YouTube subtitle/fallback fixtures before promoting partial or experimental routes to verified.
+1. Add real image OCR, legacy Office, media ASR, and real-network YouTube subtitle/fallback fixtures before promoting partial or experimental routes to verified.
 2. Keep MOBI explicitly unsupported unless the project owner later reopens that scope.

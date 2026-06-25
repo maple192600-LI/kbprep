@@ -37,7 +37,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | batch_playlist_rerun | partial | Batch + parent status manifest exist; Playlist and selective rerun need more evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
-| youtube_url_routes | partial | Local YouTube `.url` descriptors route subtitle-first and fall back to media transcription with mocked fixtures; real-network YouTube evidence is not verified. |
+| youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
 
 ## Guiding Principles
 
@@ -231,10 +231,11 @@ Slices:
 - **F1** Landed: `media_local_transcript` moved from experimental to partial
   with mocked golden transcript route evidence, command evidence, and dependency
   failure reporting. Verified promotion still requires real local ASR samples.
-- **F2** Landed: local YouTube `.url` descriptors use a subtitle-first route
-  and fall back to media transcription when subtitles are unavailable. Fixtures
-  mock `yt-dlp`, `ffmpeg`, and Whisper; no real network/account/cookie evidence
-  is claimed.
+- **F2** Landed: direct YouTube URLs, explicit video ids, and local `.url` descriptors
+  use a subtitle-first route. Media fallback is explicit and only runs when
+  enabled. Fixtures mock `yt-dlp`, `ffmpeg`, and Whisper; real-network breadth,
+  timeout behavior, dependency variance, and transcript quality still need
+  broader evidence before verified promotion.
 - **F3** Landed: `capability-matrix.md`, status JSON, README/operator guidance,
   and golden format manifest keep media and YouTube partial, not verified.
 
@@ -274,7 +275,7 @@ Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
 | M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | partial |
-| M6 Optional Source Expansion | Phase F | local media route is experimental; YouTube remains design_only |
+| M6 Optional Source Expansion | Phase F | local media and YouTube are partial; verified promotion still needs broader real-sample evidence |
 
 Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
 M1-M6. Phase B (PDF routing), Phase D (cleanup), and Phase E (job status)
@@ -360,8 +361,10 @@ Current truth:
 - `media_local_transcript` has local detection and an external transcript route,
   but capability status is still experimental at the route level because real
   ASR fixtures and timing-quality evidence are missing.
-- `youtube_url_routes` is design_only. No standalone CLI URL route, subtitle
-  extraction, media download, or verified fixture support is shipped.
+- `youtube_url_routes` is partial. Standalone CLI direct URL / explicit video id input,
+  descriptor routing, subtitle extraction, explicit media fallback, and mocked
+  failure fixtures exist; verified promotion still needs broader real-network
+  and transcript-quality evidence.
 - Image OCR and legacy Office routes are also experimental and need real
   fixtures before promotion.
 
@@ -380,10 +383,11 @@ Required slices:
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists if
   in scope, and final source-side publication.
 
-Acceptance: `youtube_url_routes` leaves `design_only` only after real CLI
-support and fixtures exist. M6 is complete only when every optional route in
-scope is either verified/partial with evidence or explicitly kept unsupported
-with owner-readable guidance.
+Acceptance: `youtube_url_routes` moves from `partial` to `verified` only after
+broader real-network fixtures, dependency variance, timeout behavior, media
+fallback evidence, and final quality-gate checks pass. M6 is complete only when
+every optional route in scope is either verified/partial with evidence or
+explicitly kept unsupported with owner-readable guidance.
 
 ### 5. Final Release Closure
 

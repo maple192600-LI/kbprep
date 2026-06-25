@@ -311,7 +311,7 @@ describe("kbprep worker governance guards", () => {
               ]),
               statusCapability("batch_playlist_rerun", "partial", ["python/tests/test_batch_status_manifest.py"]),
               statusCapability("media_local_transcript", "partial", ["src/test/scenarios/worker-core-runtime-part2.test.ts"]),
-              statusCapability("youtube_url_routes", "design_only", ["docs/development/11-multimedia-youtube-optional.md"]),
+              statusCapability("youtube_url_routes", "partial", ["python/tests/test_media_youtube_routes.py"]),
             ],
           },
           null,

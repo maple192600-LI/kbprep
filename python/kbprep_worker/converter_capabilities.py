@@ -290,9 +290,9 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "dependency failure and no-network tests",
         ],
         "promotion_blocker": (
-            "Only local .url descriptor routing with mocked subtitle and fallback fixtures is covered; "
-            "verified promotion needs direct URL input, real subtitle/fallback fixtures, dependency failures, "
-            "timeout handling, and final quality-gate evidence."
+            "Direct URL, explicit video id, and local .url descriptor routing are covered with mocked subtitle and fallback fixtures; "
+            "verified promotion needs real subtitle/fallback fixtures, dependency variance, timeout handling, "
+            "and final quality-gate evidence."
         ),
         "preserves": ["subtitle order", "transcript text", "source URL evidence"],
         "risk": (

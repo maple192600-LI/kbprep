@@ -46,7 +46,11 @@ def external_route_message(route_kind: ConversionRouteKind) -> str:
 
 def _convert_youtube_to_transcript(state: PipelineState, converted_path: Path, run_dir: Path) -> dict:
     source_url = youtube_url_from_source(state.input_p, state.data)
-    external = extract_youtube_transcript(source_url, run_dir)
+    external = extract_youtube_transcript(
+        source_url,
+        run_dir,
+        allow_media_fallback=state.data.get("allow_youtube_media_fallback") is True,
+    )
     _raise_external_conversion_failure(external.report)
     transcript_path = _external_artifact_path(external.artifact_path)
     text = transcript_path.read_text(encoding="utf-8")

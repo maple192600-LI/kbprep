@@ -1,6 +1,6 @@
 # KBPrep Standalone CLI
 
-The standalone CLI is KBPrep's maintained agent-independent entry point. The maintained command surface is local-file oriented today. URL, YouTube, and heavier media routes are target or optional capabilities until the capability matrix and tests promote them.
+The standalone CLI is KBPrep's maintained agent-independent entry point. The stable core command surface is local-file oriented; YouTube direct URL and explicit `--youtube-video-id` input are partial optional routes that normalize into controlled local descriptors before entering the same quality pipeline.
 
 ## AI Review Backend
 
@@ -45,6 +45,8 @@ Use `KBPREP_BOOTSTRAP_PYTHON`, `KBPREP_PYTHON`, or `--config-file` with `python_
 kbprep-preflight --workdir ./.kbprep/check
 kbprep-analyze --input ./source.pdf --output ./.kbprep/source
 kbprep-prepare --input ./source.pdf --output ./.kbprep/source --mode rules_only --force
+kbprep-prepare --input https://www.youtube.com/watch?v=ExampleVideo01 --output ./.kbprep/youtube --force
+kbprep-prepare --youtube-video-id ExampleVideo01 --output ./.kbprep/youtube --allow-youtube-media-fallback --force
 kbprep-apply-review --run-dir ./.kbprep/source/runs/<run-id> --patch-file ./review.patch.json
 kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --feedback-text "下次删除「关注公众号」这种污染"
 kbprep-feedback --accept-proposal latest --confirm-rule-acceptance

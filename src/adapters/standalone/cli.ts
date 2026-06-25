@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { parse, relative, resolve } from "node:path";
 import { callWorker, type WorkerConfig, type WorkerResult } from "../../worker.js";
 import { ensurePythonRuntime, type RuntimeConfig } from "../../runtime/pythonRuntime.js";
@@ -33,14 +33,14 @@ const HELP: Record<StandaloneCommand, string> = {
     "Checks KBPrep runtime readiness. Omit device_override to let KBPrep choose CPU/GPU automatically.",
   ].join("\n"),
   diagnose: [
-    "Usage: kbprep-analyze --input <file|youtube.url> [--output <dir>] [--source-type auto|pdf_like|markdown_note|generic_block|subtitle_transcript] [--config-file <file>]",
+    "Usage: kbprep-analyze --input <file|youtube.url|youtube-url> [--youtube-video-id <id>] [--output <dir>] [--source-type auto|pdf_like|markdown_note|generic_block|subtitle_transcript] [--config-file <file>]",
     "",
-    "Reads one source file or local YouTube .url descriptor and reports source type, quality, and recommended processing route.",
+    "Reads one source file, local YouTube .url descriptor, direct YouTube URL, or explicit YouTube video id and reports source type, quality, and recommended processing route.",
   ].join("\n"),
   prepare: [
-    "Usage: kbprep-prepare --input <file|youtube.url> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--source-url <url>] [--source-domain <domain>] [--site-name <name>] [--max-quality-iterations <n>] [--force] [--config-file <file>]",
+    "Usage: kbprep-prepare --input <file|youtube.url|youtube-url> [--youtube-video-id <id>] --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--source-url <url>] [--source-domain <domain>] [--site-name <name>] [--allow-youtube-media-fallback] [--max-quality-iterations <n>] [--force] [--config-file <file>]",
     "",
-    "Converts one local source file or YouTube .url descriptor. Default profile standard publishes source-side Markdown; obsidian_kb publishes a generic Obsidian vault; curated_obsidian_kb is a compatibility template for course or self-media documents.",
+    "Converts one local source file, YouTube .url descriptor, direct YouTube URL, or explicit YouTube video id. Default profile standard publishes source-side Markdown; obsidian_kb publishes a generic Obsidian vault; curated_obsidian_kb is a compatibility template for course or self-media documents.",
   ].join("\n"),
   apply_review: [
     "Usage: kbprep-apply-review --run-dir <dir> --patch-file <json> [--config-file <file>]",
@@ -114,12 +114,14 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
     case "diagnose": {
       const outputRoot = resolveOutputDir(readString(options, "output") ?? ".kbprep/analyze", "output");
       mkdirSync(outputRoot, { recursive: true });
+      const input = requireInputOrYoutubeDescriptor(options, "input", outputRoot);
       return {
         command,
         input: {
-          input_path: requireInputFile(options, "input"),
+          input_path: input.inputPath,
           output_root: outputRoot,
           source_type: readString(options, "source_type") ?? "auto",
+          source_url: input.sourceUrl,
         },
         timeoutMs: 120_000,
       };
@@ -127,10 +129,11 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
     case "prepare": {
       const outputRoot = requireOutputDir(options, "output");
       mkdirSync(outputRoot, { recursive: true });
+      const input = requireInputOrYoutubeDescriptor(options, "input", outputRoot);
       return {
         command,
         input: {
-          input_path: requireInputFile(options, "input"),
+          input_path: input.inputPath,
           output_root: outputRoot,
           profile: readString(options, "profile") ?? "standard",
           mode: readString(options, "mode") ?? "rules_only",
@@ -138,9 +141,10 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
           artifact_policy: readString(options, "artifact_policy") ?? "keep_latest",
           language: readString(options, "language") ?? "zh",
           source_type: readString(options, "source_type") ?? "auto",
-          source_url: readString(options, "source_url"),
+          source_url: input.sourceUrl ?? readString(options, "source_url"),
           source_domain: readString(options, "source_domain"),
           site_name: readString(options, "site_name"),
+          allow_youtube_media_fallback: readBoolean(options, "allow_youtube_media_fallback", false),
           splitter: readString(options, "splitter") ?? "auto",
           max_quality_iterations: readNumber(options, "max_quality_iterations", 3),
         },
@@ -364,9 +368,44 @@ function requireInputFile(options: Record<string, string | boolean>, key: string
   const value = readString(options, key);
   if (!value) throw new Error(`--${key.replace(/_/g, "-")} is required.`);
   const filePath = resolvePath(value);
-  const stats = statSync(filePath);
+  let stats;
+  try {
+    stats = statSync(filePath);
+  } catch {
+    throw new Error(`--${key.replace(/_/g, "-")} must be a file: ${filePath}`);
+  }
   if (!stats.isFile()) throw new Error(`--${key.replace(/_/g, "-")} must be a file: ${filePath}`);
   return filePath;
+}
+
+function requireInputOrYoutubeDescriptor(
+  options: Record<string, string | boolean>,
+  key: string,
+  outputRoot: string,
+): { inputPath: string; sourceUrl?: string } {
+  const value = readString(options, key);
+  const explicitVideoId = readString(options, "youtube_video_id");
+  if (!value && !explicitVideoId) throw new Error(`--${key.replace(/_/g, "-")} is required.`);
+  if (explicitVideoId) {
+    const youtubeUrl = youtubeUrlFromVideoId(explicitVideoId);
+    const descriptor = youtubeDescriptorPath(outputRoot, youtubeUrl);
+    mkdirSync(resolve(outputRoot, ".kbprep-inputs", "youtube"), { recursive: true });
+    writeFileSync(descriptor, `[InternetShortcut]\nURL=${youtubeUrl}\n`, "utf-8");
+    return { inputPath: descriptor, sourceUrl: youtubeUrl };
+  }
+  if (!value) throw new Error(`--${key.replace(/_/g, "-")} is required.`);
+  const candidatePath = resolvePath(value);
+  try {
+    if (statSync(candidatePath).isFile()) return { inputPath: candidatePath };
+  } catch {
+    // Fall through so direct YouTube URLs and video ids can become descriptors.
+  }
+  const youtubeUrl = normalizeYouTubeInput(value);
+  if (!youtubeUrl) return { inputPath: requireInputFile(options, key) };
+  const descriptor = youtubeDescriptorPath(outputRoot, youtubeUrl);
+  mkdirSync(resolve(outputRoot, ".kbprep-inputs", "youtube"), { recursive: true });
+  writeFileSync(descriptor, `[InternetShortcut]\nURL=${youtubeUrl}\n`, "utf-8");
+  return { inputPath: descriptor, sourceUrl: youtubeUrl };
 }
 
 function requireInputDir(options: Record<string, string | boolean>, key: string): string {
@@ -463,6 +502,47 @@ function readBoolean(options: Record<string, string | boolean>, key: string, fal
     throw new Error(`--${key.replace(/_/g, "-")} must be true or false.`);
   }
   return fallback;
+}
+
+function normalizeYouTubeInput(value: string): string | undefined {
+  if (isYouTubeUrl(value)) return value.trim();
+  return undefined;
+}
+
+function youtubeUrlFromVideoId(value: string): string {
+  const videoId = safeVideoId(value);
+  if (!videoId) throw new Error("--youtube-video-id must contain a YouTube video id.");
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function youtubeDescriptorPath(outputRoot: string, sourceUrl: string): string {
+  const videoId = videoIdFromYouTubeUrl(sourceUrl) ?? "youtube";
+  return resolve(outputRoot, ".kbprep-inputs", "youtube", `${videoId}.url`);
+}
+
+function isYouTubeUrl(value: string): boolean {
+  try {
+    return videoIdFromYouTubeUrl(value) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+function videoIdFromYouTubeUrl(value: string): string | undefined {
+  const url = new URL(value.trim());
+  if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+  const host = url.hostname.toLowerCase();
+  if (host === "youtu.be") return safeVideoId(url.pathname.slice(1).split("/")[0]);
+  if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) return undefined;
+  const queryId = url.searchParams.get("v");
+  if (queryId) return safeVideoId(queryId);
+  const match = url.pathname.match(/\/(?:shorts|embed)\/([^/?#]+)/);
+  return match ? safeVideoId(match[1]) : undefined;
+}
+
+function safeVideoId(value: string | undefined): string | undefined {
+  const sanitized = (value ?? "").replace(/[^A-Za-z0-9_-]+/g, "").slice(0, 64);
+  return sanitized || undefined;
 }
 
 function normalizeKey(key: string): string {
