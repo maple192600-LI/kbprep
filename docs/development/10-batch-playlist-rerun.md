@@ -15,10 +15,10 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - At least one successful child can produce `completed_with_warnings`.
 - All children failed means parent `failed`.
 - Rerun uses existing run metadata only when the source can be safely located.
-- Current public selective rerun execution includes single-source feedback rerun and batch failed/pending rerun from `batch_manifest.json`; playlist rerun is not shipped.
-- `batch_manifest.json` records parent status, per-file status, skipped unsupported files, source hashes, artifact paths, command defaults, and rerun scope.
+- Current public selective rerun execution includes single-source feedback rerun and batch failed/pending rerun from `batch_manifest.json`; playlist input is shipped, but playlist rerun is not shipped.
+- `batch_manifest.json` records parent status, per-file status, skipped unsupported files, source hashes, source URLs when available, artifact paths, command defaults, and rerun scope.
 - Batch rerun writes `batch_rerun_manifest.json` with selected children, successes, failures, skipped unsupported visibility, and source-manifest evidence.
-- Playlist input expands into bounded child jobs that reuse the YouTube subtitle-first route and keep per-video status visible.
+- Playlist input expands into bounded local `.url` child jobs that reuse the YouTube subtitle-first route and keep per-video status visible through `source_collection` metadata.
 
 ## Acceptance
 
@@ -30,6 +30,7 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - Batch rerun refuses missing or changed source files and records the failure in `batch_rerun_manifest.json` instead of claiming success.
 - Batch status manifest exists for successful, partially successful, and sample-failed runs.
 - Playlist status records every child video, preserves successful child deliverables, and reports mixed success as completed with warnings.
+- Playlist input is explicit (`kbprep-batch --playlist`) and does not make directory batch process arbitrary `.url` files unless the user chose the playlist path.
 
 ## Risk And Rollback
 

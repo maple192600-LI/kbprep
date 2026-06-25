@@ -67,9 +67,10 @@ const HELP: Record<StandaloneCommand, string> = {
   ].join("\n"),
   prepare_batch: [
     "Usage: kbprep-batch --input <dir> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--max-quality-iterations <n>] [--convert-jobs <n>] [--config-file <file>]",
+    "       kbprep-batch --playlist <youtube-playlist-url> --output <dir> [--playlist-limit <n>] [--allow-youtube-media-fallback] [--config-file <file>]",
     "       kbprep-batch --rerun --batch-manifest <batch_manifest.json> [--rerun-scope failed_only|pending_only|failed_and_pending|recommended] [--force] [--config-file <file>]",
     "",
-    "Processes a directory through the same agent-independent Python worker used by all callers. Rerun mode reprocesses only failed or pending children named by an existing batch manifest.",
+    "Processes a directory or explicit YouTube playlist through the same agent-independent Python worker used by all callers. Rerun mode reprocesses only failed or pending children named by an existing batch manifest.",
   ].join("\n"),
 };
 
@@ -239,6 +240,28 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
       }
       const outputRoot = requireOutputDir(options, "output");
       mkdirSync(outputRoot, { recursive: true });
+      const playlistUrl = readString(options, "playlist");
+      if (playlistUrl) {
+        if (readString(options, "input")) throw new Error("--playlist cannot be combined with --input.");
+        return {
+          command,
+          input: {
+            playlist_url: requireYouTubePlaylistUrl(playlistUrl),
+            output_root: outputRoot,
+            profile: readString(options, "profile") ?? "standard",
+            mode: readString(options, "mode") ?? "rules_only",
+            force: readBoolean(options, "force", false),
+            artifact_policy: readString(options, "artifact_policy") ?? "keep_latest",
+            language: readString(options, "language") ?? "zh",
+            convert_jobs: readNumber(options, "convert_jobs", 1),
+            max_quality_iterations: readNumber(options, "max_quality_iterations", 3),
+            playlist_limit: readNumber(options, "playlist_limit", undefined),
+            allow_youtube_media_fallback: readBoolean(options, "allow_youtube_media_fallback", false),
+          },
+          cwd: outputRoot,
+          timeoutMs: 10_800_000,
+        };
+      }
       return {
         command,
         input: {
@@ -563,6 +586,11 @@ function normalizeYouTubeInput(value: string): string | undefined {
   return undefined;
 }
 
+function requireYouTubePlaylistUrl(value: string): string {
+  if (isYouTubePlaylistUrl(value)) return value.trim();
+  throw new Error("--playlist must be a YouTube playlist URL.");
+}
+
 function youtubeUrlFromVideoId(value: string): string {
   const videoId = safeVideoId(value);
   if (!videoId) throw new Error("--youtube-video-id must contain a YouTube video id.");
@@ -591,6 +619,19 @@ function videoIdFromYouTubeUrl(value: string): string | undefined {
   if (url.pathname === "/watch") return safeVideoId(url.searchParams.get("v") ?? undefined);
   const match = url.pathname.match(/^\/(?:shorts|embed)\/([^/?#]+)/);
   return match ? safeVideoId(match[1]) : undefined;
+}
+
+function isYouTubePlaylistUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) return false;
+    if (url.pathname !== "/playlist" && url.pathname !== "/watch") return false;
+    return safeVideoId(url.searchParams.get("list") ?? undefined) !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 function safeVideoId(value: string | undefined): string | undefined {

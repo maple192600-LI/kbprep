@@ -43,16 +43,16 @@ Current completion state:
 
 The first version was too conservative in three places. Use this revised flow. The rule is: develop independent code paths in parallel, but promote capability status only after evidence is complete and integration checks pass.
 
-- Do not split YouTube into a separate approval-only boundary branch. Per owner instruction, legal, platform, or terms-of-service review is not a development gate for this plan. The remaining boundary is only the technical product contract inside the implementation branch: accepted URL shapes, dependency detection, bounded network timeout, cache/artifact policy, no-subtitle fallback, error messages, quality gates, and status evidence. The route handles public URL or explicit id inputs through normal local dependencies; it does not add account login, cookie import, credential storage, DRM circumvention, paywall bypass, or other secret-handling behavior.
+- Do not split YouTube into a separate approval-only boundary branch. Per owner instruction, there is no external compliance approval step in this plan. The remaining boundary is only the engineering product contract inside the implementation branch: accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache/artifact policy, no-subtitle fallback, clear error messages, quality gates, and status evidence. Logged-in/cookie/credential-based sources are not part of this slice because they would add a separate secret-handling feature, not because of a compliance approval step.
 - Do not make all M5 rerun work wait for C3. Split M5B into command/state scaffolding that can run with C1/C2 and final Canonical-IR identity binding that waits for C3.
 - Do not make all Phase F work wait for M2 and M5. F1 local media fixtures, F2 image/legacy fixtures, and the YouTube technical-contract tests can start immediately. Only capability promotion waits for passing fixtures and final gate evidence.
 - Do not run a full reviewer loop for every small doc-only adjustment. Keep reviewer subagents for contract boundaries and merge readiness; use targeted checks during implementation and reserve `npm run dev:full-check` for merge-ready branches.
-- Do not leave playlist as a decision-only tail. For full project completion, playlist support is an implementation slice after the direct YouTube technical contract is stable; it may run in the same YouTube workstream when file ownership and tests overlap.
+- Do not leave playlist as a decision-only tail. Explicit playlist input is now an implementation slice on `codex/playlist-route`: it expands YouTube playlists into bounded child jobs and keeps per-video parent status visible. Remaining playlist work is playlist rerun and real-network/dependency/quality evidence before any promotion.
 
 Speed correction:
 
-- Start C1, C2, M5A, M5B1, F1, F2, F3, and BATCH1 as soon as their worktrees are clean and file ownership does not collide.
-- Hold only C3, M5B2, playlist promotion, and final status promotion for dependency completion.
+- Start C1, C2, M5A, M5B1, F1, F2, and F3 as soon as their worktrees are clean and file ownership does not collide. BATCH1 is merged; PLAYLIST1 is the active Wave 3 implementation slice.
+- Hold only C3, M5B2 final Canonical IR identity binding, playlist capability promotion, and final status promotion for dependency completion.
 - Merge small, verified branches frequently. The second branch touching status docs must synchronize with latest `main` and rerun the affected checks before merge.
 
 ## Worktree Setup Pattern
@@ -459,7 +459,7 @@ git diff --check
 
 ## Wave 3: Batch, Playlist, And Rerun
 
-Batch selective rerun can start immediately because it uses the parent batch manifest and child run evidence, not feedback proposal state. Playlist is in completion scope, not a decision-only placeholder. Implement it after the direct YouTube URL contract is stable, or fold it into the YouTube implementation branch when URL parsing, network timeout, fixture, and status evidence share the same files.
+Batch selective rerun is merged. Playlist is in completion scope, not a decision-only placeholder; explicit playlist input is active on `codex/playlist-route`. Remaining Wave 3 work after that branch is playlist rerun plus policy/CIR affected batch targeting.
 
 ### Branch BATCH1: Batch Selective Rerun
 
@@ -477,15 +477,15 @@ Batch selective rerun can start immediately because it uses the parent batch man
 - Modify: `docs/standalone-cli.md`
 - Modify: `docs/development/10-batch-playlist-rerun.md`
 
-- [ ] **Step 1: Add failing tests**
+- [x] **Step 1: Add failing tests**
 
 Require batch rerun scope to select failed or pending children without rerunning unrelated successful children. Require source hashes in the parent manifest and require rerun to refuse missing or changed source files.
 
-- [ ] **Step 2: Implement rerun scope**
+- [x] **Step 2: Implement rerun scope**
 
 Use `batch_manifest.json`, child run metadata, command defaults, and source hash. Do not rely on filename-only matching.
 
-- [ ] **Step 3: Verify branch**
+- [x] **Step 3: Verify branch**
 
 Run:
 
@@ -531,7 +531,7 @@ git diff --check
 
 ### Branch PLAYLIST1: Playlist Implementation
 
-**Parallel:** Can run in the same workstream as F3 if the same worker owns YouTube source parsing and converter routing files. If run separately, start it as soon as F3's URL normalization and timeout behavior are merged; do not wait for M2 or M5 completion.
+**Parallel:** Active slice. It can proceed without waiting for M2 or M5 because it reuses the existing partial YouTube URL route and does not promote capability status to verified.
 
 **Branch:** `codex/playlist-route`
 
@@ -542,19 +542,24 @@ git diff --check
 - Modify: `docs/development/development-roadmap.md`
 - Modify: `docs/capability-matrix.md`
 - Modify: `python/kbprep_worker/youtube_source.py`
-- Modify: `python/kbprep_worker/converter_registry.py`
-- Modify: `python/kbprep_worker/converters/external_tools.py`
+- Create: `python/kbprep_worker/youtube_playlist.py`
+- Modify: `python/kbprep_worker/prepare_batch.py`
+- Modify: `python/kbprep_worker/prepare_batch_rerun.py`
+- Modify: `python/kbprep_worker/batch_manifest.py`
 - Modify: `python/tests/test_media_youtube_routes.py`
+- Modify: `python/tests/test_batch_status_manifest.py`
+- Modify: `src/adapters/standalone/cli.ts`
+- Modify: `src/adapters/standalone/cli.test.ts`
 
-- [ ] **Step 1: Add failing playlist tests**
+- [x] **Step 1: Add failing playlist tests**
 
-Require playlist URLs or playlist descriptors to create a bounded parent job with child YouTube video entries, per-child status, and no final parent success claim when every child fails.
+Require playlist URLs to create a bounded parent job with child YouTube video entries, per-child status, and no final parent success claim when every child fails.
 
-- [ ] **Step 2: Implement playlist route**
+- [x] **Step 2: Implement playlist route**
 
-Reuse the same YouTube subtitle-first child route. Keep per-video artifacts auditable and keep parent status honest: all failed means failed, mixed success means completed with warnings.
+Reuse the same YouTube subtitle-first child route through generated local `.url` descriptors. Keep per-video artifacts auditable and keep parent status honest: all failed means failed, mixed success means completed with warnings.
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 ```powershell
 node scripts/python-venv.mjs -m unittest python.tests.test_media_youtube_routes python.tests.test_batch_status_manifest -v
@@ -688,7 +693,7 @@ Merge order:
 3. C3 after C1 and C2.
 4. M5B2 after C3.
 5. BATCH2 after M5B2 when policy-affected batch targeting needs Canonical IR identity.
-6. PLAYLIST1 implementation, or fold playlist into F3 if the same worker owns YouTube source parsing and converter routing.
+6. PLAYLIST2 playlist rerun and real playlist evidence.
 7. Capability-status promotion branches after their implementation evidence exists.
 
 Final release gate:

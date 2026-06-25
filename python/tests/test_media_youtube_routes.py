@@ -17,10 +17,28 @@ from kbprep_worker.converters.external_tools import (
 from kbprep_worker.envelope import EnvelopeExit
 from kbprep_worker.stages import external_conversion
 from kbprep_worker.stages.pipeline import run as run_prepare
-from kbprep_worker.youtube_source import is_youtube_url, youtube_url_from_source, youtube_video_id
+from kbprep_worker.youtube_playlist import expand_youtube_playlist_to_descriptors
+from kbprep_worker.youtube_source import (
+    is_youtube_playlist_url,
+    is_youtube_url,
+    youtube_playlist_id,
+    youtube_url_from_source,
+    youtube_video_id,
+)
 
 
 class TestMediaYoutubeRoute(unittest.TestCase):
+    def test_youtube_source_accepts_playlist_url_shapes(self) -> None:
+        cases = [
+            "https://www.youtube.com/playlist?list=ExamplePlaylist01",
+            "https://www.youtube.com/watch?v=ExampleVideo01&list=ExamplePlaylist01",
+            "https://m.youtube.com/playlist?list=ExamplePlaylist01",
+        ]
+        for url in cases:
+            with self.subTest(url=url):
+                self.assertTrue(is_youtube_playlist_url(url))
+                self.assertEqual(youtube_playlist_id(url), "ExamplePlaylist01")
+
     def test_youtube_source_accepts_documented_url_shapes(self) -> None:
         cases = [
             ("https://www.youtube.com/watch?v=ExampleVideo01&t=30s", "ExampleVideo01"),
@@ -310,6 +328,44 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertFalse(result.ok)
             self.assertEqual(result.report["failure_reason"]["code"], "E_TIMEOUT")
             self.assertIn("yt-dlp", result.report["sanitized_commands"][0][0])
+
+    def test_youtube_playlist_expands_to_bounded_local_descriptors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds: int) -> ExternalCommandResult:
+                self.assertIn("--flat-playlist", command)
+                self.assertEqual(timeout_seconds, 7)
+                return ExternalCommandResult(
+                    0,
+                    json.dumps(
+                        {
+                            "entries": [
+                                {"id": "ExampleVideo01", "title": "Intro"},
+                                {"url": "ExampleVideo02", "title": "Method"},
+                                {"webpage_url": "https://www.youtube.com/watch?v=ExampleVideo03", "title": "Extra"},
+                            ]
+                        }
+                    ),
+                    "",
+                )
+
+            result = expand_youtube_playlist_to_descriptors(
+                "https://www.youtube.com/playlist?list=ExamplePlaylist01",
+                root,
+                limit=2,
+                which=lambda tool: tool,
+                runner=runner,
+                timeout_seconds=7,
+            )
+
+            self.assertTrue(result.ok)
+            self.assertEqual(result.report["playlist_id"], "ExamplePlaylist01")
+            self.assertEqual(result.report["summary"]["selected"], 2)
+            self.assertEqual(result.report["summary"]["available"], 3)
+            self.assertEqual(len(result.descriptor_paths), 2)
+            self.assertIn("URL=https://www.youtube.com/watch?v=ExampleVideo01", result.descriptor_paths[0].read_text(encoding="utf-8"))
+            self.assertIn("URL=https://www.youtube.com/watch?v=ExampleVideo02", result.descriptor_paths[1].read_text(encoding="utf-8"))
 
     def test_youtube_descriptor_pipeline_writes_transcript_without_bypassing_gates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

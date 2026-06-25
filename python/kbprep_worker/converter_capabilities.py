@@ -285,18 +285,20 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "subtitle-first golden fixtures",
             "fallback transcript fixtures",
             "direct CLI URL input tests",
+            "playlist expansion and child status tests",
             "real YouTube subtitle export fixture",
+            "real YouTube playlist expansion fixture",
             "real fallback media transcript acceptance evidence",
             "dependency failure and no-network tests",
         ],
         "promotion_blocker": (
-            "Direct URL, explicit video id, and local .url descriptor routing are covered with mocked subtitle and fallback fixtures; "
-            "verified promotion needs real subtitle/fallback fixtures, dependency variance, timeout handling, "
+            "Direct URL, explicit video id, local .url descriptor routing, and playlist expansion are covered with mocked fixtures; "
+            "verified promotion needs real subtitle/fallback/playlist fixtures, dependency variance, timeout handling, "
             "and final quality-gate evidence."
         ),
-        "preserves": ["subtitle order", "transcript text", "source URL evidence"],
+        "preserves": ["subtitle order", "transcript text", "source URL evidence", "per-video playlist status"],
         "risk": (
-            "URL processing depends on accepted URL shapes, network timeout handling, subtitle availability, "
+            "URL and playlist processing depend on accepted URL shapes, network timeout handling, subtitle availability, "
             "external dependencies, transcript quality, and final quality gates; it remains partial."
         ),
     },

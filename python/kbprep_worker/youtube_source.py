@@ -42,6 +42,15 @@ def is_youtube_url(value: str) -> bool:
     return parsed.scheme in {"http", "https"} and host in YOUTUBE_HOSTS and bool(youtube_video_id(value))
 
 
+def is_youtube_playlist_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value.strip())
+    except ValueError:
+        return False
+    host = parsed.netloc.lower()
+    return parsed.scheme in {"http", "https"} and host in YOUTUBE_HOSTS and bool(youtube_playlist_id(value))
+
+
 def youtube_video_id(value: str) -> str:
     parsed = urlparse(value.strip())
     host = parsed.netloc.lower()
@@ -54,6 +63,17 @@ def youtube_video_id(value: str) -> str:
         return _safe_video_id(query_id)
     match = re.search(r"^/(?:shorts|embed)/([^/?#]+)", parsed.path)
     return _safe_video_id(match.group(1) if match else "")
+
+
+def youtube_playlist_id(value: str) -> str:
+    parsed = urlparse(value.strip())
+    host = parsed.netloc.lower()
+    if host not in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+        return ""
+    if parsed.path not in {"/playlist", "/watch"}:
+        return ""
+    query_id = parse_qs(parsed.query).get("list", [""])[0]
+    return _safe_video_id(query_id)
 
 
 def safe_youtube_stem(value: str) -> str:

@@ -43,6 +43,9 @@ def write_batch_manifest(
         "updated_at": finished_at or time.time(),
         "finished_at": finished_at,
     }
+    source_collection = inventory.get("source_collection")
+    if isinstance(source_collection, dict):
+        payload["source_collection"] = source_collection
     path = output_root / "batch_manifest.json"
     atomic_write_json(path, payload, indent=2, trailing_newline=False)
     return path
@@ -57,6 +60,7 @@ def _command_defaults(command_defaults: dict[str, Any]) -> dict[str, Any]:
         "artifact_policy",
         "max_quality_iterations",
         "convert_jobs",
+        "allow_youtube_media_fallback",
     }
     return {key: command_defaults[key] for key in allowed if key in command_defaults}
 
@@ -153,6 +157,8 @@ def _failed_item(entry: dict[str, Any], relative_path: str, failure: dict[str, A
 
 def _source_evidence(entry: dict[str, Any]) -> dict[str, Any]:
     evidence: dict[str, Any] = {}
+    if entry.get("source_url"):
+        evidence["source_url"] = entry.get("source_url")
     if entry.get("source_sha256"):
         evidence["source_sha256"] = entry.get("source_sha256")
     if entry.get("size_bytes") is not None:

@@ -325,6 +325,27 @@ describe("standalone KBPrep CLI adapter", () => {
     expect(plan.input.profile).toBe("standard");
   });
 
+  it("maps explicit YouTube playlist input to the Python prepare_batch worker command", () => {
+    const parsed = parseStandaloneArgs([
+      "--playlist",
+      "https://www.youtube.com/playlist?list=ExamplePlaylist01",
+      "--output",
+      ".kbprep/playlist",
+      "--playlist-limit",
+      "2",
+      "--allow-youtube-media-fallback",
+      "--force",
+    ]);
+    const plan = buildCliPlan("prepare_batch", parsed.options);
+
+    expect(plan.command).toBe("prepare_batch");
+    expect(plan.input.input_dir).toBeUndefined();
+    expect(plan.input.playlist_url).toBe("https://www.youtube.com/playlist?list=ExamplePlaylist01");
+    expect(plan.input.playlist_limit).toBe(2);
+    expect(plan.input.allow_youtube_media_fallback).toBe(true);
+    expect(plan.input.output_root).toContain(join(".kbprep", "playlist"));
+  });
+
   it("maps batch rerun options to the Python prepare_batch worker command", () => {
     const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-"));
     try {

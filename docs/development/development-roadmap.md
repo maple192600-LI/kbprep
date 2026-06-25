@@ -34,7 +34,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
 | feedback_rule_learning | partial | Proposal-first model and public single-source selective rerun execution exist; Canonical IR id-level targeting remains pending. |
-| batch_playlist_rerun | partial | Batch + parent status manifest and failed/pending batch rerun exist; playlist support still needs implementation and evidence. |
+| batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, and explicit YouTube playlist input exist; playlist rerun and policy/CIR id-level targeting still need implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
 | youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; media fallback is explicit and covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
@@ -278,10 +278,10 @@ Phase B (PDF routing)   Phase C (Canonical IR typed nodes)
 
 Development execution is parallel where file ownership and contracts do not
 collide. Capability promotion and final release acceptance remain evidence
-gated. That means M2, M5, batch rerun, media fixtures, YouTube route hardening,
-and playlist implementation can be developed in parallel slices, but a status
-row moves out of `partial` only after its code, tests, docs, and sample evidence
-agree.
+gated. That means M2, M5, playlist rerun, media fixtures, YouTube route
+hardening, and real playlist evidence can be developed in parallel slices, but
+a status row moves out of `partial` only after its code, tests, docs, and sample
+evidence agree.
 
 ## Alignment With Implementation Plan M1–M6
 
@@ -373,14 +373,15 @@ Required slices:
 - Keep unsupported files visible as skipped, not silent failures.
 - Prove partial batch success, completed-with-warnings, failed children, and
   rerun scopes with tests.
-- Implement playlist input in the same YouTube workstream when URL parsing,
-  timeout behavior, dependency handling, fixture evidence, and failure messages
-  touch the same files. If split, start playlist immediately after the direct
-  YouTube technical contract is stable.
+- Explicit YouTube playlist input is implemented: `kbprep-batch --playlist`
+  expands the playlist into bounded local `.url` child jobs and records
+  per-video parent status. Remaining work is playlist rerun and broader
+  real-network/dependency evidence before any verified promotion.
 
-Acceptance: `batch_playlist_rerun` moves from `partial` only when playlist and
-selective rerun are implemented with evidence, or a concrete dependency blocker
-is documented without overstating completion.
+Acceptance: `batch_playlist_rerun` moves from `partial` only when playlist
+rerun, selective rerun, and policy/CIR affected targeting are implemented with
+evidence, or a concrete dependency blocker is documented without overstating
+completion.
 
 ### 4. Close M6 / Phase F
 
@@ -409,8 +410,8 @@ Required slices:
 - Add YouTube timeout, dependency-variance, cache/artifact, and no-subtitle
   fallback evidence against the existing partial URL contract and subtitle-first
   route.
-- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists,
-  and final source-side publication.
+- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlist
+  expansion, playlist child publication, and final source-side publication.
 
 Execution: start local media fixtures, image/legacy format fixtures, and YouTube
 technical-contract work now in parallel with M2/M5/batch work when file ownership

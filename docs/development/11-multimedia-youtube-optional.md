@@ -10,17 +10,20 @@ This stage supports source inspection, route selection, dependency failure repor
 
 ## Contract
 
-- Local files remain the stable core CLI path; YouTube direct URL and explicit `--youtube-video-id` inputs are normalized into controlled local descriptors before entering the same quality pipeline.
+- Local files remain the stable core CLI path; YouTube direct URL, explicit `--youtube-video-id`, and explicit playlist inputs are normalized into controlled local descriptors before entering the same quality pipeline.
 - Media sources must become transcript evidence before classification.
 - YouTube uses available subtitles before media transcript extraction.
 - YouTube support enters through direct URLs, explicit video ids, local `.url` descriptor
-  files, or explicit source identity metadata. The accepted public URL shapes
+  files, explicit playlist input, or explicit source identity metadata. The accepted public URL shapes
   are `youtube.com/watch?v=...`, `m.youtube.com/watch?v=...`, `youtu.be/...`,
   `youtube.com/shorts/...`, and `youtube.com/embed/...`.
+- Explicit playlist input uses `kbprep-batch --playlist`; it expands the playlist
+  into bounded local `.url` child descriptors before each child enters the
+  subtitle-first route and normal quality gates.
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
-- The YouTube boundary is a technical product contract, not a legal or platform-compliance approval gate. Implement the requested user-facing capability through accepted URL/id inputs, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence.
-- The route handles public URL or explicit video-id inputs through normal local dependencies. It does not add account login, cookie import, credential storage, DRM circumvention, paywall bypass, or other secret-handling behavior.
+- The YouTube boundary is an engineering product contract; there is no external compliance approval step in this plan. Implement the requested user-facing capability through accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence.
+- Logged-in/cookie/credential-based sources are not part of this slice because they would add a separate secret-handling feature, not because of a compliance approval step.
 
 ## Acceptance
 

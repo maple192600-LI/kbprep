@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .atomic_io import atomic_write_json
 from .batch_manifest import batch_parent_status, write_batch_manifest
@@ -23,7 +24,10 @@ from .supported_formats import (
     LEGACY_OFFICE_EXTENSIONS,
     MEDIA_EXTENSIONS,
     MINERU_EXTENSIONS,
+    URL_DESCRIPTOR_EXTENSIONS,
 )
+from .youtube_playlist import expand_youtube_playlist_to_descriptors
+from .youtube_source import source_url_from_descriptor
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +71,9 @@ class BatchConfig:
     max_quality_iterations: int | str | None
     min_free_gb: float
     convert_jobs: int
+    allow_youtube_media_fallback: bool
+    playlist_url: str
+    playlist_limit: int | None
 
 
 def _available_memory_gb() -> float:
@@ -79,7 +86,8 @@ def _available_memory_gb() -> float:
 
 def _process_one_file(file_path: Path, output_root: str, profile: str,
                       language: str, mode: str, force: bool, artifact_policy: str = "keep_latest",
-                      max_quality_iterations: int | str | None = DEFAULT_MAX_QUALITY_ITERATIONS) -> dict:
+                      max_quality_iterations: int | str | None = DEFAULT_MAX_QUALITY_ITERATIONS,
+                      allow_youtube_media_fallback: bool = False) -> dict:
     payload = {
         "input_path": str(file_path),
         "output_root": output_root,
@@ -91,6 +99,7 @@ def _process_one_file(file_path: Path, output_root: str, profile: str,
         "force": force,
         "artifact_policy": artifact_policy,
         "max_quality_iterations": max_quality_iterations,
+        "allow_youtube_media_fallback": allow_youtube_media_fallback,
     }
     proc = subprocess.run(
         [sys.executable, "-m", "kbprep_worker.cli", "prepare", "--json-stdin"],
@@ -192,7 +201,7 @@ def _write_failures(output_root: Path, failures: list[dict]) -> None:
     )
 
 
-def _scan_input_files(input_p: Path) -> tuple[list[Path], dict]:
+def _scan_input_files(input_p: Path, supported_extensions: set[str] | frozenset[str] = SUPPORTED_EXTENSIONS) -> tuple[list[Path], dict]:
     files: list[Path] = []
     entries: list[dict] = []
     skipped_unsupported = 0
@@ -209,7 +218,10 @@ def _scan_input_files(input_p: Path) -> tuple[list[Path], dict]:
             "size_bytes": file_path.stat().st_size,
             "conversion_weight": "heavy" if _is_heavy_conversion_file(file_path) else "light",
         }
-        if ext in SUPPORTED_EXTENSIONS:
+        source_url = source_url_from_descriptor(file_path) if ext in URL_DESCRIPTOR_EXTENSIONS else ""
+        if source_url:
+            entry["source_url"] = source_url
+        if ext in supported_extensions:
             entry["action"] = "process"
             entry["source_sha256"] = _file_sha256(file_path)
             files.append(file_path)
@@ -270,10 +282,13 @@ def run(data: dict) -> None:
         run_batch_rerun(data)
         return
     config = _batch_config(data)
-    input_p, output_p = _batch_paths_or_fail(config)
-    files, inventory = _scan_input_files(input_p)
+    input_p, output_p, source_collection = _batch_paths_or_fail(config)
+    supported_extensions = _batch_supported_extensions(config)
+    files, inventory = _scan_input_files(input_p, supported_extensions)
+    if source_collection:
+        inventory["source_collection"] = source_collection
     inventory_path = _write_batch_inventory(output_p, inventory)
-    _ensure_batch_files_or_fail(files, inventory, inventory_path, config.input_dir)
+    _ensure_batch_files_or_fail(files, inventory, inventory_path, str(input_p))
     _ensure_batch_memory(config.min_free_gb)
     started_at = time.time()
     results: list[dict] = []
@@ -307,7 +322,7 @@ def run(data: dict) -> None:
 
 def _batch_config(data: dict) -> BatchConfig:
     return BatchConfig(
-        input_dir=str(data["input_dir"]),
+        input_dir=str(data.get("input_dir") or ""),
         output_root=str(data["output_root"]),
         profile=str(data.get("profile", "standard")),
         language=str(data.get("language", "auto")),
@@ -317,6 +332,9 @@ def _batch_config(data: dict) -> BatchConfig:
         max_quality_iterations=data.get("max_quality_iterations", DEFAULT_MAX_QUALITY_ITERATIONS),
         min_free_gb=float(data.get("min_free_memory_gb", DEFAULT_MIN_FREE_GB)),
         convert_jobs=int(data.get("convert_jobs", 1)),
+        allow_youtube_media_fallback=bool(data.get("allow_youtube_media_fallback", False)),
+        playlist_url=str(data.get("playlist_url") or "").strip(),
+        playlist_limit=_optional_int(data.get("playlist_limit")),
     )
 
 
@@ -329,15 +347,62 @@ def _batch_command_defaults(config: BatchConfig) -> dict:
         "artifact_policy": config.artifact_policy,
         "max_quality_iterations": config.max_quality_iterations,
         "convert_jobs": config.convert_jobs,
+        "allow_youtube_media_fallback": config.allow_youtube_media_fallback,
     }
 
 
-def _batch_paths_or_fail(config: BatchConfig) -> tuple[Path, Path]:
-    input_p = Path(config.input_dir)
+def _batch_paths_or_fail(config: BatchConfig) -> tuple[Path, Path, dict[str, Any] | None]:
     output_p = Path(config.output_root)
+    if config.playlist_url:
+        return _playlist_batch_paths_or_fail(config, output_p)
+    input_p = Path(config.input_dir)
     if not input_p.exists() or not input_p.is_dir():
         fail("E_INVALID_INPUT", f"input_dir does not exist or is not a directory: {config.input_dir}")
-    return input_p, output_p
+    return input_p, output_p, None
+
+
+def _playlist_batch_paths_or_fail(config: BatchConfig, output_p: Path) -> tuple[Path, Path, dict[str, Any]]:
+    expansion = expand_youtube_playlist_to_descriptors(
+        config.playlist_url,
+        output_p,
+        limit=config.playlist_limit,
+    )
+    if not expansion.ok:
+        failure = _dict_value(expansion.report.get("failure_reason"))
+        fail(
+            failure.get("code") or "E_INVALID_INPUT",
+            failure.get("message") or "YouTube playlist could not be expanded.",
+            details={"playlist_report": expansion.report},
+        )
+    return expansion.source_dir, output_p, _playlist_source_collection(expansion.report)
+
+
+def _playlist_source_collection(report: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "kind": "youtube_playlist",
+        "playlist_url": report.get("playlist_url"),
+        "playlist_id": report.get("playlist_id"),
+        "playlist_manifest_json": report.get("playlist_manifest_json"),
+        "summary": report.get("summary", {}),
+    }
+
+
+def _batch_supported_extensions(config: BatchConfig) -> set[str] | frozenset[str]:
+    if config.playlist_url:
+        return SUPPORTED_EXTENSIONS | URL_DESCRIPTOR_EXTENSIONS
+    return SUPPORTED_EXTENSIONS
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    return int(str(value))
+
+
+def _dict_value(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return {str(key): item for key, item in value.items()}
+    return {}
 
 
 def _ensure_batch_files_or_fail(files: list[Path], inventory: dict, inventory_path: Path, input_dir: str) -> None:
@@ -469,6 +534,7 @@ def _stop_after_failed_sample(
 
 
 def _process_configured_file(config: BatchConfig, file_path: Path, output_root: Path) -> dict:
+    extra_kwargs = {"allow_youtube_media_fallback": True} if config.allow_youtube_media_fallback else {}
     return _process_one_file(
         file_path,
         str(output_root),
@@ -478,6 +544,7 @@ def _process_configured_file(config: BatchConfig, file_path: Path, output_root: 
         config.force,
         config.artifact_policy,
         config.max_quality_iterations,
+        **extra_kwargs,
     )
 
 

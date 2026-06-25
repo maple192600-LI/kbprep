@@ -47,10 +47,11 @@ kbprep-feedback --run-dir ./.kbprep/source/runs/<run-id> --feedback-text "下次
 kbprep-feedback --accept-proposal latest --confirm-rule-acceptance
 kbprep-cleanup --output ./.kbprep/source --dry-run
 kbprep-batch --input ./sources --output ./.kbprep/batch
+kbprep-batch --playlist https://www.youtube.com/playlist?list=ExamplePlaylist01 --output ./.kbprep/playlist
 ```
 
 The CLI prints JSON envelopes for worker results. Failures use the same shape with `ok: false`, an error code, warnings when available, and evidence paths when available.
-Batch runs write `batch_manifest.json` with parent status, per-file status, skipped unsupported files, source hashes, command defaults, and evidence-backed rerun scope. This is the live batch status summary. Use `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` to rerun failed or pending children without rerunning unrelated successful children; rerun uses the manifest command defaults, writes `batch_rerun_manifest.json`, and refuses missing or changed source files. After a batch output root is finalized with `kbprep-cleanup --action finalize`, cleanup writes `kbprep_batch_manifest.json`; that file is only the retention manifest proving final deliverables were preserved before temporary process artifacts were removed.
+Batch runs write `batch_manifest.json` with parent status, per-file status, skipped unsupported files, source hashes, command defaults, and evidence-backed rerun scope. Explicit YouTube playlist runs first expand the playlist into bounded local `.url` child descriptors, then run each child through the same quality pipeline. This is the live batch status summary. Use `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` to rerun failed or pending children without rerunning unrelated successful children; rerun uses the manifest command defaults, writes `batch_rerun_manifest.json`, and refuses missing or changed source files. After a batch output root is finalized with `kbprep-cleanup --action finalize`, cleanup writes `kbprep_batch_manifest.json`; that file is only the retention manifest proving final deliverables were preserved before temporary process artifacts were removed.
 
 ## PDF Routing
 
@@ -60,7 +61,7 @@ PDF routing is diagnosis-selected: simple trusted text-layer PDFs use `pymupdf4l
 
 Local audio/video files can route through local `ffmpeg` + Whisper transcription before KBPrep runs the normal conversion and publication gates. The route is partial, not verified: mocked golden fixtures prove routing and error reporting, while real ASR quality evidence is still required before verified promotion.
 
-YouTube currently accepts direct YouTube URLs, explicit `--youtube-video-id` values, or local `.url` descriptor files. KBPrep writes URL inputs into a controlled local descriptor, tries subtitles first through `yt-dlp`, and falls back to the local media transcript route only when `--allow-youtube-media-fallback` is explicitly set and `yt-dlp`, `ffmpeg`, and Whisper are available. The route is partial, not verified: mocked fixtures prove routing and failure handling, while real-network sample breadth, timeout behavior, dependency variance, and transcript quality evidence are still required before verified promotion.
+YouTube currently accepts direct YouTube URLs, explicit `--youtube-video-id` values, local `.url` descriptor files, or explicit playlist input through `kbprep-batch --playlist`. KBPrep writes URL inputs into controlled local descriptors, tries subtitles first through `yt-dlp`, and falls back to the local media transcript route only when `--allow-youtube-media-fallback` is explicitly set and `yt-dlp`, `ffmpeg`, and Whisper are available. The route is partial, not verified: mocked fixtures prove routing, playlist expansion, and failure handling, while real-network sample breadth, timeout behavior, dependency variance, and transcript quality evidence are still required before verified promotion.
 
 ## Output
 

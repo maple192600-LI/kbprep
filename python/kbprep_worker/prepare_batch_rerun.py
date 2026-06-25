@@ -31,7 +31,8 @@ def run_batch_rerun(data: dict[str, Any]) -> None:
 
     started_at = time.time()
     batch._ensure_batch_memory(config.min_free_gb)
-    results, failures = _execute_batch_rerun_items(config, input_p, output_p, selected_items)
+    source_collection = _dict_value(manifest.get("source_collection"))
+    results, failures = _execute_batch_rerun_items(config, input_p, output_p, selected_items, source_collection)
     manifest_out = _write_batch_rerun_manifest(
         output_p=output_p,
         source_manifest=manifest_path,
@@ -98,6 +99,11 @@ def _batch_rerun_config(
         ),
         min_free_gb=float(data.get("min_free_memory_gb", batch.DEFAULT_MIN_FREE_GB)),
         convert_jobs=int(data.get("convert_jobs", defaults.get("convert_jobs", 1))),
+        allow_youtube_media_fallback=bool(
+            data.get("allow_youtube_media_fallback", defaults.get("allow_youtube_media_fallback", False))
+        ),
+        playlist_url="",
+        playlist_limit=None,
     )
 
 
@@ -181,6 +187,7 @@ def _execute_batch_rerun_items(
     input_p: Path,
     output_p: Path,
     selected: list[dict[str, Any]],
+    source_collection: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     results: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
@@ -193,6 +200,10 @@ def _execute_batch_rerun_items(
         source_changed = _changed_rerun_file(file_path, item)
         if source_changed:
             failures.append(source_changed)
+            continue
+        descriptor_error = _invalid_url_descriptor_rerun(input_p, file_path, relative_path, source_collection)
+        if descriptor_error:
+            failures.append(descriptor_error)
             continue
         output_root = batch._output_root_for_file(output_p, file_path)
         result = batch._process_configured_file(config, file_path, output_root)
@@ -229,6 +240,41 @@ def _changed_rerun_file(file_path: Path, item: dict[str, Any]) -> dict[str, Any]
             "message": "Batch rerun source file changed since the source manifest was written.",
             "expected_source_sha256": expected,
             "actual_source_sha256": actual,
+        },
+    }
+
+
+def _invalid_url_descriptor_rerun(
+    input_p: Path,
+    file_path: Path,
+    relative_path: str,
+    source_collection: dict[str, Any],
+) -> dict[str, Any] | None:
+    if file_path.suffix.lower() != ".url":
+        return None
+    if source_collection.get("kind") != "youtube_playlist":
+        return _url_descriptor_rerun_failure(relative_path)
+    playlist_id = str(source_collection.get("playlist_id") or "")
+    try:
+        source_root = input_p.resolve()
+        descriptor = file_path.resolve()
+    except (OSError, RuntimeError):
+        return _url_descriptor_rerun_failure(relative_path)
+    if descriptor.parent != source_root:
+        return _url_descriptor_rerun_failure(relative_path)
+    if playlist_id and source_root.name != playlist_id:
+        return _url_descriptor_rerun_failure(relative_path)
+    if source_root.parent.name != "youtube-playlist" or source_root.parent.parent.name != ".kbprep-inputs":
+        return _url_descriptor_rerun_failure(relative_path)
+    return None
+
+
+def _url_descriptor_rerun_failure(relative_path: str) -> dict[str, Any]:
+    return {
+        "relative_path": relative_path,
+        "error": {
+            "code": "E_INVALID_INPUT",
+            "message": "URL descriptor batch rerun is allowed only for explicit YouTube playlist child descriptors.",
         },
     }
 

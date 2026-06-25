@@ -182,10 +182,11 @@
       "id": "batch_playlist_rerun",
       "label": "Batch, Playlist, and rerun",
       "status": "partial",
-      "scope": "Batch behavior exists for local sources and writes a parent status manifest with evidence-backed rerun scope, source hashes, command defaults, and skipped unsupported visibility. Batch selective rerun can execute failed, pending, failed-and-pending, or recommended parent-manifest scopes, writes batch_rerun_manifest.json, and refuses missing or changed source files instead of claiming success. Single-source feedback selective rerun execution exists. Playlist support, playlist rerun, and policy/CIR id-level batch targeting still require implementation and evidence.",
+      "scope": "Batch behavior exists for local sources and writes a parent status manifest with evidence-backed rerun scope, source hashes, command defaults, and skipped unsupported visibility. Batch selective rerun can execute failed, pending, failed-and-pending, or recommended parent-manifest scopes, writes batch_rerun_manifest.json, and refuses missing or changed source files instead of claiming success. Explicit YouTube playlist input expands into bounded local .url child descriptors, reuses the subtitle-first YouTube route for each child, records source_collection metadata, and keeps per-video status visible in batch_manifest.json. Single-source feedback selective rerun execution exists. Playlist rerun and policy/CIR id-level batch targeting still require implementation and evidence.",
       "evidence": [
         "docs/development/10-batch-playlist-rerun.md",
         "python/kbprep_worker/batch_manifest.py",
+        "python/kbprep_worker/youtube_playlist.py",
         "python/kbprep_worker/prepare_batch_rerun.py",
         "python/tests/test_batch_status_manifest.py",
         "src/adapters/standalone/cli.test.ts"

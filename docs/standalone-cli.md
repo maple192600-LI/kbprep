@@ -57,11 +57,12 @@ kbprep-feedback --suggest-dictionary-updates
 kbprep-feedback --promote-dictionary-suggestion --document-type course --confirm-dictionary-update
 kbprep-cleanup --output ./.kbprep/source --action finalize
 kbprep-batch --input ./sources --output ./.kbprep/batch --mode rules_only
+kbprep-batch --playlist https://www.youtube.com/playlist?list=ExamplePlaylist01 --output ./.kbprep/playlist --playlist-limit 25
 kbprep-batch --rerun --batch-manifest ./.kbprep/batch/batch_manifest.json --rerun-scope failed_and_pending
 ```
 
 Every command supports `--help`.
-Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, source hashes, command defaults, and the evidence-backed rerun scope. Use `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` to rerun failed or pending children without rerunning unrelated successful children. Rerun uses the original command defaults from the manifest unless explicit CLI overrides are passed; `--force` is available when you want to force child reruns. Rerun writes `batch_rerun_manifest.json` and refuses missing or changed source files instead of claiming success. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
+Batch runs write `batch_manifest.json` beside `results.json`, `progress.json`, and `failures.json`. Use `batch_manifest.json` to see parent status, per-file status, skipped unsupported files, source hashes, command defaults, and the evidence-backed rerun scope. `kbprep-batch --playlist <youtube-playlist-url>` expands the playlist into bounded local `.url` child descriptors, records `source_collection.kind=youtube_playlist`, and keeps every child video visible in the parent manifest. Use `kbprep-batch --rerun --batch-manifest <batch_manifest.json>` to rerun failed or pending children without rerunning unrelated successful children. Rerun uses the original command defaults from the manifest unless explicit CLI overrides are passed; `--force` is available when you want to force child reruns. Rerun writes `batch_rerun_manifest.json` and refuses missing or changed source files instead of claiming success. Batch cleanup finalization writes a different file, `kbprep_batch_manifest.json`, after preserving final deliverables; use it only as cleanup-retention proof, not as the live batch run list.
 
 ## PDF Routing
 
