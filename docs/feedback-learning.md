@@ -106,7 +106,8 @@ Implemented behavior includes:
 - source-specific accepted rules match explicit source identity fields
 - invalid accepted rule files fail with file and line evidence
 - rerun verification reports unavailable metadata instead of pretending proof exists
-- selective rerun planning can emit command evidence without executing the rerun; the plan records run id, source identity, document type, policy snapshot hash when available, and `canonical_ir_binding.status: pending`
+- selective rerun planning can emit command evidence without executing the rerun; the plan records run id, source identity, document type, policy snapshot hash when available, and run-level `canonical_ir_binding.status: bound` when the run has Canonical IR manifest evidence
+- `canonical_ir_binding` is run-level evidence only; Canonical IR node-id or cleaning-unit id-level targeting remains outside the shipped claim
 - selective rerun execution can use the same selectors as planning (`accepted_proposal`, `run_dir`, or promotion history by `document_type`) to execute one `rules_only` rerun and return verification evidence with `actually_executed=true`
 - blocked selective rerun planning is recorded in `rerun_history.jsonl` so missing metadata or failed promotion history remains visible
 - dictionary suggestions require explicit confirmation before promotion

@@ -157,7 +157,7 @@
       "id": "feedback_rule_learning",
       "label": "Proposal-first feedback learning",
       "status": "partial",
-      "scope": "Feedback proposals, acceptance, rejection, public single-source selective rerun planning and execution, proposal risk notes, explicit owner confirmation status, scope-based dictionary suggestion thresholds, stronger body-text counterexamples, and failed-promotion-history blocking exist; Canonical IR id-level rerun targeting remains pending.",
+      "scope": "Feedback proposals, acceptance, rejection, public single-source selective rerun planning and execution, run-level Canonical IR manifest binding for selected runs, proposal risk notes, explicit owner confirmation status, scope-based dictionary suggestion thresholds, stronger body-text counterexamples, and failed-promotion-history blocking exist; Canonical IR node-id or cleaning-unit id-level rerun targeting remains pending.",
       "evidence": [
         "docs/feedback-learning.md",
         "docs/development/09-feedback-rule-learning.md",

@@ -33,7 +33,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
-| feedback_rule_learning | partial | Proposal-first model and public single-source selective rerun execution exist; Canonical IR id-level targeting remains pending. |
+| feedback_rule_learning | partial | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding exist; Canonical IR node-id or cleaning-unit id-level targeting remains pending. |
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; policy/CIR id-level targeting still needs implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
@@ -348,8 +348,8 @@ the affected evidence-backed scope.
 
 Required slices:
 
-- Complete rerun scope selection from source evidence, Canonical IR ids,
-  document type, and policy snapshot identity.
+- Complete rerun scope selection from source evidence, run-level Canonical IR
+  manifest evidence, document type, and policy snapshot identity.
 - Extend public selective rerun beyond the current run directory,
   accepted-proposal, and document-type promotion-history selectors to
   Canonical IR id-level or cleaning-unit targeting when stable identity
@@ -362,8 +362,9 @@ Required slices:
 
 Execution: proposal-state hardening and public rerun command scaffolding are
 already landed; only add regression guards for proven gaps. Affected-scope
-identity binding can start with current run/source/policy evidence and finishes
-when stable Canonical IR or cleaning-unit identity is available.
+identity binding starts with current run/source/policy evidence and run-level
+Canonical IR manifest evidence, then finishes when stable Canonical IR node ids
+or cleaning-unit identity are available.
 
 Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
 acceptance, rerun, rejection, and failed-promotion paths have named tests,

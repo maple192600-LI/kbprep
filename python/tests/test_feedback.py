@@ -64,6 +64,7 @@ class FeedbackTests(unittest.TestCase):
                 json.dumps({"profile": "standard", "document_type": "course"}),
                 encoding="utf-8",
             )
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-run-001")
 
             envelope = self._run_feedback({"plan_rerun": True, "run_dir": str(run_dir)})
 
@@ -73,12 +74,76 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(plan["run_id"], "run_001")
         self.assertEqual(plan["document_type"], "course")
         self.assertEqual(plan["policy_snapshot_hash"], "hash-policy-123")
-        self.assertEqual(plan["canonical_ir_binding"]["status"], "pending")
+        binding = plan["canonical_ir_binding"]
+        self.assertEqual(binding["status"], "bound")
+        self.assertEqual(binding["binding_level"], "run")
+        self.assertEqual(binding["document_id"], "doc-run-001")
+        self.assertEqual(binding["canonical_ir_manifest"], str(run_dir / "canonical_ir" / "manifest.json"))
+        self.assertEqual(binding["document_manifest"], str(run_dir / "document_manifest.json"))
+        self.assertEqual(binding["artifacts"]["typed_nodes"], "canonical_ir/typed_nodes.json")
+        self.assertEqual(binding["artifacts"]["source_spans"], "canonical_ir/source_spans.json")
+        self.assertFalse(binding["id_level_narrowing"])
         self.assertEqual(plan["source_identity"]["source_name"], "source.md")
         self.assertEqual(plan["prepare_payload"]["mode"], "rules_only")
         self.assertEqual(plan["prepare_payload"]["source_url"], "https://www.youtube.com/watch?v=ExampleVideo01")
         self.assertEqual(plan["prepare_payload"]["allow_youtube_media_fallback"], True)
         self.assertTrue(plan["command_evidence"]["standalone_command"])
+
+    def test_selective_rerun_plan_keeps_pending_when_document_manifest_is_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.md"
+            source.write_text("# Note\n\n正文\n", encoding="utf-8")
+            run_dir = self._metadata_run_dir(root, source, run_id="run_missing_document_manifest")
+            (run_dir / "document_manifest.json").unlink()
+
+            envelope = self._run_feedback({"plan_rerun": True, "run_dir": str(run_dir)})
+
+        plan = envelope["data"]["rerun_plan"]
+        self.assertTrue(envelope["ok"])
+        self.assertEqual(plan["status"], "planned")
+        self.assertEqual(plan["canonical_ir_binding"]["status"], "pending")
+
+    def test_selective_rerun_plan_keeps_pending_when_document_manifest_reference_is_invalid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.md"
+            source.write_text("# Note\n\n正文\n", encoding="utf-8")
+            run_dir = self._metadata_run_dir(root, source, run_id="run_invalid_document_manifest")
+            (run_dir / "document_manifest.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.document_manifest.v1",
+                    "canonical_ir_manifest": str(run_dir / "canonical_ir" / "manifest.json"),
+                    "conversion_report": "conversion_report.json",
+                    "converted_md": "converted.md",
+                    "created_from_run": str(run_dir),
+                }),
+                encoding="utf-8",
+            )
+
+            envelope = self._run_feedback({"plan_rerun": True, "run_dir": str(run_dir)})
+
+        plan = envelope["data"]["rerun_plan"]
+        self.assertTrue(envelope["ok"])
+        self.assertEqual(plan["status"], "planned")
+        self.assertEqual(plan["canonical_ir_binding"]["status"], "pending")
+
+    def test_selective_rerun_plan_keeps_pending_when_canonical_manifest_schema_is_invalid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.md"
+            source.write_text("# Note\n\n正文\n", encoding="utf-8")
+            run_dir = self._metadata_run_dir(root, source, run_id="run_invalid_canonical_manifest")
+            canonical_manifest = json.loads((run_dir / "canonical_ir" / "manifest.json").read_text(encoding="utf-8"))
+            canonical_manifest["schema"] = "wrong.schema"
+            (run_dir / "canonical_ir" / "manifest.json").write_text(json.dumps(canonical_manifest), encoding="utf-8")
+
+            envelope = self._run_feedback({"plan_rerun": True, "run_dir": str(run_dir)})
+
+        plan = envelope["data"]["rerun_plan"]
+        self.assertTrue(envelope["ok"])
+        self.assertEqual(plan["status"], "planned")
+        self.assertEqual(plan["canonical_ir_binding"]["status"], "pending")
 
     def test_selective_rerun_plan_can_start_from_latest_accepted_proposal(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -152,6 +217,8 @@ class FeedbackTests(unittest.TestCase):
         self.assertTrue(execution["ok"])
         self.assertEqual(execution["run_id"], "run_execute")
         self.assertEqual(execution["plan"]["status"], "planned")
+        self.assertEqual(execution["plan"]["canonical_ir_binding"]["status"], "bound")
+        self.assertEqual(execution["plan"]["canonical_ir_binding"]["document_id"], "doc-run_execute")
         self.assertEqual(execution["plan"]["command_evidence"]["would_execute"], False)
         self.assertEqual(execution["command_evidence"]["actually_executed"], True)
         self.assertEqual(execution["command_evidence"]["payload"]["mode"], "rules_only")
@@ -273,6 +340,7 @@ class FeedbackTests(unittest.TestCase):
                 }),
                 encoding="utf-8",
             )
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-run_missing_input")
 
             with patch("kbprep_worker.feedback.selective_rerun_execution._run_prepare_subprocess") as run_prepare:
                 envelope = self._run_feedback({
@@ -288,6 +356,8 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(execution["status"], "blocked")
         self.assertFalse(execution["ok"])
         self.assertEqual(execution["plan"]["status"], "blocked")
+        self.assertEqual(execution["plan"]["canonical_ir_binding"]["status"], "bound")
+        self.assertEqual(execution["plan"]["canonical_ir_binding"]["document_id"], "doc-run_missing_input")
         self.assertIn("input_path", execution["plan"]["missing_evidence"])
         self.assertEqual(history[-1]["status"], "blocked")
         run_prepare.assert_not_called()
@@ -295,6 +365,9 @@ class FeedbackTests(unittest.TestCase):
     def test_selective_rerun_plan_preserves_failed_promotion_history_as_blocked(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            source = root / "source.md"
+            source.write_text("# Note\n\n正文\n", encoding="utf-8")
+            run_dir = self._metadata_run_dir(root, source, run_id="run_failed_history")
             target_rules_dir = root / "rules"
             history_path = target_rules_dir / "promotion_history.jsonl"
             history_path.parent.mkdir(parents=True)
@@ -305,7 +378,7 @@ class FeedbackTests(unittest.TestCase):
                     "regression_verification": {
                         "status": "failed",
                         "samples": [{
-                            "run_dir": str(root / "missing-run"),
+                            "run_dir": str(run_dir),
                             "reason": "representative metadata unavailable",
                         }],
                     },
@@ -323,6 +396,8 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(plan["status"], "blocked")
         self.assertEqual(plan["plan_source"], "promotion_history")
         self.assertEqual(plan["promotion_history_status"], "failed")
+        self.assertEqual(plan["canonical_ir_binding"]["status"], "bound")
+        self.assertEqual(plan["canonical_ir_binding"]["document_id"], "doc-run_failed_history")
         self.assertIn("representative metadata unavailable", plan["reason"])
 
     def test_selective_rerun_plan_requires_explicit_selector(self):
@@ -449,7 +524,43 @@ class FeedbackTests(unittest.TestCase):
             json.dumps({"profile": "standard", "document_type": "course"}),
             encoding="utf-8",
         )
+        self._write_canonical_ir_binding_artifacts(run_dir, document_id=f"doc-{run_id}")
         return run_dir
+
+    def _write_canonical_ir_binding_artifacts(self, run_dir: Path, *, document_id: str) -> None:
+        canonical_dir = run_dir / "canonical_ir"
+        canonical_dir.mkdir(parents=True)
+        (run_dir / "converted.md").write_text("# Converted\n", encoding="utf-8")
+        (run_dir / "conversion_report.json").write_text(
+            json.dumps({"converted_md": str(run_dir / "converted.md")}),
+            encoding="utf-8",
+        )
+        (canonical_dir / "manifest.json").write_text(
+            json.dumps({
+                "schema": "kbprep.canonical_ir_manifest.v1",
+                "document_id": document_id,
+                "status": "partial",
+                "artifacts": {
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+                "coverage": {
+                    "typed_nodes_available": True,
+                    "source_spans_available": True,
+                },
+            }),
+            encoding="utf-8",
+        )
+        (run_dir / "document_manifest.json").write_text(
+            json.dumps({
+                "schema": "kbprep.document_manifest.v1",
+                "canonical_ir_manifest": "canonical_ir/manifest.json",
+                "conversion_report": "conversion_report.json",
+                "converted_md": "converted.md",
+                "created_from_run": str(run_dir),
+            }),
+            encoding="utf-8",
+        )
 
     def _run_feedback(self, payload: dict) -> dict:
         stdout = io.StringIO()

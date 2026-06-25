@@ -131,7 +131,12 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
       expect(plan.data.rerun_plan.run_id).toBe(prepared.data.run_id);
       expect(plan.data.rerun_plan.document_type).toBeTruthy();
       expect(plan.data.rerun_plan.policy_snapshot_hash).toBeTruthy();
-      expect(plan.data.rerun_plan.canonical_ir_binding.status).toBe("pending");
+      expect(plan.data.rerun_plan.canonical_ir_binding.status).toBe("bound");
+      expect(plan.data.rerun_plan.canonical_ir_binding.binding_level).toBe("run");
+      expect(plan.data.rerun_plan.canonical_ir_binding.document_id).toBeTruthy();
+      expect(plan.data.rerun_plan.canonical_ir_binding.canonical_ir_manifest).toContain(path.join("canonical_ir", "manifest.json"));
+      expect(plan.data.rerun_plan.canonical_ir_binding.document_manifest).toContain("document_manifest.json");
+      expect(plan.data.rerun_plan.canonical_ir_binding.id_level_narrowing).toBe(false);
       expect(plan.data.rerun_plan.command_evidence.standalone_command[0]).toBe("kbprep-prepare");
       expect(plan.data.rerun_plan.command_evidence.payload.mode).toBe("rules_only");
     } finally {
@@ -165,6 +170,8 @@ describe("kbprep worker pipeline - feedback rules part 2", () => {
       expect(executed.data.rerun_verification.status).toBe("passed");
       expect(executed.data.rerun_verification.ok).toBe(true);
       expect(executed.data.rerun_verification.plan.run_id).toBe(prepared.data.run_id);
+      expect(executed.data.rerun_verification.plan.canonical_ir_binding.status).toBe("bound");
+      expect(executed.data.rerun_verification.plan.canonical_ir_binding.binding_level).toBe("run");
       expect(executed.data.rerun_verification.plan.command_evidence.would_execute).toBe(false);
       expect(executed.data.rerun_verification.command_evidence.actually_executed).toBe(true);
       expect(executed.data.rerun_verification.command_evidence.payload.mode).toBe("rules_only");

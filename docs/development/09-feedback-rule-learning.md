@@ -33,6 +33,7 @@ Accepted proposals become deterministic rules only after explicit `confirm_rule_
 - Proposal acceptance refuses promotion until owner confirmation is recorded.
 - Rerun verification reports whether the accepted rule helped.
 - Public selective rerun can be planned or executed from an accepted proposal, a run directory, or document-type promotion history when run metadata is sufficient.
+- Selective rerun plans bind run-level Canonical IR manifest evidence when the selected run has it, while node-id and cleaning-unit id-level targeting remain future work.
 - Failed rerun or promotion evidence is visible as `rerun_failed` or `promotion_blocked` without changing the accepted-rule loading contract.
 
 ## Risk And Rollback

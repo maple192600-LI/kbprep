@@ -7,6 +7,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .canonical_ir_binding import canonical_ir_binding, pending_canonical_ir_binding
 from .support import (
     _append_jsonl_locked,
     _matches_pattern,
@@ -118,13 +119,15 @@ def _plan_from_latest_promotion_entry(entry: dict, rules_root: Path) -> dict:
     samples = _promotion_samples(verification)
     if status == "failed":
         sample = next((item for item in samples if item.get("ok") is False), samples[0] if samples else {})
+        run_dir = _optional_string(sample.get("run_dir")) or ""
         return _blocked_plan(
             plan_source="promotion_history",
             reason=_promotion_sample_reason(sample) or "Failed promotion history blocks selective rerun planning.",
-            run_dir=_optional_string(sample.get("run_dir")) or "",
+            run_dir=run_dir,
             document_type=_optional_string(entry.get("document_type")) or "",
             promotion_history_status=status,
             missing_evidence=["passing_promotion_history"],
+            canonical_ir_binding=canonical_ir_binding(Path(run_dir).expanduser().resolve()) if run_dir else None,
         )
     if not samples:
         return _blocked_plan(
@@ -287,6 +290,7 @@ def _selective_plan_from_run_dir(run_dir: Path, plan_source: str) -> dict:
             run_id=evidence.get("run_id", ""),
             document_type=evidence.get("document_type", ""),
             missing_evidence=missing,
+            canonical_ir_binding=canonical_ir_binding(run_dir),
         )
     return _planned_selective_rerun(plan_source, run_dir, evidence)
 
@@ -354,7 +358,7 @@ def _planned_selective_rerun(plan_source: str, run_dir: Path, evidence: dict) ->
         "source_path": evidence["input_path"],
         "document_type": evidence["document_type"],
         "policy_snapshot_hash": evidence["policy_snapshot_hash"],
-        "canonical_ir_binding": _pending_canonical_ir_binding(),
+        "canonical_ir_binding": canonical_ir_binding(run_dir),
         "prepare_payload": payload,
         "command_evidence": _command_evidence(payload, {}),
     }
@@ -394,14 +398,6 @@ def _safe_prepare_payload(payload: dict) -> dict:
     }
 
 
-def _pending_canonical_ir_binding() -> dict:
-    return {
-        "status": "pending",
-        "canonical_ir_id": None,
-        "reason": "Canonical IR id binding is pending until the C3 contract is implemented.",
-    }
-
-
 def _command_evidence(payload: dict, env: dict[str, str]) -> dict:
     return {
         "would_execute": False,
@@ -433,6 +429,7 @@ def _blocked_plan(
     document_type: str = "",
     accepted_proposal_id: str = "",
     promotion_history_status: str = "",
+    canonical_ir_binding: dict | None = None,
 ) -> dict:
     plan = {
         "schema": "kbprep.selective_rerun_plan.v1",
@@ -444,7 +441,7 @@ def _blocked_plan(
         "run_dir": run_dir,
         "run_id": run_id or (Path(run_dir).name if run_dir else ""),
         "document_type": document_type,
-        "canonical_ir_binding": _pending_canonical_ir_binding(),
+        "canonical_ir_binding": canonical_ir_binding or pending_canonical_ir_binding(),
     }
     _add_optional_blocked_fields(plan, accepted_proposal_id, promotion_history_status)
     return plan

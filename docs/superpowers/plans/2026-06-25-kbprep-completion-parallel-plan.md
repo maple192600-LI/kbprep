@@ -364,11 +364,11 @@ node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
 
 - [ ] **Step 1: Add failing affected-scope tests**
 
-Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and Canonical IR ids or cleaning-unit ids when available.
+Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and run-level Canonical IR manifest evidence when available. Keep node-id or cleaning-unit id-level narrowing explicit as unavailable until those identities are stable.
 
 - [ ] **Step 2: Implement final binding**
 
-Use stable Canonical IR ids or cleaning-unit ids to avoid filename-only or document-wide reruns when the changed rule affects only a known source span or cleaning unit.
+Use current stable run/source/document/policy evidence plus Canonical IR manifest evidence for the baseline binding. Add stable Canonical IR node ids or cleaning-unit ids later to avoid document-wide reruns when the changed rule affects only a known source span or cleaning unit.
 
 - [ ] **Step 3: Promote M5 status only if complete**
 
