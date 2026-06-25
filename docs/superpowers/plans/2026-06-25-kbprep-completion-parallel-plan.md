@@ -112,7 +112,7 @@ Can run now in the current checkout because it only cleans status and planning r
 - Modify: `scripts/checks/implementation-status.mjs`
 - Modify: `src/test/scenarios/worker-governance-guards.test.ts`
 
-- [ ] **Step 1: Keep `SESSION_START.md` tracked**
+- [x] **Step 1: Keep `SESSION_START.md` tracked**
 
 Ensure `.gitignore` contains:
 
@@ -120,7 +120,7 @@ Ensure `.gitignore` contains:
 !/SESSION_START.md
 ```
 
-- [ ] **Step 2: Keep verification wrapper agent-neutral**
+- [x] **Step 2: Keep verification wrapper agent-neutral**
 
 Ensure `SESSION_START.md` references:
 
@@ -129,7 +129,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-kbprep.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-kbprep.ps1 -Full
 ```
 
-- [ ] **Step 3: Remove old agent-specific wrapper**
+- [x] **Step 3: Remove old agent-specific wrapper**
 
 Run:
 
@@ -139,7 +139,7 @@ Get-ChildItem scripts -Filter "verify-*.ps1" | Select-Object -ExpandProperty Nam
 
 Expected: `verify-kbprep.ps1`.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run:
 
