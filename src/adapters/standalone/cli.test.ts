@@ -330,14 +330,7 @@ describe("standalone KBPrep CLI adapter", () => {
     try {
       const manifest = join(root, "batch_manifest.json");
       writeFileSync(manifest, "{}", "utf-8");
-      const parsed = parseStandaloneArgs([
-        "--rerun",
-        "--batch-manifest",
-        manifest,
-        "--rerun-scope",
-        "failed-and-pending",
-        "--force",
-      ]);
+      const parsed = parseStandaloneArgs(["--rerun", "--batch-manifest", manifest, "--rerun-scope", "failed-and-pending", "--force"]);
       const plan = buildCliPlan("prepare_batch", parsed.options);
 
       expect(plan.command).toBe("prepare_batch");
