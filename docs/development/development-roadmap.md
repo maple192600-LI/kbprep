@@ -28,7 +28,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
 | conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, C4 coverage-report claims, and C5 complete-IR text-quality evidence when available; full route-wide IR semantics remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, and pre-clean gate use of complete typed-node/source-span text evidence exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence. SourceSpan schema now validates route-native precision records when provided and reports missing native precision kinds without fabricating evidence; converter-native extraction, renderer regeneration, and full fact-layer usage are not shipped. |
+| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, pre-clean gate use of complete typed-node/source-span text evidence, and a minimal standard Markdown IR regeneration path exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence. SourceSpan schema now validates route-native precision records when provided and reports missing native precision kinds without fabricating evidence; converter-native extraction, full renderer/profile coverage, and full fact-layer usage are not shipped. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -141,11 +141,16 @@ Slices:
   typed-node and source-span Canonical IR text evidence when `coverage.report`
   proves full node/span coverage, and falls back to converter-provided quality
   or rendered Markdown only when complete IR evidence is unavailable.
+- **C6** Landed narrow slice: standard Markdown rendering can regenerate
+  `cleaned.md` from Canonical IR typed-node text plus Clean View accepted
+  change identity. Accepted patch entries still render from accepted in-memory
+  cleanup block content, while `cleaning_patches.jsonl` remains content-safe
+  and does not carry source or cleaned text.
 
 Phase C remains partial until route-native spans, relationships, assets,
-annotations, universal fact-layer use, and Markdown regeneration from IR plus
-accepted changes are implemented with named evidence. Only then can
-`canonical_ir_contract` move from partial to implemented.
+annotations, full renderer/profile coverage, and universal fact-layer use are
+implemented with named evidence. Only then can `canonical_ir_contract` move
+from partial to implemented.
 
 ### Phase D — CleaningPolicySnapshot, CleaningPatch, Clean View
 
@@ -307,8 +312,9 @@ Required slices:
   to Canonical IR.
 - Make conversion gates consume complete route-wide IR semantics for every
   verified or promoted route.
-- Render Markdown from Canonical IR plus accepted changes, not from parallel
-  legacy cleanup state.
+- Extend Markdown regeneration from the minimal standard path to all required
+  output profiles and route cases, with named tests proving accepted changes
+  and IR ordering stay coherent.
 - Promote `canonical_ir_contract` and `conversion_quality_gate` only after
   named tests cover the above across representative routes.
 
