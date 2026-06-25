@@ -23,7 +23,7 @@ This stage supports source inspection, route selection, dependency failure repor
 - Media and YouTube routes require dependency checks, sample evidence, and capability matrix status before promotion.
 - No route is verified without named tests or fixtures.
 - The YouTube boundary is an engineering product contract; there is no external compliance approval step in this plan. Implement the requested user-facing capability through accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache and artifact behavior, no-subtitle fallback, clear error messages, quality gates, and status evidence.
-- Logged-in/cookie/credential-based sources are not part of this slice because they would add a separate secret-handling feature, not because of a compliance approval step.
+- If logged-in, cookie, or credential-based sources are required by the feature, implement them as explicit operator-provided local inputs with deterministic errors; do not silently discover, store, or reuse secrets.
 
 ## Acceptance
 

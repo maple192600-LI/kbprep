@@ -43,8 +43,8 @@ Current completion state:
 
 The first version was too conservative in three places. Use this revised flow. The rule is: develop independent code paths in parallel, but promote capability status only after evidence is complete and integration checks pass.
 
-- Do not split YouTube into a separate approval-only boundary branch. Per owner instruction, there is no external compliance approval step in this plan. The remaining boundary is only the engineering product contract inside the implementation branch: accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache/artifact policy, no-subtitle fallback, clear error messages, quality gates, and status evidence. Logged-in/cookie/credential-based sources are not part of this slice because they would add a separate secret-handling feature, not because of a compliance approval step.
-- Do not make all M5 rerun work wait for C3. Split M5B into command/state scaffolding that can run with C1/C2 and final Canonical-IR identity binding that waits for C3.
+- Do not split YouTube into a separate approval-only boundary branch. Per owner instruction, there is no external compliance approval step in this plan. The remaining boundary is only the engineering product contract inside the implementation branch: accepted URL/id/playlist inputs, dependency detection, bounded network timeout, cache/artifact policy, no-subtitle fallback, clear error messages, quality gates, and status evidence. If logged-in, cookie, or credential-based sources are required by the feature, implement them as explicit operator-provided local inputs with deterministic errors; do not silently discover, store, or reuse secrets.
+- Do not make all M5 rerun work wait for C3. Run the existing command/state coverage as M5B2 preflight, then implement affected-scope identity binding immediately with current stable ids. Attach Canonical IR id-level narrowing later when those ids are complete.
 - Do not make all Phase F work wait for M2 and M5. F1 local media fixtures, F2 image/legacy fixtures, and the YouTube technical-contract tests can start immediately. Only capability promotion waits for passing fixtures and final gate evidence.
 - Do not run a full reviewer loop for every small doc-only adjustment. Keep reviewer subagents for contract boundaries and merge readiness; use targeted checks during implementation and reserve `npm run dev:full-check` for merge-ready branches.
 - Do not leave playlist as a decision-only tail. Explicit playlist input is merged, and playlist rerun now preserves playlist `source_collection` plus child `source_url` evidence in `batch_rerun_manifest.json`. Remaining playlist-adjacent work is policy/CIR affected targeting plus real-network/dependency/quality evidence before any promotion.
@@ -64,7 +64,8 @@ This review removes overcautious slices that would waste time by rebuilding ship
 - **M5A/M5B1:** Proposal state hardening, public single-source selective rerun planning/execution, proposal risk notes, owner confirmation status, counterexamples, and failed-promotion blocking already exist. Remaining M5 work is affected-scope identity binding: source ids, policy snapshot identity, document type, Canonical IR ids or cleaning-unit identity, and reliable rerun evidence.
 - **Playlist:** Explicit playlist input and playlist rerun evidence preservation are merged. The next playlist branch is real-network/dependency/quality evidence plus optional capability promotion, not another playlist implementation branch.
 - **YouTube:** Direct URL, explicit video id, local `.url` descriptor, subtitle-first route, explicit media fallback, and playlist input are implemented through the existing `youtube_source`, `youtube_playlist`, external conversion, and CLI descriptor path. The next YouTube branch must harden evidence around real network samples, bounded timeout behavior, dependency variance, no-subtitle fallback, cache/artifact behavior, and transcript quality. Do not create a duplicate `converters/youtube.py` route unless current code evidence proves the existing architecture cannot support the required behavior.
-- **Boundary:** There is no external YouTube compliance approval gate in this plan. The only boundaries are engineering/product boundaries: no hidden credentials or cookie scraping, no secret handling added implicitly, no quality-gate bypass, no unbounded network work, no silent dependency cost, no private/source-body leakage, and no verified status without real evidence.
+- **Speed audit:** M5A and M5B1 are no longer standalone development branches. They are fast preflight checks inside M5B2. If the existing tests pass, proceed directly to affected-scope identity binding; do not create a review-only branch.
+- **Boundary:** There is no external YouTube compliance approval gate in this plan. The only boundaries are product-engineering boundaries: no quality-gate bypass, no unbounded network work, no silent dependency cost, no private/source-body leakage, and no verified status without real evidence. If YouTube support needs cookies, tokens, or other operator-provided access material for the requested feature, implement it as an explicit local configuration or file input with deterministic errors; do not add hidden credential discovery or implicit secret storage.
 
 ## Immediate Parallel Work Sets
 
@@ -338,89 +339,19 @@ Reviewer verifies M2 completion evidence, no fabricated source spans, no target-
 
 Proposal state hardening and public single-source selective rerun scaffolding are already in the current implementation evidence. Wave 2 now focuses on affected-scope identity binding and promotion evidence; do not rebuild proposal states or the public rerun command unless current tests prove a regression.
 
-### Branch M5A: Feedback Proposal State Regression Guard
+### M5 Preflight: Existing Feedback And Command Coverage
 
-**Parallel:** Can run with C1R, C2R, F1, F2, or YouTube evidence work because it is test/documentation focused and should not edit Canonical IR core files.
-
-**Branch:** `codex/m5-feedback-regression-guard`
-
-**Files:**
-
-- Modify: `python/kbprep_worker/feedback/proposals.py`
-- Modify: `python/kbprep_worker/feedback/promotion_history.py`
-- Modify: `python/tests/test_feedback_proposals.py`
-- Modify: `python/tests/test_feedback_promotion.py`
-- Modify: `docs/feedback-learning.md`
-- Modify: `docs/development/09-feedback-rule-learning.md`
-
-- [ ] **Step 1: Audit existing state coverage**
-
-Confirm existing tests cover `proposed`, `accepted`, `rejected`, `rerun_pending`, `rerun_passed`, `rerun_failed`, `promotion_blocked`, owner-confirmation status, risk notes, counterexamples, and failed-promotion blocking. Add a failing regression test only for an actually missing transition or unsafe promotion path.
-
-Run:
+**No standalone branch.** Run this as the first step of M5B2. These checks are speed guards, not development slices. If they pass, start affected-scope binding immediately. Create a fix only when a command proves a real regression.
 
 ```powershell
+npm test -- src/test/scenarios/worker-feedback-rules-part1.test.ts src/test/scenarios/worker-feedback-rules-part2.test.ts
 node scripts/python-venv.mjs -m unittest python.tests.test_feedback_proposals python.tests.test_feedback_promotion -v
-```
-
-Expected before implementation: only a real missing transition or unsafe broad-promotion path fails. If current coverage is sufficient, record the evidence and do not add redundant implementation.
-
-- [ ] **Step 2: Fix only proven gaps**
-
-Keep one-sentence feedback proposal-first. Do not promote a permanent rule without owner confirmation, positive examples, counterexamples, and rerun evidence.
-
-- [ ] **Step 3: Reviewer gate**
-
-Reviewer checks that no broad deletion rule can be promoted from a single sentence.
-
-### Branch M5B1: Selective Rerun Command Regression Guard
-
-**Parallel:** Can run with M5A and optional-route evidence work. Do not edit Canonical IR identity contracts in this branch.
-
-**Branch:** `codex/m5-rerun-command-guard`
-
-**Files:**
-
-- Modify: `python/kbprep_worker/feedback/rerun_verification.py`
-- Modify: `python/kbprep_worker/feedback/command.py`
-- Modify: `src/adapters/standalone/bin/feedback.ts`
-- Modify: `src/test/scenarios/worker-feedback-rules-part1.test.ts`
-- Modify: `src/test/scenarios/worker-feedback-rules-part2.test.ts`
-- Modify: `python/tests/test_feedback.py`
-- Modify: `docs/feedback-learning.md`
-- Modify: `docs/standalone-cli.md`
-
-- [ ] **Step 1: Audit existing CLI and Python tests**
-
-Confirm existing `kbprep-feedback` and Python rerun verification tests cover accepted-proposal rerun planning/execution, run directory scope, source/document-type selectors, policy snapshot identity when available, and failed-promotion history. Add a failing test only for a missing selector or stale operator claim.
-
-Run:
-
-```powershell
-npm test -- src/test/scenarios/worker-feedback-rules-part1.test.ts src/test/scenarios/worker-feedback-rules-part2.test.ts
 node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
-```
-
-Expected before implementation: only an actually missing command/evidence path fails. If current coverage is already present, update status docs instead of rebuilding the command.
-
-- [ ] **Step 2: Fix only proven command gaps**
-
-Use source evidence, document type, and policy snapshot identity. Preserve failed promotion history when rerun evidence is weak. Leave Canonical IR id matching behind an explicit pending field when C3 has not landed.
-
-- [ ] **Step 3: Verify branch**
-
-Run:
-
-```powershell
-npm test -- src/test/scenarios/worker-feedback-rules-part1.test.ts src/test/scenarios/worker-feedback-rules-part2.test.ts
-node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
-npm run dev:check
-git diff --check
 ```
 
 ### Branch M5B2: Affected-Scope Evidence Binding
 
-**Parallel:** Prep can start now by auditing existing proposal/run evidence and adding tests around current stable ids. Final Canonical IR or cleaning-unit id-level promotion waits for C1R/C2R/C7 identity semantics if those ids are required.
+**Parallel:** Starts now. Use existing stable run ids, source ids, document type, and policy snapshot identity immediately. Canonical IR id-level narrowing can attach later when C1R/C2R/C7 makes those ids complete; do not block the whole branch on final M2 closure.
 
 **Branch:** `codex/m5-rerun-evidence-binding`
 
@@ -687,10 +618,10 @@ git diff --check
 Merge order:
 
 1. Wave 0 is already closed; skip it unless a new regression is found.
-2. C1R, C2R, M5A regression guard, M5B1 regression guard, F1, F2, F3, and PLAYLIST2 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
+2. C1R, C2R, M5B2, F1, F2, F3, and PLAYLIST2 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
 3. C7 full IR fact-layer closure after C1R and C2R.
-4. M5B2 affected-scope evidence binding after the required Canonical IR or cleaning-unit identity semantics are stable.
-5. BATCH2 after M5B2 when policy-affected batch targeting needs that identity binding.
+4. M5B2 Canonical IR id-level narrowing or status promotion after the required Canonical IR or cleaning-unit identity semantics are stable, if the baseline M5B2 branch could not already include it.
+5. BATCH2 after baseline M5B2; policy/CIR targeting can add deeper Canonical IR id narrowing when those ids are stable.
 7. Capability-status promotion branches after their implementation evidence exists.
 
 Final release gate:
