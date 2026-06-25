@@ -13,9 +13,11 @@ This stage supports the flowchart nodes for Canonical IR conversion, normalizati
 The current worker ships a partial Canonical IR contract. It writes
 `canonical_ir/manifest.json`, `document_manifest.json`, a validated
 `canonical_ir/typed_nodes.json` artifact, a validated
-`canonical_ir/source_spans.json` artifact, and a validated
-`canonical_ir/transformation_ledger.json` artifact for conversion-phase
-Canonical IR evidence.
+`canonical_ir/source_spans.json` artifact,
+`canonical_ir/transformation_ledger.json`, and C2
+`canonical_ir/relationships.json`, `canonical_ir/assets.json`, and
+`canonical_ir/annotations.json` artifacts for conversion-phase Canonical IR
+evidence.
 
 The shipped typed-node slices cover heading, paragraph, list, table, code,
 quote, formula, figure, metadata, and transcript cue nodes in source order.
@@ -44,9 +46,15 @@ evidence before they can be considered complete for every route. The
 TransformationLedger currently records ordered conversion-phase evidence for
 route decisions, converted Markdown, typed nodes, and source spans, and the
 pre-clean conversion gate validates it when the manifest claims the artifact.
-Relationship evidence, assets, annotations, full route-wide gate use of IR
-semantics, and Markdown regeneration from IR plus accepted changes are still
-target work.
+C2 relationships record content-safe `contains` and `next_sibling` structure
+links between typed-node ids. C2 assets record content-safe image references
+from figure nodes without copying alt text or title text. C2 annotations record
+content-safe coverage warnings. The coverage report now marks these three gap
+areas as `partial` only when the corresponding artifact has records; empty or
+missing artifacts remain `target_work`. Full route-wide gate use of IR
+semantics, complete route-native relationship and asset semantics, richer
+quality annotations, and Markdown regeneration from IR plus accepted changes
+are still target work.
 
 ## Contract
 

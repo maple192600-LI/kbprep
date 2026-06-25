@@ -7,6 +7,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .canonical_record_artifacts import (
+    ANNOTATION_RECORD_KEYS,
+    ANNOTATION_TOP_KEYS,
+    ASSET_RECORD_KEYS,
+    ASSET_TOP_KEYS,
+    CANONICAL_IR_ANNOTATIONS_SCHEMA,
+    CANONICAL_IR_ASSETS_SCHEMA,
+    CANONICAL_IR_RELATIONSHIPS_SCHEMA,
+    EVIDENCE_KEYS,
+    RELATIONSHIP_RECORD_KEYS,
+    RELATIONSHIP_TOP_KEYS,
+    valid_record_artifact_payload,
+)
+
 CANONICAL_IR_COVERAGE_REPORT_SCHEMA = "kbprep.canonical_ir_coverage_report.v1"
 COVERAGE_REPORT_INVALID_CODE = "E_CANONICAL_IR_COVERAGE_REPORT_INVALID"
 _REQUIRED_GAPS = frozenset({
@@ -24,8 +38,6 @@ _TARGET_NATIVE_PRECISIONS = frozenset({
     "transcript_cue_id",
     "youtube_cue_id",
 })
-
-
 @dataclass(frozen=True)
 class CoverageReportValidationIssue:
     code: str
@@ -47,6 +59,9 @@ def build_canonical_ir_coverage_report(
     typed_nodes = _read_json_object(typed_nodes_path)
     source_spans = _read_json_object(source_spans_path)
     ledger = _read_json_object(transformation_ledger_path)
+    relationships_path = run_dir / "canonical_ir" / "relationships.json"
+    assets_path = run_dir / "canonical_ir" / "assets.json"
+    annotations_path = run_dir / "canonical_ir" / "annotations.json"
     typed_section = _typed_nodes_section(run_dir, typed_nodes_path, typed_nodes, typed_nodes_available)
     span_section = _source_spans_section(
         run_dir, source_spans_path, source_spans, source_spans_available, typed_section,
@@ -54,12 +69,26 @@ def build_canonical_ir_coverage_report(
     ledger_section = _transformation_ledger_section(
         run_dir, transformation_ledger_path, ledger, transformation_ledger_available,
     )
+    relationship_section = _record_artifact_section(
+        run_dir, relationships_path, CANONICAL_IR_RELATIONSHIPS_SCHEMA,
+        "relationship_count", "relationships", RELATIONSHIP_RECORD_KEYS, RELATIONSHIP_TOP_KEYS, EVIDENCE_KEYS,
+    )
+    asset_section = _record_artifact_section(
+        run_dir, assets_path, CANONICAL_IR_ASSETS_SCHEMA, "asset_count", "assets", ASSET_RECORD_KEYS, ASSET_TOP_KEYS, frozenset(),
+    )
+    annotation_section = _record_artifact_section(
+        run_dir, annotations_path, CANONICAL_IR_ANNOTATIONS_SCHEMA,
+        "annotation_count", "annotations", ANNOTATION_RECORD_KEYS, ANNOTATION_TOP_KEYS, EVIDENCE_KEYS,
+    )
     return {
         "schema": CANONICAL_IR_COVERAGE_REPORT_SCHEMA,
         "typed_nodes": typed_section,
         "source_spans": span_section,
         "transformation_ledger": ledger_section,
-        "gaps": _target_gaps(span_section),
+        "relationships": relationship_section,
+        "assets": asset_section,
+        "annotations": annotation_section,
+        "gaps": _target_gaps(span_section, relationship_section, asset_section, annotation_section),
     }
 
 
@@ -79,6 +108,9 @@ def validate_canonical_ir_coverage_report(coverage: dict[str, Any]) -> list[Cove
     _validate_typed_nodes_report(coverage, report.get("typed_nodes"), issues)
     _validate_source_spans_report(coverage, report.get("source_spans"), issues)
     _validate_transformation_ledger_report(coverage, report.get("transformation_ledger"), issues)
+    _validate_record_artifact_report(coverage, report.get("relationships"), "relationships", "relationships_available", issues)
+    _validate_record_artifact_report(coverage, report.get("assets"), "assets", "assets_available", issues)
+    _validate_record_artifact_report(coverage, report.get("annotations"), "annotations", "annotations_available", issues)
     _validate_gap_report(report.get("gaps"), issues)
     return issues
 
@@ -137,7 +169,35 @@ def _transformation_ledger_section(
     }
 
 
-def _target_gaps(span_section: dict[str, Any]) -> dict[str, dict[str, Any]]:
+def _record_artifact_section(
+    run_dir: Path,
+    path: Path,
+    schema: str,
+    count_field: str,
+    list_field: str,
+    record_keys: frozenset[str],
+    top_keys: frozenset[str],
+    evidence_keys: frozenset[str],
+) -> dict[str, Any]:
+    payload = _read_json_object(path)
+    records = _list_value(payload, list_field)
+    valid = valid_record_artifact_payload(payload, schema, count_field, list_field, record_keys, top_keys, evidence_keys)
+    record_count = len(records) if valid else 0
+    available = valid and record_count > 0
+    return {
+        "artifact": _relative_run_path(run_dir, path),
+        "available": available,
+        "status": _status(path, payload, available),
+        "record_count": record_count,
+    }
+
+
+def _target_gaps(
+    span_section: dict[str, Any],
+    relationship_section: dict[str, Any],
+    asset_section: dict[str, Any],
+    annotation_section: dict[str, Any],
+) -> dict[str, dict[str, Any]]:
     precisions = sorted(str(key) for key in _dict_value(span_section.get("precisions")).keys())
     missing_native = sorted(_TARGET_NATIVE_PRECISIONS.difference(precisions))
     return {
@@ -146,11 +206,17 @@ def _target_gaps(span_section: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "current_precisions": precisions,
             "missing": missing_native,
         },
-        "relationships": {"status": "target_work", "missing": ["links_between_nodes"]},
-        "assets": {"status": "target_work", "missing": ["asset_records"]},
-        "annotations": {"status": "target_work", "missing": ["annotation_sets"]},
+        "relationships": _record_gap(relationship_section, "relationship_records", "route_wide_relationship_semantics"),
+        "assets": _record_gap(asset_section, "asset_records", "route_wide_asset_semantics"),
+        "annotations": _record_gap(annotation_section, "annotation_records", "route_wide_quality_annotation_semantics"),
         "ir_markdown_regeneration": {"status": "target_work", "missing": ["renderer_from_ir_plus_changes"]},
     }
+
+
+def _record_gap(section: dict[str, Any], missing_when_empty: str, missing_when_partial: str) -> dict[str, Any]:
+    if section.get("available") is True and section.get("record_count", 0) > 0:
+        return {"status": "partial", "record_count": section["record_count"], "missing": [missing_when_partial]}
+    return {"status": "target_work", "record_count": section.get("record_count", 0), "missing": [missing_when_empty]}
 
 
 def _route_native_precision_status(precisions: list[str]) -> str:
@@ -206,6 +272,25 @@ def _validate_transformation_ledger_report(
     if coverage.get("transformation_ledger_available") is True:
         _require_status(ledger, "transformation_ledger", issues)
         _require_positive_int(ledger, "entry_count", "transformation_ledger", issues)
+
+
+def _validate_record_artifact_report(
+    coverage: dict[str, Any],
+    section: object,
+    name: str,
+    coverage_field: str,
+    issues: list[CoverageReportValidationIssue],
+) -> None:
+    if section is None and coverage.get(coverage_field) is not True:
+        return
+    record_section = _require_section(section, name, issues)
+    if record_section is None:
+        return
+    _require_bool_match(record_section, coverage, coverage_field, issues)
+    _require_non_negative_int(record_section, "record_count", name, issues)
+    if coverage.get(coverage_field) is True:
+        _require_status(record_section, name, issues)
+        _require_positive_int(record_section, "record_count", name, issues)
 
 
 def _validate_gap_report(gaps: object, issues: list[CoverageReportValidationIssue]) -> None:
@@ -295,6 +380,9 @@ def _claims_any_coverage(coverage: dict[str, Any]) -> bool:
         "typed_nodes_available",
         "source_spans_available",
         "transformation_ledger_available",
+        "relationships_available",
+        "assets_available",
+        "annotations_available",
     ))
 
 

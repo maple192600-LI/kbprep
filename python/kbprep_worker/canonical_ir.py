@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .atomic_io import atomic_write_json
+from .canonical_annotations import write_annotations_artifact
+from .canonical_assets import write_assets_artifact
 from .canonical_coverage import build_canonical_ir_coverage_report, validate_canonical_ir_coverage_report
 from .canonical_ledger import (
     validate_transformation_ledger_reference,
@@ -18,6 +20,8 @@ from .canonical_nodes import (
     validate_typed_nodes_artifact,
     write_typed_nodes_artifact,
 )
+from .canonical_record_artifacts import validate_record_artifact_references
+from .canonical_relationships import write_relationships_artifact
 from .canonical_routes import canonical_conversion_route, canonical_converter, dict_or_empty
 from .canonical_spans import (
     validate_source_spans_artifact,
@@ -194,6 +198,9 @@ def _write_canonical_artifacts(
         source_spans_available=spans_available,
         conversion=conversion,
     )
+    write_relationships_artifact(run_dir=run_dir, document_id=document_id, typed_nodes_path=typed_path)
+    write_assets_artifact(run_dir=run_dir, document_id=document_id, typed_nodes_path=typed_path)
+    write_annotations_artifact(run_dir=run_dir, document_id=document_id)
     return CanonicalArtifactState(
         document_id=document_id,
         route_decision=route_decision,
@@ -428,6 +435,9 @@ def _artifact_snapshot(
         "typed_nodes": _relative_run_path(run_dir, typed_nodes_path),
         "source_spans": _relative_run_path(run_dir, source_spans_path),
         "transformation_ledger": _relative_run_path(run_dir, transformation_ledger_path),
+        "relationships": "canonical_ir/relationships.json",
+        "assets": "canonical_ir/assets.json",
+        "annotations": "canonical_ir/annotations.json",
     }
 
 
@@ -441,20 +451,23 @@ def _coverage_snapshot(
     transformation_ledger_path: Path,
     transformation_ledger_available: bool,
 ) -> dict[str, Any]:
+    report = build_canonical_ir_coverage_report(
+        run_dir=run_dir,
+        typed_nodes_path=typed_nodes_path,
+        typed_nodes_available=typed_nodes_available,
+        source_spans_path=source_spans_path,
+        source_spans_available=source_spans_available,
+        transformation_ledger_path=transformation_ledger_path,
+        transformation_ledger_available=transformation_ledger_available,
+    )
     return {
         "typed_nodes_available": typed_nodes_available,
         "source_spans_available": source_spans_available,
         "transformation_ledger_available": transformation_ledger_available,
-        "assets_available": (run_dir / "images").exists(),
-        "report": build_canonical_ir_coverage_report(
-            run_dir=run_dir,
-            typed_nodes_path=typed_nodes_path,
-            typed_nodes_available=typed_nodes_available,
-            source_spans_path=source_spans_path,
-            source_spans_available=source_spans_available,
-            transformation_ledger_path=transformation_ledger_path,
-            transformation_ledger_available=transformation_ledger_available,
-        ),
+        "relationships_available": bool(report.get("relationships", {}).get("available")),
+        "assets_available": bool(report.get("assets", {}).get("available")),
+        "annotations_available": bool(report.get("annotations", {}).get("available")),
+        "report": report,
     }
 
 
@@ -477,19 +490,13 @@ def _validate_canonical_manifest(
     coverage = _validate_coverage_snapshot(manifest.get("coverage"), issues)
     if artifacts is not None and coverage is not None:
         converted = converted_path or run_dir / "converted.md"
-        _validate_typed_nodes_reference(
-            run_dir,
-            artifacts,
-            coverage,
-            str(manifest.get("document_id") or ""),
-            converted,
-            issues,
-        )
+        document_id = str(manifest.get("document_id") or "")
+        _validate_typed_nodes_reference(run_dir, artifacts, coverage, document_id, converted, issues)
         for issue in validate_source_spans_reference(
             run_dir=run_dir,
             artifacts=artifacts,
             coverage=coverage,
-            document_id=str(manifest.get("document_id") or ""),
+            document_id=document_id,
             converted_path=converted,
         ):
             _add_issue(issues, issue.code, issue.message, issue.evidence)
@@ -497,10 +504,14 @@ def _validate_canonical_manifest(
             run_dir=run_dir,
             artifacts=artifacts,
             coverage=coverage,
-            document_id=str(manifest.get("document_id") or ""),
+            document_id=document_id,
             converted_path=converted,
         ):
             _add_issue(issues, ledger_issue.code, ledger_issue.message, ledger_issue.evidence)
+        for record_issue in validate_record_artifact_references(
+            run_dir=run_dir, artifacts=artifacts, coverage=coverage, document_id=document_id,
+        ):
+            _add_issue(issues, record_issue.code, record_issue.message, record_issue.evidence)
     if manifest.get("status") != "partial":
         _add_issue(
             issues,
@@ -583,7 +594,8 @@ def _validate_coverage_snapshot(value: object, issues: list[CanonicalIrValidatio
     if coverage is None:
         return None
     required_fields = ("typed_nodes_available", "source_spans_available", "assets_available")
-    for field in required_fields + ("transformation_ledger_available",):
+    optional_fields = ("transformation_ledger_available", "relationships_available", "annotations_available")
+    for field in required_fields + optional_fields:
         if field in required_fields or field in coverage:
             value = coverage.get(field)
         else:

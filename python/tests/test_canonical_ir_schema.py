@@ -497,6 +497,150 @@ class CanonicalIrSchemaTests(unittest.TestCase):
 
         self.assertTrue(any(issue.code == "E_CANONICAL_IR_MANIFEST_INVALID" for issue in issues))
 
+    def test_validator_rejects_assets_available_without_artifact(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            report = _coverage_report()
+            report["assets"] = {
+                "artifact": "canonical_ir/assets.json",
+                "available": True,
+                "status": "validated",
+                "record_count": 1,
+            }
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                coverage={"assets_available": True, "report": report},
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any("coverage.assets_available requires artifacts.assets" in issue.message for issue in issues))
+
+    def test_validator_rejects_invalid_asset_artifact_payload(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            report = _coverage_report()
+            report["assets"] = {
+                "artifact": "canonical_ir/assets.json",
+                "available": True,
+                "status": "validated",
+                "record_count": 1,
+            }
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"assets": "canonical_ir/assets.json"},
+                coverage={"assets_available": True, "report": report},
+            )
+            (run_dir / "canonical_ir" / "assets.json").write_text(
+                json.dumps({
+                    "schema": "wrong.schema",
+                    "document_id": "doc_test",
+                    "asset_count": 1,
+                    "assets": [{
+                        "asset_id": "a_000001",
+                        "asset_type": "image",
+                        "source_node_id": "n_000001",
+                        "reference": "images/chart.png",
+                        "reference_kind": "markdown_image",
+                        "copied_text": "Sensitive source sentence",
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any("assets schema is invalid" in issue.message for issue in issues))
+        self.assertTrue(any("assets record keys must match schema exactly" in issue.message for issue in issues))
+
+    def test_validator_rejects_record_artifact_top_level_source_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            report = _coverage_report()
+            report["assets"] = {
+                "artifact": "canonical_ir/assets.json",
+                "available": True,
+                "status": "validated",
+                "record_count": 1,
+            }
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"assets": "canonical_ir/assets.json"},
+                coverage={"assets_available": True, "report": report},
+            )
+            (run_dir / "canonical_ir" / "assets.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_assets.v1",
+                    "document_id": "doc_test",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "asset_count": 1,
+                    "assets": [{
+                        "asset_id": "a_000001",
+                        "asset_type": "image",
+                        "source_node_id": "n_000001",
+                        "reference": "images/chart.png",
+                        "reference_kind": "markdown_image",
+                    }],
+                    "copied_text": "Sensitive source sentence",
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any("assets top-level keys must match schema exactly" in issue.message for issue in issues))
+
+    def test_validator_rejects_record_artifact_evidence_source_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("# Safe\n", encoding="utf-8")
+            report = _coverage_report()
+            report["relationships"] = {
+                "artifact": "canonical_ir/relationships.json",
+                "available": True,
+                "status": "validated",
+                "record_count": 1,
+            }
+            _write_valid_manifest_pair(
+                run_dir,
+                converted,
+                artifacts={"relationships": "canonical_ir/relationships.json"},
+                coverage={"relationships_available": True, "report": report},
+            )
+            (run_dir / "canonical_ir" / "relationships.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_relationships.v1",
+                    "document_id": "doc_test",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "relationship_count": 1,
+                    "relationships": [{
+                        "relationship_id": "r_000001",
+                        "type": "next_sibling",
+                        "source_node_id": "n_000001",
+                        "target_node_id": "n_000002",
+                        "evidence": {
+                            "basis": "typed_node_order",
+                            "copied_text": "Sensitive source sentence",
+                        },
+                    }],
+                }),
+                encoding="utf-8",
+            )
+
+            issues = validate_canonical_ir_manifests(run_dir, converted_path=converted)
+
+        self.assertTrue(any("relationships record evidence keys must match schema exactly" in issue.message for issue in issues))
+
     def test_validator_rejects_typed_nodes_artifact_path_escape(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)

@@ -173,6 +173,69 @@ class CanonicalIrCoverageReportTests(unittest.TestCase):
         self.assertEqual(gap["missing"], [])
         self.assertEqual(gap["status"], "partial")
 
+    def test_invalid_record_artifact_does_not_promote_gap_to_partial(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            canonical_dir = run_dir / "canonical_ir"
+            canonical_dir.mkdir()
+            typed_nodes = canonical_dir / "typed_nodes.json"
+            source_spans = canonical_dir / "source_spans.json"
+            ledger = canonical_dir / "transformation_ledger.json"
+            assets = canonical_dir / "assets.json"
+            typed_nodes.write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "node_count": 0,
+                    "nodes": [],
+                }),
+                encoding="utf-8",
+            )
+            source_spans.write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_source_spans.v1",
+                    "document_id": "doc_test",
+                    "source_artifact": "converted.md",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "span_count": 0,
+                    "spans": [],
+                }),
+                encoding="utf-8",
+            )
+            ledger.write_text(json.dumps({"entries": []}), encoding="utf-8")
+            assets.write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_assets.v1",
+                    "document_id": "doc_test",
+                    "typed_nodes_artifact": "canonical_ir/typed_nodes.json",
+                    "asset_count": 1,
+                    "assets": [{
+                        "asset_id": "a_000001",
+                        "asset_type": "image",
+                        "source_node_id": "n_000001",
+                        "reference": "images/chart.png",
+                        "reference_kind": "markdown_image",
+                    }],
+                    "copied_text": "Sensitive source sentence",
+                }),
+                encoding="utf-8",
+            )
+
+            report = build_canonical_ir_coverage_report(
+                run_dir=run_dir,
+                typed_nodes_path=typed_nodes,
+                typed_nodes_available=True,
+                source_spans_path=source_spans,
+                source_spans_available=True,
+                transformation_ledger_path=ledger,
+                transformation_ledger_available=False,
+            )
+
+        self.assertFalse(report["assets"]["available"])
+        self.assertEqual(report["assets"]["record_count"], 0)
+        self.assertEqual(report["gaps"]["assets"]["status"], "target_work")
+
 
 if __name__ == "__main__":
     unittest.main()
