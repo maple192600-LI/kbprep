@@ -47,10 +47,12 @@ def youtube_video_id(value: str) -> str:
     host = parsed.netloc.lower()
     if host == "youtu.be":
         return _safe_video_id(parsed.path.strip("/").split("/", 1)[0])
-    query_id = parse_qs(parsed.query).get("v", [""])[0]
-    if query_id:
+    if host not in {"youtube.com", "www.youtube.com", "m.youtube.com"}:
+        return ""
+    if parsed.path == "/watch":
+        query_id = parse_qs(parsed.query).get("v", [""])[0]
         return _safe_video_id(query_id)
-    match = re.search(r"/(?:shorts|embed)/([^/?#]+)", parsed.path)
+    match = re.search(r"^/(?:shorts|embed)/([^/?#]+)", parsed.path)
     return _safe_video_id(match.group(1) if match else "")
 
 

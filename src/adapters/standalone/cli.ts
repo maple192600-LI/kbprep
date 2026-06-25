@@ -542,9 +542,8 @@ function videoIdFromYouTubeUrl(value: string): string | undefined {
   const host = url.hostname.toLowerCase();
   if (host === "youtu.be") return safeVideoId(url.pathname.slice(1).split("/")[0]);
   if (!["youtube.com", "www.youtube.com", "m.youtube.com"].includes(host)) return undefined;
-  const queryId = url.searchParams.get("v");
-  if (queryId) return safeVideoId(queryId);
-  const match = url.pathname.match(/\/(?:shorts|embed)\/([^/?#]+)/);
+  if (url.pathname === "/watch") return safeVideoId(url.searchParams.get("v") ?? undefined);
+  const match = url.pathname.match(/^\/(?:shorts|embed)\/([^/?#]+)/);
   return match ? safeVideoId(match[1]) : undefined;
 }
 

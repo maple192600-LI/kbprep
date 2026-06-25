@@ -371,12 +371,13 @@ dependency setup, fixtures, quality gates, and status promotion are complete.
 Current truth:
 
 - `media_local_transcript` has local detection and an external transcript route,
-  but capability status is still experimental at the route level because real
-  ASR fixtures and timing-quality evidence are missing.
+  but capability status is still partial because real ASR fixtures and
+  timing-quality evidence are missing.
 - `youtube_url_routes` is partial. Standalone CLI direct URL / explicit video id input,
-  descriptor routing, subtitle extraction, explicit media fallback, and mocked
-  failure fixtures exist; verified promotion still needs broader real-network
-  and transcript-quality evidence.
+  descriptor routing, accepted public URL-shape evidence, subtitle extraction,
+  explicit media fallback, and mocked failure fixtures exist; verified promotion
+  still needs broader real-network, timeout, dependency-variance, fallback, and
+  transcript-quality evidence.
 - Image OCR and legacy Office routes are also experimental and need real
   fixtures before promotion.
 
@@ -386,12 +387,9 @@ Required slices:
   timing evidence, dependency failure tests, and final-output quality checks.
 - Promote local media only after those fixtures pass and the capability matrix
   changes from experimental toward partial or verified.
-- Define the YouTube URL technical contract, including accepted URL shapes,
-  network timeout, dependency detection, artifact evidence, and no-subtitle
-  fallback behavior.
-- Implement the subtitle-first YouTube route in the same development stream as
-  that technical contract, then add media-transcript fallback only when
-  dependencies are present and the CLI option enables it.
+- Add YouTube timeout, dependency-variance, cache/artifact, and no-subtitle
+  fallback evidence against the existing partial URL contract and subtitle-first
+  route.
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlists,
   and final source-side publication.
 

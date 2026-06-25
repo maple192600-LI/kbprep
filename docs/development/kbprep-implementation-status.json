@@ -215,13 +215,14 @@
       "id": "youtube_url_routes",
       "label": "YouTube URL route",
       "status": "partial",
-      "scope": "Direct YouTube URLs, explicit video ids, and local .url descriptors can route through subtitle-first extraction. Media fallback is explicit and only runs when allow_youtube_media_fallback is true. Tests use mocked yt-dlp, ffmpeg, and Whisper behavior; verified promotion still needs broader real-network, dependency, timeout, and transcript-quality evidence.",
+      "scope": "Direct YouTube URLs, explicit video ids, and local .url descriptors can route through subtitle-first extraction. Accepted URL-shape evidence covers watch, mobile watch, youtu.be, shorts, and embed URLs. Media fallback is explicit and only runs when allow_youtube_media_fallback is true. Tests use mocked yt-dlp, ffmpeg, and Whisper behavior plus URL-shape contract tests; verified promotion still needs broader real-network, dependency, timeout, and transcript-quality evidence.",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
         "docs/capability-matrix.md",
         "python/kbprep_worker/converters/external_tools.py",
         "python/kbprep_worker/stages/external_conversion.py",
         "python/tests/test_media_youtube_routes.py",
+        "src/adapters/standalone/cli.test.ts",
         "src/test/scenarios/worker-core-runtime-part2.test.ts",
         "python/tests/golden/formats/manifest.json"
       ],
