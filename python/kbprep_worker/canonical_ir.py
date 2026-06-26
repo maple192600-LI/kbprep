@@ -179,12 +179,13 @@ def _write_canonical_artifacts(
     document_id = _document_id(file_hash, input_path)
     converter = canonical_converter(conversion_report, route_decision)
     conversion_route = canonical_conversion_route(conversion_report, route_decision)
+    native_source_spans = _native_source_spans_from_report(conversion_report)
     typed_path, typed_available = _write_validated_typed_nodes(
         run_dir, document_id, input_path, converted_path, source_type, conversion_route,
     )
     spans_path, spans_available = _write_validated_source_spans(
         run_dir, document_id, input_path, converted_path, typed_path, source_type,
-        converter, conversion_route,
+        converter, conversion_route, native_source_spans,
     )
     conversion = _conversion_snapshot(conversion_report, route_decision)
     ledger_path, ledger_available = _write_validated_transformation_ledger(
@@ -247,6 +248,7 @@ def _write_validated_source_spans(
     source_type: str,
     converter: str,
     conversion_route: str,
+    native_source_spans: list[dict[str, Any]] | None,
 ) -> tuple[Path, bool]:
     source_spans_path = write_source_spans_artifact(
         run_dir=run_dir,
@@ -257,6 +259,7 @@ def _write_validated_source_spans(
         source_type=source_type,
         converter=converter,
         conversion_route=conversion_route,
+        native_source_spans=native_source_spans,
     )
     source_spans_available = _source_spans_artifact_is_valid(
         run_dir=run_dir,
@@ -266,6 +269,15 @@ def _write_validated_source_spans(
         converted_path=converted_path,
     )
     return source_spans_path, source_spans_available
+
+
+def _native_source_spans_from_report(conversion_report: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Extract converter-native source span evidence recorded by the converter."""
+    artifacts = conversion_report.get("mineru_artifacts")
+    if not isinstance(artifacts, dict):
+        return None
+    native = artifacts.get("native_source_spans")
+    return native if isinstance(native, list) else None
 
 
 def _write_validated_transformation_ledger(

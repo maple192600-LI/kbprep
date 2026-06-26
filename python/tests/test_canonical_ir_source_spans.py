@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from kbprep_worker.canonical_ir import write_canonical_ir_manifests
 from kbprep_worker.canonical_nodes import write_typed_nodes_artifact
 from kbprep_worker.canonical_spans import (
     CANONICAL_IR_SOURCE_SPANS_SCHEMA,
@@ -822,6 +823,206 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
         self.assertEqual(payload["spans"][0]["source_kind"], "pdf")
         self.assertEqual(payload["spans"][0]["evidence"]["precision"], "converted_line_range")
         self.assertNotIn("bbox", payload["spans"][0]["location"])
+
+    def test_writer_emits_pptx_shape_precision_from_native_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "deck.pptx"
+            converted = run_dir / "converted.md"
+            converted.write_text("# Slide 1: Title\n\nBody paragraph\n", encoding="utf-8")
+            source.write_bytes(b"PK fake pptx placeholder")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="office_xml",
+                input_path=source,
+            )
+
+            artifact = write_source_spans_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                input_path=source,
+                converted_path=converted,
+                typed_nodes_path=typed_nodes,
+                source_type="office_xml",
+                converter="office_xml",
+                conversion_route="office_xml",
+                native_source_spans=[
+                    {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "precision": "pptx_shape",
+                        "location": {"slide": 1, "shape_id": "title-1"},
+                    },
+                    {
+                        "converted_line_start": 3,
+                        "converted_line_end": 3,
+                        "precision": "pptx_shape",
+                        "location": {"slide": 1, "shape_id": "body-2"},
+                    },
+                ],
+            )
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=artifact,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        self.assertEqual(payload["spans"][0]["source_kind"], "pptx")
+        self.assertEqual(payload["spans"][0]["evidence"]["precision"], "pptx_shape")
+        self.assertEqual(payload["spans"][0]["location"]["slide"], 1)
+        self.assertEqual(payload["spans"][0]["location"]["shape_id"], "title-1")
+        self.assertEqual(payload["spans"][1]["evidence"]["precision"], "pptx_shape")
+        self.assertEqual(payload["spans"][1]["location"]["slide"], 1)
+        self.assertEqual(payload["spans"][1]["location"]["shape_id"], "body-2")
+        self.assertEqual(issues, [])
+
+    def test_canonical_ir_manifest_threads_native_source_spans_to_writer(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "deck.pptx"
+            converted = run_dir / "converted.md"
+            converted.write_text("# Slide 1: Title\n\nBody paragraph\n", encoding="utf-8")
+            source.write_bytes(b"PK fake pptx placeholder")
+            (run_dir / "conversion_report.json").write_text(json.dumps({
+                "converter": "office_xml",
+                "converted_md": str(converted),
+                "converted_bytes": converted.stat().st_size,
+                "mineru_artifacts": {
+                    "native_source_spans": [
+                        {
+                            "converted_line_start": 1,
+                            "converted_line_end": 1,
+                            "precision": "pptx_shape",
+                            "location": {"slide": 1, "shape_id": "title-1"},
+                        },
+                        {
+                            "converted_line_start": 3,
+                            "converted_line_end": 3,
+                            "precision": "pptx_shape",
+                            "location": {"slide": 1, "shape_id": "body-2"},
+                        },
+                    ],
+                },
+            }), encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="office_xml",
+                file_hash="abc123def456",
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            spans_path = run_dir / "canonical_ir" / "source_spans.json"
+            typed_path = run_dir / "canonical_ir" / "typed_nodes.json"
+            payload = json.loads(spans_path.read_text(encoding="utf-8"))
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=spans_path,
+                typed_nodes_path=typed_path,
+                document_id="doc_abc123def456",
+                converted_path=converted,
+            )
+
+        self.assertEqual(payload["spans"][0]["evidence"]["precision"], "pptx_shape")
+        self.assertEqual(payload["spans"][0]["location"]["shape_id"], "title-1")
+        self.assertEqual(payload["spans"][1]["evidence"]["precision"], "pptx_shape")
+        self.assertEqual(payload["spans"][1]["location"]["shape_id"], "body-2")
+        self.assertEqual(issues, [])
+
+    def test_writer_ignores_native_evidence_when_precision_mismatches_source_kind(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "doc.pdf"
+            converted = run_dir / "converted.md"
+            converted.write_text("# Title\n\nBody paragraph\n", encoding="utf-8")
+            source.write_bytes(b"%PDF placeholder")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="pdf_like",
+                input_path=source,
+            )
+
+            artifact = write_source_spans_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                input_path=source,
+                converted_path=converted,
+                typed_nodes_path=typed_nodes,
+                source_type="pdf_like",
+                converter="pdf_text_layer",
+                conversion_route="pdf_text_layer",
+                native_source_spans=[
+                    {
+                        "converted_line_start": 1,
+                        "converted_line_end": 1,
+                        "precision": "pptx_shape",
+                        "location": {"slide": 1, "shape_id": "wrong-route"},
+                    },
+                ],
+            )
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=artifact,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        self.assertEqual(payload["spans"][0]["source_kind"], "pdf")
+        self.assertEqual(payload["spans"][0]["evidence"]["precision"], "converted_line_range")
+        self.assertNotIn("shape_id", payload["spans"][0]["location"])
+        self.assertEqual(issues, [])
+
+    def test_writer_keeps_converted_line_range_when_native_evidence_does_not_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "deck.pptx"
+            converted = run_dir / "converted.md"
+            converted.write_text("# Slide 1: Title\n", encoding="utf-8")
+            source.write_bytes(b"PK placeholder")
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="office_xml",
+                input_path=source,
+            )
+
+            artifact = write_source_spans_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                input_path=source,
+                converted_path=converted,
+                typed_nodes_path=typed_nodes,
+                source_type="office_xml",
+                converter="office_xml",
+                conversion_route="office_xml",
+                native_source_spans=[
+                    {
+                        "converted_line_start": 99,
+                        "converted_line_end": 99,
+                        "precision": "pptx_shape",
+                        "location": {"slide": 1, "shape_id": "no-overlap"},
+                    },
+                ],
+            )
+
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["spans"][0]["evidence"]["precision"], "converted_line_range")
+        self.assertNotIn("shape_id", payload["spans"][0]["location"])
 
 
 if __name__ == "__main__":

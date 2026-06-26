@@ -85,6 +85,12 @@ SUPPORTED_SOURCE_KINDS = frozenset({
     "unknown",
 })
 _XLSX_CELL_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
+_NATIVE_PRECISION_SOURCE_KIND: dict[str, str] = {
+    "pdf_bbox": "pdf",
+    "docx_run_range": "docx",
+    "pptx_shape": "pptx",
+    "xlsx_cell_range": "xlsx",
+}
 
 
 @dataclass(frozen=True)
@@ -104,6 +110,7 @@ def write_source_spans_artifact(
     source_type: str,
     converter: str,
     conversion_route: str,
+    native_source_spans: list[dict[str, object]] | None = None,
 ) -> Path:
     """Write ``canonical_ir/source_spans.json`` for the converted Markdown."""
     artifact_path = run_dir / "canonical_ir" / "source_spans.json"
@@ -116,7 +123,10 @@ def write_source_spans_artifact(
         transcript_cue_texts=[cue.text for cue in transcript_cues],
     )
     spans = [
-        _span_dict(index, node, input_path, source_type, converter, conversion_route, transcript_cues)
+        _span_dict(
+            index, node, input_path, source_type, converter, conversion_route,
+            transcript_cues, native_source_spans,
+        )
         for index, node in enumerate(nodes, start=1)
     ]
     payload = {
@@ -217,15 +227,23 @@ def _span_dict(
     converter: str,
     conversion_route: str,
     transcript_cues: list[TranscriptCue],
+    native_source_spans: list[dict[str, object]] | None,
 ) -> dict[str, object]:
     source_kind = _span_source_kind(node.node_type, input_path, source_type, converter, conversion_route)
-    location = _span_location(node, source_kind, input_path, converter, conversion_route, transcript_cues)
+    native_evidence = _match_native_evidence(node, native_source_spans)
+    native_precision = _native_evidence_precision(native_evidence, source_kind)
+    location = _span_location(
+        node, source_kind, input_path, converter, conversion_route, transcript_cues,
+        native_evidence, native_precision,
+    )
     return {
         "span_id": f"s_{index:06d}",
         "node_id": node.node_id,
         "source_kind": source_kind,
         "location": location,
-        "evidence": _span_evidence(source_type, converter, conversion_route, location, source_kind),
+        "evidence": _span_evidence(
+            source_type, converter, conversion_route, location, source_kind, native_precision,
+        ),
     }
 
 
@@ -273,6 +291,8 @@ def _span_location(
     converter: str,
     conversion_route: str,
     transcript_cues: list[TranscriptCue],
+    native_evidence: dict[str, object] | None,
+    native_precision: str | None,
 ) -> dict[str, object]:
     location: dict[str, object] = {
         "converted_line_start": node.line_start,
@@ -283,7 +303,55 @@ def _span_location(
         location["source_line_end"] = node.line_end
     if source_kind == "transcript":
         _add_transcript_location(location, node, transcript_cues)
+    if native_precision is not None:
+        _add_native_location(location, native_evidence)
     return location
+
+
+def _match_native_evidence(
+    node: Any,
+    native_source_spans: list[dict[str, object]] | None,
+) -> dict[str, object] | None:
+    """Return the first native evidence whose converted line range overlaps the typed node."""
+    if not native_source_spans:
+        return None
+    for evidence in native_source_spans:
+        if not isinstance(evidence, dict):
+            continue
+        start = evidence.get("converted_line_start")
+        end = evidence.get("converted_line_end")
+        if not isinstance(start, int) or isinstance(start, bool):
+            continue
+        if not isinstance(end, int) or isinstance(end, bool):
+            continue
+        if start > 0 and end > 0 and start <= node.line_end and end >= node.line_start:
+            return evidence
+    return None
+
+
+def _native_evidence_precision(evidence: dict[str, object] | None, source_kind: str) -> str | None:
+    """Return the native precision only when it is compatible with the span source_kind."""
+    if not isinstance(evidence, dict):
+        return None
+    precision = evidence.get("precision")
+    if not isinstance(precision, str):
+        return None
+    return precision if _native_precision_matches_source_kind(precision, source_kind) else None
+
+
+def _native_precision_matches_source_kind(precision: str, source_kind: str) -> bool:
+    return _NATIVE_PRECISION_SOURCE_KIND.get(precision) == source_kind
+
+
+def _add_native_location(location: dict[str, object], native_evidence: dict[str, object] | None) -> None:
+    """Merge converter-native coordinate fields into the span location."""
+    if not isinstance(native_evidence, dict):
+        return
+    native_location = native_evidence.get("location")
+    if not isinstance(native_location, dict):
+        return
+    for key, value in native_location.items():
+        location[key] = value
 
 
 def _add_transcript_location(location: dict[str, object], node: Any, transcript_cues: list[TranscriptCue]) -> None:
@@ -306,12 +374,16 @@ def _span_evidence(
     conversion_route: str,
     location: dict[str, object],
     source_kind: str,
+    native_precision: str | None = None,
 ) -> dict[str, object]:
-    precision = "converted_line_range"
-    if source_kind == "transcript" and "start_time" in location:
+    if native_precision is not None:
+        precision = native_precision
+    elif source_kind == "transcript" and "start_time" in location:
         precision = "transcript_cue_timing"
     elif "source_line_start" in location:
         precision = "source_line_range"
+    else:
+        precision = "converted_line_range"
     return {
         "source_type": source_type,
         "converter": converter,
