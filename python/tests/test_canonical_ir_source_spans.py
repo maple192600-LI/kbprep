@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from kbprep_worker.canonical_ir import write_canonical_ir_manifests
@@ -10,6 +11,7 @@ from kbprep_worker.canonical_spans import (
     validate_source_spans_artifact,
     write_source_spans_artifact,
 )
+from kbprep_worker.converters.office_xml import office_xml_to_markdown
 
 
 class CanonicalIrSourceSpanTests(unittest.TestCase):
@@ -1023,6 +1025,59 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
 
         self.assertEqual(payload["spans"][0]["evidence"]["precision"], "converted_line_range")
         self.assertNotIn("shape_id", payload["spans"][0]["location"])
+
+    def test_pptx_converter_native_spans_align_with_typed_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "deck.pptx"
+            with zipfile.ZipFile(source, "w") as zf:
+                zf.writestr("ppt/slides/slide1.xml", (
+                    "<p:sld xmlns:p='p' xmlns:a='a' xmlns:r='r'>"
+                    "<p:cSld><p:spTree>"
+                    "<p:sp><p:nvSpPr><p:cNvPr id='2' name='Title'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>"
+                    "<p:spPr/><p:txBody><a:p><a:r><a:t>Slide Title</a:t></a:r></a:p></p:txBody></p:sp>"
+                    "<p:sp><p:nvSpPr><p:cNvPr id='3' name='Body'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>"
+                    "<p:spPr/><p:txBody><a:p><a:r><a:t>Body content</a:t></a:r></a:p></p:txBody></p:sp>"
+                    "</p:spTree></p:cSld></p:sld>"
+                ))
+            markdown, _office_warnings, office_artifacts = office_xml_to_markdown(source, run_dir)
+            native = office_artifacts["native_source_spans"]
+
+            converted = run_dir / "converted.md"
+            converted.write_text(markdown, encoding="utf-8")
+            (run_dir / "conversion_report.json").write_text(json.dumps({
+                "converter": "office_xml",
+                "converted_md": str(converted),
+                "converted_bytes": converted.stat().st_size,
+                "mineru_artifacts": {"native_source_spans": native},
+            }), encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="office_xml",
+                file_hash="pptxhash1234567",
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            spans_path = run_dir / "canonical_ir" / "source_spans.json"
+            typed_path = run_dir / "canonical_ir" / "typed_nodes.json"
+            spans_payload = json.loads(spans_path.read_text(encoding="utf-8"))
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=spans_path,
+                typed_nodes_path=typed_path,
+                document_id="doc_pptxhash1234567",
+                converted_path=converted,
+            )
+
+        precisions = [span["evidence"]["precision"] for span in spans_payload["spans"]]
+        shape_ids = [span["location"].get("shape_id") for span in spans_payload["spans"]]
+        self.assertEqual(precisions.count("pptx_shape"), 2)
+        self.assertIn("2", shape_ids)
+        self.assertIn("3", shape_ids)
+        self.assertEqual(issues, [])
 
 
 if __name__ == "__main__":

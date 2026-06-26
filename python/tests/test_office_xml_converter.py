@@ -61,6 +61,60 @@ class OfficeXmlConverterTests(unittest.TestCase):
         self.assertIn('"page_idx": 0', content)
         self.assertIn('"page_idx": 1', content)
 
+    def test_pptx_native_source_spans_record_shape_id_and_line_range(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "deck.pptx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("ppt/slides/slide1.xml", (
+                    "<p:sld xmlns:p='p' xmlns:a='a' xmlns:r='r'>"
+                    "<p:cSld><p:spTree>"
+                    "<p:sp>"
+                    "<p:nvSpPr><p:cNvPr id='2' name='Title 1'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>"
+                    "<p:spPr/>"
+                    "<p:txBody><a:p><a:r><a:t>Slide Title</a:t></a:r></a:p></p:txBody>"
+                    "</p:sp>"
+                    "<p:sp>"
+                    "<p:nvSpPr><p:cNvPr id='3' name='Content 2'/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>"
+                    "<p:spPr/>"
+                    "<p:txBody><a:p><a:r><a:t>Body content</a:t></a:r></a:p></p:txBody>"
+                    "</p:sp>"
+                    "</p:spTree></p:cSld>"
+                    "</p:sld>"
+                ))
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("# Slide 1: Slide Title", markdown)
+        self.assertIn("Body content", markdown)
+        self.assertEqual(len(native), 2)
+        self.assertEqual([entry["precision"] for entry in native], ["pptx_shape", "pptx_shape"])
+        self.assertEqual(native[0]["location"]["slide"], 1)
+        self.assertEqual(native[0]["location"]["shape_id"], "2")
+        self.assertEqual(native[0]["converted_line_start"], 1)
+        self.assertEqual(native[0]["converted_line_end"], 1)
+        self.assertEqual(native[1]["location"]["shape_id"], "3")
+        self.assertEqual(native[1]["converted_line_start"], 3)
+        self.assertEqual(native[1]["converted_line_end"], 3)
+
+    def test_pptx_without_shape_wrappers_falls_back_to_paragraph_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "flat.pptx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("ppt/slides/slide1.xml", (
+                    "<p:sld xmlns:p='p' xmlns:a='a' xmlns:r='r'>"
+                    "<a:p><a:r><a:t>Flat Title</a:t></a:r></a:p>"
+                    "<a:p><a:r><a:t>Flat Body</a:t></a:r></a:p>"
+                    "</p:sld>"
+                ))
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("# Slide 1: Flat Title", markdown)
+        self.assertIn("Flat Body", markdown)
+        self.assertEqual(native, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,12 +26,13 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
     ext = input_p.suffix.lower()
     warnings: list[str] = []
     artifacts: dict = {"office_image_assets": {"copied_count": 0, "copied": []}}
+    native_source_spans: list[dict] = []
     try:
         with open_safe_zip(input_p) as zf:
             if ext == ".docx":
                 markdown, image_artifacts = docx_to_markdown(zf, run_dir)
             elif ext == ".pptx":
-                markdown, image_artifacts = pptx_to_markdown(zf, run_dir)
+                markdown, image_artifacts, native_source_spans = pptx_to_markdown(zf, run_dir)
             elif ext == ".xlsx":
                 markdown = xlsx_to_markdown(zf)
                 image_artifacts = []
@@ -68,6 +69,8 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
         )
 
     warnings.append("W_OFFICE_XML_CONVERTER_USED: extracted text directly from Office XML; complex layout fidelity may be limited.")
+    if native_source_spans:
+        artifacts["native_source_spans"] = native_source_spans
     return markdown.strip() + "\n", warnings, artifacts
 
 
@@ -104,7 +107,7 @@ def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
     return "\n\n".join(lines), image_artifacts
 
 
-def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
+def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], list[dict]]:
     import xml.etree.ElementTree as ET
 
     def slide_index(name: str) -> int:
@@ -115,11 +118,12 @@ def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
         (name for name in zf.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)),
         key=slide_index,
     )
-    sections: list[str] = []
+    builder = _MarkdownLineBuilder()
+    native_source_spans: list[dict] = []
     image_artifacts: list[str] = []
     for idx, name in enumerate(slide_names, start=1):
         root = ET.fromstring(zf.read_bytes(name))
-        paragraphs = drawing_paragraphs(root)
+        shape_texts = _pptx_slide_text(root)
         image_lines, slide_artifacts = extract_office_images(
             zf=zf,
             part_name=name,
@@ -129,21 +133,107 @@ def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
             alt_prefix=f"Slide {idx} Image",
         )
         image_artifacts.extend(slide_artifacts)
-        if paragraphs or image_lines:
-            title = paragraphs[0] if paragraphs else ""
-            body = paragraphs[1:] if paragraphs else []
-            section_lines = [f"# Slide {idx}: {title}"] if title else [f"# Slide {idx}"]
-            section_lines.extend(body)
-            section_lines.extend(image_lines)
-            sections.append("\n\n".join(section_lines))
+        if shape_texts or image_lines:
+            _append_pptx_slide_section(builder, native_source_spans, idx, shape_texts, image_lines)
 
         notes_name = f"ppt/notesSlides/notesSlide{idx}.xml"
         if notes_name in zf.namelist():
             notes_root = ET.fromstring(zf.read_bytes(notes_name))
             notes = drawing_paragraphs(notes_root)
             if notes:
-                sections.append("\n\n".join([f"## Slide {idx} Notes", *notes]))
-    return "\n\n".join(sections), image_artifacts
+                _append_pptx_notes_section(builder, idx, notes)
+    return builder.build(), image_artifacts, native_source_spans
+
+
+class _MarkdownLineBuilder:
+    """Build Markdown by joining blocks with blank lines while tracking line numbers."""
+
+    def __init__(self) -> None:
+        self._parts: list[str] = []
+        self._line_count = 0
+
+    def append_block(self, text: str) -> tuple[int, int]:
+        """Append a block and return its (start_line, end_line) in the rendered Markdown."""
+        if not text:
+            return (0, 0)
+        block_lines = text.count("\n") + 1
+        start_line = self._line_count + 2 if self._parts else 1
+        self._parts.append(text)
+        self._line_count = start_line + block_lines - 1
+        return (start_line, self._line_count)
+
+    def build(self) -> str:
+        return "\n\n".join(self._parts)
+
+
+def _pptx_slide_text(root: _Element) -> list[tuple[str | None, str]]:
+    """Flatten slide text into (shape_id, paragraph_text) pairs in document order."""
+    shapes = drawing_shapes(root)
+    if shapes:
+        return [(shape_id, text) for shape_id, texts in shapes for text in texts]
+    return [(None, text) for text in drawing_paragraphs(root)]
+
+
+def drawing_shapes(root: _Element) -> list[tuple[str, list[str]]]:
+    """Return (shape_id, paragraph_texts) for each shape that carries text."""
+    shapes: list[tuple[str, list[str]]] = []
+    for sp in iter_by_local_name(root, "sp"):
+        shape_id = _shape_identifier(sp)
+        paragraphs: list[str] = []
+        for paragraph in iter_by_local_name(sp, "p"):
+            text = xml_text(paragraph)
+            if text and text not in paragraphs:
+                paragraphs.append(text)
+        if paragraphs:
+            shapes.append((shape_id, paragraphs))
+    return shapes
+
+
+def _shape_identifier(sp: _Element) -> str:
+    """Return the cNvPr id of a shape, falling back to its name."""
+    for nv_sp_pr in iter_by_local_name(sp, "nvSpPr"):
+        for cnv_pr in iter_by_local_name(nv_sp_pr, "cNvPr"):
+            identifier = xml_attr_by_local_name(cnv_pr, "id")
+            if identifier:
+                return identifier
+            name = xml_attr_by_local_name(cnv_pr, "name")
+            if name:
+                return name
+    return ""
+
+
+def _append_pptx_slide_section(
+    builder: _MarkdownLineBuilder,
+    native_source_spans: list[dict],
+    slide_idx: int,
+    shape_texts: list[tuple[str | None, str]],
+    image_lines: list[str],
+) -> None:
+    title_text = shape_texts[0][1] if shape_texts else ""
+    if title_text:
+        heading = f"# Slide {slide_idx}: {title_text}"
+        title_shape_id = shape_texts[0][0]
+        body = shape_texts[1:]
+    else:
+        heading = f"# Slide {slide_idx}"
+        title_shape_id = None
+        body = shape_texts
+    for shape_id, text in [(title_shape_id, heading), *body]:
+        start_line, end_line = builder.append_block(text)
+        if shape_id:
+            native_source_spans.append({
+                "converted_line_start": start_line,
+                "converted_line_end": end_line,
+                "precision": "pptx_shape",
+                "location": {"slide": slide_idx, "shape_id": shape_id},
+            })
+    for image_line in image_lines:
+        builder.append_block(image_line)
+
+
+def _append_pptx_notes_section(builder: _MarkdownLineBuilder, slide_idx: int, notes: list[str]) -> None:
+    for text in [f"## Slide {slide_idx} Notes", *notes]:
+        builder.append_block(text)
 
 
 def extract_office_images(
