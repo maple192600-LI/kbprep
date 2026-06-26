@@ -15,7 +15,7 @@ from ..supported_formats import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, LEGACY_OFFIC
 from ..youtube_source import is_youtube_url, safe_youtube_stem
 
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 900
-# Whisper/Qwen3-ASR 双链路 ASR + 路由见 converters.asr（从本模块拆出避免文件超 800 行）。
+# 媒体转写（whisper + 中文 ASR + 语言路由）见 converters.asr（从本模块拆出避免文件超 800 行）。
 IMAGE_SOURCE_EXTENSIONS = frozenset(IMAGE_EXTENSIONS)
 LEGACY_OFFICE_SOURCE_EXTENSIONS = frozenset(LEGACY_OFFICE_EXTENSIONS)
 MEDIA_SOURCE_EXTENSIONS = frozenset(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS)
