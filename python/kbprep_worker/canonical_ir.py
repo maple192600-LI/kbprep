@@ -179,7 +179,9 @@ def _write_canonical_artifacts(
     document_id = _document_id(file_hash, input_path)
     converter = canonical_converter(conversion_report, route_decision)
     conversion_route = canonical_conversion_route(conversion_report, route_decision)
-    native_source_spans = _native_source_spans_from_report(conversion_report)
+    mineru_artifacts = dict_or_empty(conversion_report.get("mineru_artifacts"))
+    native_raw = mineru_artifacts.get("native_source_spans")
+    native_source_spans = native_raw if isinstance(native_raw, list) else None
     typed_path, typed_available = _write_validated_typed_nodes(
         run_dir, document_id, input_path, converted_path, source_type, conversion_route,
     )
@@ -269,15 +271,6 @@ def _write_validated_source_spans(
         converted_path=converted_path,
     )
     return source_spans_path, source_spans_available
-
-
-def _native_source_spans_from_report(conversion_report: dict[str, Any]) -> list[dict[str, Any]] | None:
-    """Extract converter-native source span evidence recorded by the converter."""
-    artifacts = conversion_report.get("mineru_artifacts")
-    if not isinstance(artifacts, dict):
-        return None
-    native = artifacts.get("native_source_spans")
-    return native if isinstance(native, list) else None
 
 
 def _write_validated_transformation_ledger(

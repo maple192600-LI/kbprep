@@ -69,8 +69,7 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
         )
 
     warnings.append("W_OFFICE_XML_CONVERTER_USED: extracted text directly from Office XML; complex layout fidelity may be limited.")
-    if native_source_spans:
-        artifacts["native_source_spans"] = native_source_spans
+    artifacts["native_source_spans"] = native_source_spans
     return markdown.strip() + "\n", warnings, artifacts
 
 
