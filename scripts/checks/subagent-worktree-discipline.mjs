@@ -24,12 +24,18 @@ const MAX_BEHIND = 5;
 const failures = [];
 
 // §1 — every registered worktree except the main worktree must be under .worktrees/.
-for (const line of lines(git(["worktree", "list"]))) {
+// Judge by absolute path (git worktree list prints absolute paths) and treat the
+// first listed worktree as the main worktree, so the verdict is identical whether
+// this script runs from the main repo or from inside a slice worktree. A
+// cwd-relative check wrongly flags the main worktree when run from a slice worktree.
+const worktreeLines = lines(git(["worktree", "list"]));
+const mainWorktreePath = worktreeLines.length ? (worktreeLines[0].match(/^(\S+)/) || [])[1] : null;
+for (const line of worktreeLines) {
   const wtPath = (line.match(/^(\S+)/) || [])[1];
   if (!wtPath) continue;
-  const rel = path.relative(repoRoot, wtPath);
-  const isMain = rel === "" || rel === ".";
-  const underWorktrees = rel === ".worktrees" || rel.startsWith(".worktrees" + path.sep) || rel.startsWith(".worktrees/");
+  const isMain = Boolean(mainWorktreePath) && wtPath === mainWorktreePath;
+  const normalized = wtPath.replace(/\\/g, "/") + "/";
+  const underWorktrees = normalized.includes("/.worktrees/");
   if (!isMain && !underWorktrees) {
     failures.push({
       check: "worktree-location",
