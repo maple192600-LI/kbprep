@@ -8,11 +8,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kbprep_worker.converter_capabilities import get_capability_for_extension
+from kbprep_worker.converters.asr import transcribe_media_with_whisper
 from kbprep_worker.converters.external_tools import (
     ExternalCommandResult,
     ExternalConversionResult,
     extract_youtube_transcript,
-    transcribe_media_with_whisper,
 )
 from kbprep_worker.envelope import EnvelopeExit
 from kbprep_worker.stages import external_conversion
@@ -103,7 +103,7 @@ class TestMediaYoutubeRoute(unittest.TestCase):
 
             self.assertTrue(result.ok)
             self.assertEqual(result.report["route_decision"]["external_route"], "media_to_transcript")
-            self.assertEqual(result.report["whisper_model"], "base")
+            self.assertEqual(result.report["whisper_model"], "large-v3")
             self.assertEqual(result.artifact_path.read_text(encoding="utf-8").strip(), "Step 1: keep threshold=0.8.")
             self.assertEqual(get_capability_for_extension(".mp4")["status"], "partial")
 

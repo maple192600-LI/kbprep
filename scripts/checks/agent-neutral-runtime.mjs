@@ -8,7 +8,14 @@ const roots = ["src", "python/kbprep_worker", "scripts", ".github/workflows"];
 
 const explicitFiles = ["package.json"];
 
-const allowlistedFiles = new Set(["scripts/checks/agent-neutral-runtime.mjs", "scripts/checks/guidance-drift.mjs"]);
+// These governance scripts exist *because* a specific named agent (codex) runs
+// unsupervised slice work; checking the `codex/*` branch prefix is their job,
+// not product vendor lock-in. Mirror the precedent set by the two checks above.
+const allowlistedFiles = new Set([
+  "scripts/checks/agent-neutral-runtime.mjs",
+  "scripts/checks/guidance-drift.mjs",
+  "scripts/checks/subagent-worktree-discipline.mjs",
+]);
 const namedAgentTerms = ["claude", "codex", "openclaw", "hermes"];
 
 function collectFiles(relativeRoot) {

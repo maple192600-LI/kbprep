@@ -15,8 +15,7 @@ from ..supported_formats import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, LEGACY_OFFIC
 from ..youtube_source import is_youtube_url, safe_youtube_stem
 
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 900
-DEFAULT_WHISPER_MODEL = "base"
-
+# 媒体转写（whisper + 中文 ASR + 语言路由）见 converters.asr（从本模块拆出避免文件超 800 行）。
 IMAGE_SOURCE_EXTENSIONS = frozenset(IMAGE_EXTENSIONS)
 LEGACY_OFFICE_SOURCE_EXTENSIONS = frozenset(LEGACY_OFFICE_EXTENSIONS)
 MEDIA_SOURCE_EXTENSIONS = frozenset(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS)
@@ -98,38 +97,6 @@ def convert_legacy_office_to_pdf(
     command = _libreoffice_command(executable, source, artifact.parent)
     sanitized = _sanitize_command(command, source, artifact)
     return _command_pdf_result(source, command, sanitized, artifact, runner or _default_runner, timeout_seconds)
-
-
-def transcribe_media_with_whisper(
-    source_path: Path,
-    run_dir: Path,
-    env: Mapping[str, str] | None = None,
-    which: ToolLocator = shutil.which,
-    runner: CommandRunner | None = None,
-    timeout_seconds: int = DEFAULT_COMMAND_TIMEOUT_SECONDS,
-) -> ExternalConversionResult:
-    source = Path(source_path)
-    if source.suffix.lower() not in MEDIA_SOURCE_EXTENSIONS:
-        return _unsupported_media_result(source, run_dir)
-    ffmpeg = which("ffmpeg")
-    whisper = which("whisper")
-    audio_path = _artifact_path(run_dir, "media_audio", source, ".wav")
-    transcript_path = _artifact_path(run_dir, "media_transcript", source, ".txt")
-    model = _whisper_model(env)
-    commands = _media_commands(ffmpeg or "ffmpeg", whisper or "whisper", source, audio_path, transcript_path.parent, model)
-    sanitized = [_sanitize_command(command, source, audio_path, transcript_path) for command in commands]
-    extra = {"whisper_model": model}
-    if not ffmpeg:
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _missing_dependency("ffmpeg"), extra
-        )
-    if not whisper:
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _missing_dependency("whisper"), extra
-        )
-    return _run_media_commands(
-        source, commands, sanitized, audio_path, transcript_path, runner or _default_runner, timeout_seconds, model
-    )
 
 
 def extract_youtube_transcript(
@@ -257,6 +224,8 @@ def _youtube_media_fallback(
     if result.returncode != 0 or not media.is_file():
         failure = _command_failure(result) if result.returncode != 0 else _missing_output_failure(media)
         return _youtube_failure(source_url, "youtube_media_transcript", failure, [sanitized])
+    from .asr import transcribe_media_with_whisper
+
     media_result = transcribe_media_with_whisper(media, run_dir, env, which, runner, timeout_seconds)
     return _youtube_fallback_result(source_url, media_result, sanitized, subtitle_report)
 
@@ -342,40 +311,6 @@ def _command_pdf_result(
     return _success_result(source, "legacy_office_to_pdf", "pdf_route", [sanitized], artifact)
 
 
-def _run_media_commands(
-    source: Path,
-    commands: tuple[tuple[str, ...], tuple[str, ...]],
-    sanitized: list[list[str]],
-    audio_path: Path,
-    transcript_path: Path,
-    runner: CommandRunner,
-    timeout_seconds: int,
-    model: str,
-) -> ExternalConversionResult:
-    extra = {"whisper_model": model}
-    audio_path.parent.mkdir(parents=True, exist_ok=True)
-    transcript_path.parent.mkdir(parents=True, exist_ok=True)
-    ffmpeg_result = _safe_run(commands[0], audio_path.parent, runner, timeout_seconds)
-    if ffmpeg_result.returncode != 0:
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _command_failure(ffmpeg_result), extra
-        )
-    whisper_result = _safe_run(commands[1], transcript_path.parent, runner, timeout_seconds)
-    if whisper_result.returncode != 0:
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _command_failure(whisper_result), extra
-        )
-    if not transcript_path.is_file():
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _missing_output_failure(transcript_path), extra
-        )
-    if not transcript_path.read_text(encoding="utf-8").strip():
-        return _failure_result(
-            source, "media_to_transcript", "direct_text", sanitized, None, _empty_output_failure(transcript_path), extra
-        )
-    return _success_result(source, "media_to_transcript", "direct_text", sanitized, transcript_path, extra)
-
-
 def _safe_run(command: tuple[str, ...], cwd: Path, runner: CommandRunner, timeout_seconds: int) -> ExternalCommandResult:
     try:
         return runner(command, cwd, timeout_seconds)
@@ -431,14 +366,6 @@ def _unsupported_result(
     return _failure_result(source, external_route, next_route, sanitized_commands, None, failure)
 
 
-def _unsupported_media_result(source: Path, run_dir: Path) -> ExternalConversionResult:
-    audio_path = _artifact_path(run_dir, "media_audio", source, ".wav")
-    transcript_path = _artifact_path(run_dir, "media_transcript", source, ".txt")
-    commands = _media_commands("ffmpeg", "whisper", source, audio_path, transcript_path.parent, DEFAULT_WHISPER_MODEL)
-    sanitized = [_sanitize_command(command, source, audio_path, transcript_path) for command in commands]
-    return _unsupported_result(source, "media_to_transcript", "direct_text", sanitized)
-
-
 def _report(
     source: Path,
     external_route: str,
@@ -481,19 +408,6 @@ def _find_command(names: tuple[str, ...], which: ToolLocator) -> str | None:
 
 def _libreoffice_command(executable: str, source: Path, output_dir: Path) -> tuple[str, ...]:
     return (executable, "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(source))
-
-
-def _media_commands(
-    ffmpeg: str,
-    whisper: str,
-    source: Path,
-    audio_path: Path,
-    transcript_dir: Path,
-    model: str,
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    ffmpeg_command = (ffmpeg, "-y", "-i", str(source), "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", str(audio_path))
-    whisper_command = (whisper, str(audio_path), "--model", model, "--output_format", "txt", "--output_dir", str(transcript_dir))
-    return ffmpeg_command, whisper_command
 
 
 def _youtube_subtitle_command(ytdlp: str, source_url: str, output_template: Path) -> tuple[str, ...]:
@@ -704,11 +618,6 @@ def _has_preferred_subtitle(payload: dict[str, Any]) -> bool:
         if isinstance(value, dict):
             languages.update(str(key) for key in value)
     return any(language in languages for language in ("zh-Hans", "zh", "en"))
-
-
-def _whisper_model(env: Mapping[str, str] | None) -> str:
-    model_env = env if env is not None else os.environ
-    return (model_env.get("KBPREP_WHISPER_MODEL") or DEFAULT_WHISPER_MODEL).strip() or DEFAULT_WHISPER_MODEL
 
 
 def _command_output_text(value: str | bytes | None) -> str:

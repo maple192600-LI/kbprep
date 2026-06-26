@@ -83,7 +83,7 @@ class ExternalRouteIntegrationTests(unittest.TestCase):
                 transcript,
                 _success_report(source, "media_to_transcript", "direct_text", transcript),
             )
-            with patch("kbprep_worker.converters.external_tools.transcribe_media_with_whisper", return_value=external):
+            with patch("kbprep_worker.converters.asr.transcribe_media", return_value=external):
                 pipeline_core._stage_convert(state)
 
             self.assertEqual((run_dir / "converted.md").read_text(encoding="utf-8"), "hello transcript\n")
