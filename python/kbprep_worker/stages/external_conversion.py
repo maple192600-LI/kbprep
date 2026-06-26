@@ -93,7 +93,7 @@ def _convert_legacy_office_via_pdf(state: PipelineState, converted_path: Path, r
 
 
 def _convert_media_to_transcript(state: PipelineState, converted_path: Path, run_dir: Path) -> dict:
-    from ..converters.external_tools import transcribe_media
+    from ..converters.asr import transcribe_media
 
     external = transcribe_media(state.input_p, run_dir)
     _raise_external_conversion_failure(external.report)

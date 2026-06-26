@@ -8,11 +8,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kbprep_worker.converter_capabilities import get_capability_for_extension
+from kbprep_worker.converters.asr import transcribe_media_with_whisper
 from kbprep_worker.converters.external_tools import (
     ExternalCommandResult,
     ExternalConversionResult,
     extract_youtube_transcript,
-    transcribe_media_with_whisper,
 )
 from kbprep_worker.envelope import EnvelopeExit
 from kbprep_worker.stages import external_conversion

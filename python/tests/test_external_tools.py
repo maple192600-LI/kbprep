@@ -3,6 +3,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from kbprep_worker.converters.asr import (
+    transcribe_media,
+    transcribe_media_with_qwen3_asr,
+    transcribe_media_with_whisper,
+)
 from kbprep_worker.converters.external_tools import (
     IMAGE_SOURCE_EXTENSIONS,
     LEGACY_OFFICE_SOURCE_EXTENSIONS,
@@ -10,9 +15,6 @@ from kbprep_worker.converters.external_tools import (
     ExternalCommandResult,
     ExternalConversionResult,
     convert_legacy_office_to_pdf,
-    transcribe_media,
-    transcribe_media_with_qwen3_asr,
-    transcribe_media_with_whisper,
     wrap_image_as_pdf,
 )
 
@@ -121,8 +123,8 @@ class ExternalToolConversionTests(unittest.TestCase):
         self.assertNotIn(str(root), " ".join(" ".join(command) for command in result.report["sanitized_commands"]))
 
     def test_transcribe_media_routes_chinese_to_qwen3_asr(self):
-        with patch("kbprep_worker.converters.external_tools.transcribe_media_with_qwen3_asr") as qwen, patch(
-            "kbprep_worker.converters.external_tools.transcribe_media_with_whisper"
+        with patch("kbprep_worker.converters.asr.transcribe_media_with_qwen3_asr") as qwen, patch(
+            "kbprep_worker.converters.asr.transcribe_media_with_whisper"
         ) as whisper:
             qwen.return_value = ExternalConversionResult(
                 ok=True, artifact_path=None, report={"asr_provider": "qwen3_asr"}
@@ -132,8 +134,8 @@ class ExternalToolConversionTests(unittest.TestCase):
             whisper.assert_not_called()
 
     def test_transcribe_media_routes_english_to_whisper(self):
-        with patch("kbprep_worker.converters.external_tools.transcribe_media_with_qwen3_asr") as qwen, patch(
-            "kbprep_worker.converters.external_tools.transcribe_media_with_whisper"
+        with patch("kbprep_worker.converters.asr.transcribe_media_with_qwen3_asr") as qwen, patch(
+            "kbprep_worker.converters.asr.transcribe_media_with_whisper"
         ) as whisper:
             whisper.return_value = ExternalConversionResult(
                 ok=True, artifact_path=None, report={"whisper_model": "large-v3"}
@@ -152,8 +154,8 @@ class ExternalToolConversionTests(unittest.TestCase):
             root = Path(tmp)
             source = root / "note.mp4"
             source.write_bytes(b"mp4")
-            with patch(
-                "kbprep_worker.converters.external_tools._run_qwen3_asr_inference",
+            with patch("kbprep_worker.converters.asr.find_spec", return_value=object()), patch(
+                "kbprep_worker.converters.asr._run_qwen3_asr_inference",
                 return_value="中文转写内容 Qwen3-ASR",
             ):
                 result = transcribe_media_with_qwen3_asr(
@@ -175,7 +177,7 @@ class ExternalToolConversionTests(unittest.TestCase):
             root = Path(tmp)
             source = root / "note.mp4"
             source.write_bytes(b"mp4")
-            with patch("kbprep_worker.converters.external_tools.find_spec", return_value=None):
+            with patch("kbprep_worker.converters.asr.find_spec", return_value=None):
                 result = transcribe_media_with_qwen3_asr(
                     source,
                     root / "run",
@@ -197,8 +199,8 @@ class ExternalToolConversionTests(unittest.TestCase):
             source = root / "note.mp4"
             source.write_bytes(b"mp4")
             run_dir = root / "run"
-            with patch(
-                "kbprep_worker.converters.external_tools._run_qwen3_asr_inference",
+            with patch("kbprep_worker.converters.asr.find_spec", return_value=object()), patch(
+                "kbprep_worker.converters.asr._run_qwen3_asr_inference",
                 return_value="",
             ):
                 result = transcribe_media_with_qwen3_asr(

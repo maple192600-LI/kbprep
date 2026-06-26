@@ -127,7 +127,8 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
       [
         "import tempfile",
         "from pathlib import Path",
-        "from kbprep_worker.converters.external_tools import ExternalCommandResult, extract_youtube_transcript, transcribe_media_with_whisper",
+        "from kbprep_worker.converters.asr import transcribe_media_with_whisper",
+        "from kbprep_worker.converters.external_tools import ExternalCommandResult, extract_youtube_transcript",
         "root = Path(tempfile.mkdtemp(prefix='kbprep-media-youtube-'))",
         "media = root / 'lesson.mp4'",
         "media.write_bytes(b'golden media placeholder')",
