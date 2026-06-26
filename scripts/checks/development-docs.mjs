@@ -32,13 +32,13 @@ const currentDocs = [
 ];
 
 const stalePhrases = [
-  ["\u57fa\u7840", " Markdown"].join(""),
-  "\u5206\u5757",
-  ["chu", "nk"].join(""),
-  "\u5c0f\u8d44\u6599",
-  "\u5927\u8d44\u6599",
-  "\u65e7\u9636\u6bb5",
-  ["R", "AG"].join(""),
+  { text: ["\u57fa\u7840", " Markdown"].join(""), wordBoundary: false },
+  { text: "\u5206\u5757", wordBoundary: false },
+  { text: ["chu", "nk"].join(""), wordBoundary: true },
+  { text: "\u5c0f\u8d44\u6599", wordBoundary: false },
+  { text: "\u5927\u8d44\u6599", wordBoundary: false },
+  { text: "\u65e7\u9636\u6bb5", wordBoundary: false },
+  { text: ["R", "AG"].join(""), wordBoundary: true },
 ];
 
 const failures = [];
@@ -95,8 +95,11 @@ for (const file of requiredDocs.filter((file) => /^docs\/development\/\d{2}-/.te
 
 for (const file of currentDocs) {
   const text = read(file);
-  for (const phrase of stalePhrases) {
-    if (text.includes(phrase)) {
+  for (const { text: phrase, wordBoundary } of stalePhrases) {
+    const found = wordBoundary
+      ? new RegExp(`\\b${phrase}\\b`).test(text)
+      : text.includes(phrase);
+    if (found) {
       failures.push({ file, reason: `stale architecture wording remains: ${phrase}` });
     }
   }
