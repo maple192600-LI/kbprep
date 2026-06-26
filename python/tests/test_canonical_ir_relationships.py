@@ -46,6 +46,34 @@ class CanonicalIrRelationshipTests(unittest.TestCase):
         self.assertIn("next_sibling", relation_types)
         self.assertFalse(any("Intro paragraph" in json.dumps(item) for item in relationships["relationships"]))
 
+    def test_prepare_writes_references_relationship_linking_paragraph_to_adjacent_figure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            asset_dir = root / "assets"
+            asset_dir.mkdir()
+            (asset_dir / "chart.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+            source.write_text(
+                "# Lesson\n\nIntro paragraph referencing the chart.\n\n![Chart](assets/chart.png)\n",
+                encoding="utf-8",
+            )
+            code, envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(root / "out"), "force": True, "profile": "standard"},
+            )
+            self.assertEqual(code, 0)
+            run_dir = Path(envelope["data"]["run_dir"])
+            relationships = json.loads((run_dir / "canonical_ir" / "relationships.json").read_text(encoding="utf-8"))
+        relation_types = {item["type"] for item in relationships["relationships"]}
+        self.assertIn("references", relation_types)
+        references_records = [item for item in relationships["relationships"] if item["type"] == "references"]
+        self.assertTrue(references_records)
+        ref = references_records[0]
+        self.assertTrue(ref["source_node_id"].startswith("n_"))
+        self.assertTrue(ref["target_node_id"].startswith("n_"))
+        self.assertNotEqual(ref["source_node_id"], ref["target_node_id"])
+        self.assertFalse(any("Intro paragraph" in json.dumps(item) for item in references_records))
+
 
 if __name__ == "__main__":
     unittest.main()

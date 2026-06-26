@@ -44,6 +44,30 @@ class CanonicalIrAnnotationTests(unittest.TestCase):
         self.assertTrue(any(item["kind"] == "coverage_warning" for item in annotations["annotations"]))
         self.assertFalse(any("Sensitive source sentence" in json.dumps(item) for item in annotations["annotations"]))
 
+    def test_prepare_writes_quality_warning_for_empty_heading(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.md"
+            source.write_text(
+                "# Lesson\n\nReal intro paragraph.\n\n## Empty Section\n\n## Following Section\n\nContent here.\n",
+                encoding="utf-8",
+            )
+            code, envelope = _capture_envelope(
+                pipeline_core.run,
+                {"input_path": str(source), "output_root": str(root / "out"), "force": True, "profile": "standard"},
+            )
+            self.assertEqual(code, 0)
+            run_dir = Path(envelope["data"]["run_dir"])
+            annotations = json.loads((run_dir / "canonical_ir" / "annotations.json").read_text(encoding="utf-8"))
+        empty_heading_warnings = [
+            item for item in annotations["annotations"]
+            if item["kind"] == "quality_warning" and item["message_code"] == "W_EMPTY_HEADING"
+        ]
+        self.assertTrue(empty_heading_warnings)
+        warn = empty_heading_warnings[0]
+        self.assertTrue(warn["target"].startswith("n_"))
+        self.assertFalse(any("Real intro" in json.dumps(item) for item in annotations["annotations"]))
+
 
 if __name__ == "__main__":
     unittest.main()

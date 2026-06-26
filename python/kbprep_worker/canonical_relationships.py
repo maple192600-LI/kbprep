@@ -38,6 +38,13 @@ def _relationships(nodes: list[dict[str, Any]]) -> list[dict[str, object]]:
             records.append(_record(len(records) + 1, "next_sibling", node["node_id"], nodes[index + 1]["node_id"]))
         if node.get("type") == "heading":
             records.extend(_contains_records(len(records) + 1, node, nodes[index + 1 :]))
+        if node.get("type") == "paragraph" and index + 1 < len(nodes):
+            next_node = nodes[index + 1]
+            if next_node.get("type") in ("figure", "table"):
+                records.append(_record(
+                    len(records) + 1, "references", node["node_id"], next_node["node_id"],
+                    basis="adjacent_reference",
+                ))
     return records
 
 
@@ -51,13 +58,20 @@ def _contains_records(start_index: int, parent: dict[str, Any], following_nodes:
     return records
 
 
-def _record(index: int, relation_type: str, source_node_id: object, target_node_id: object) -> dict[str, object]:
+def _record(
+    index: int,
+    relation_type: str,
+    source_node_id: object,
+    target_node_id: object,
+    *,
+    basis: str = "typed_node_order",
+) -> dict[str, object]:
     return {
         "relationship_id": f"r_{index:06d}",
         "type": relation_type,
         "source_node_id": str(source_node_id),
         "target_node_id": str(target_node_id),
-        "evidence": {"basis": "typed_node_order"},
+        "evidence": {"basis": basis},
     }
 
 

@@ -203,7 +203,7 @@ def _write_canonical_artifacts(
     )
     write_relationships_artifact(run_dir=run_dir, document_id=document_id, typed_nodes_path=typed_path)
     write_assets_artifact(run_dir=run_dir, document_id=document_id, typed_nodes_path=typed_path)
-    write_annotations_artifact(run_dir=run_dir, document_id=document_id)
+    write_annotations_artifact(run_dir=run_dir, document_id=document_id, typed_nodes_path=typed_path)
     return CanonicalArtifactState(
         document_id=document_id,
         route_decision=route_decision,

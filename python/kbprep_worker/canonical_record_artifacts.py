@@ -12,8 +12,9 @@ CANONICAL_IR_ASSETS_SCHEMA = "kbprep.canonical_ir_assets.v1"
 CANONICAL_IR_ANNOTATIONS_SCHEMA = "kbprep.canonical_ir_annotations.v1"
 RECORD_ARTIFACT_INVALID_CODE = "E_CANONICAL_IR_MANIFEST_INVALID"
 RELATIONSHIP_RECORD_KEYS = frozenset({"relationship_id", "type", "source_node_id", "target_node_id", "evidence"})
-ASSET_RECORD_KEYS = frozenset({"asset_id", "asset_type", "source_node_id", "reference", "reference_kind"})
+ASSET_RECORD_KEYS = frozenset({"asset_id", "asset_type", "source_node_id", "reference", "reference_kind", "source_path", "referenced_by"})
 ANNOTATION_RECORD_KEYS = frozenset({"annotation_id", "kind", "severity", "target", "message_code", "evidence"})
+RECORD_LIST_FIELDS = frozenset({"referenced_by"})
 RELATIONSHIP_TOP_KEYS = frozenset({
     "schema",
     "document_id",
@@ -239,6 +240,15 @@ def _valid_record_payload(record: object, record_keys: frozenset[str], evidence_
     evidence = record.get("evidence")
     if "evidence" in record_keys and not _valid_evidence_payload(evidence, evidence_keys):
         return False
+    for key in RECORD_LIST_FIELDS:
+        if key in record:
+            value = record[key]
+            valid_list = (
+                isinstance(value, list)
+                and all(isinstance(item, str) and item for item in value)
+            )
+            if not valid_list:
+                return False
     return True
 
 
@@ -260,6 +270,17 @@ def _validate_record_payload(
             _add_issue(issues, f"{artifact_field} record evidence must be an object", {"position": index})
         elif key == "evidence":
             _validate_evidence_payload(value, evidence_keys, artifact_field, index, issues)
+        elif key in RECORD_LIST_FIELDS:
+            valid_list = (
+                isinstance(value, list)
+                and all(isinstance(item, str) and item for item in value)
+            )
+            if not valid_list:
+                _add_issue(
+                    issues,
+                    f"{artifact_field} record field {key} must be a list of non-empty strings",
+                    {"position": index, key: value},
+                )
         elif key != "evidence" and (not isinstance(value, str) or not value):
             _add_issue(issues, f"{artifact_field} record field {key} must be a non-empty string", {"position": index, key: value})
 

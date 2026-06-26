@@ -72,13 +72,16 @@ def build_canonical_ir_coverage_report(
     relationship_section = _record_artifact_section(
         run_dir, relationships_path, CANONICAL_IR_RELATIONSHIPS_SCHEMA,
         "relationship_count", "relationships", RELATIONSHIP_RECORD_KEYS, RELATIONSHIP_TOP_KEYS, EVIDENCE_KEYS,
+        distribution_field="type",
     )
     asset_section = _record_artifact_section(
         run_dir, assets_path, CANONICAL_IR_ASSETS_SCHEMA, "asset_count", "assets", ASSET_RECORD_KEYS, ASSET_TOP_KEYS, frozenset(),
+        distribution_field="asset_type",
     )
     annotation_section = _record_artifact_section(
         run_dir, annotations_path, CANONICAL_IR_ANNOTATIONS_SCHEMA,
         "annotation_count", "annotations", ANNOTATION_RECORD_KEYS, ANNOTATION_TOP_KEYS, EVIDENCE_KEYS,
+        distribution_field="kind",
     )
     return {
         "schema": CANONICAL_IR_COVERAGE_REPORT_SCHEMA,
@@ -178,18 +181,22 @@ def _record_artifact_section(
     record_keys: frozenset[str],
     top_keys: frozenset[str],
     evidence_keys: frozenset[str],
+    distribution_field: str | None = None,
 ) -> dict[str, Any]:
     payload = _read_json_object(path)
     records = _list_value(payload, list_field)
     valid = valid_record_artifact_payload(payload, schema, count_field, list_field, record_keys, top_keys, evidence_keys)
     record_count = len(records) if valid else 0
     available = valid and record_count > 0
-    return {
+    section: dict[str, Any] = {
         "artifact": _relative_run_path(run_dir, path),
         "available": available,
         "status": _status(path, payload, available),
         "record_count": record_count,
     }
+    if distribution_field is not None:
+        section["distribution"] = _count_by_key(records, distribution_field)
+    return section
 
 
 def _target_gaps(
