@@ -9,7 +9,7 @@
 | 中文 | Qwen3-ASR（transformers 后端，Python import） | `Qwen/Qwen3-ASR-1.7B` | `KBPREP_ASR_LANGUAGE=zh`（默认） | `device_map="cuda:0"` + `dtype=bfloat16` + `max_new_tokens=8192` |
 | 英文 | Whisper（openai-whisper CLI） | `large-v3` | `KBPREP_ASR_LANGUAGE=en` | whisper CLI `--model large-v3`（自动 CUDA） |
 
-- **路由**：`transcribe_media` 按 `KBPREP_ASR_LANGUAGE` 分发（`external_tools.py`）。subtitle-first 不变（YouTube 有字幕先字幕，本路由只管无字幕 media fallback）。
+- **路由**：`transcribe_media` 按 `KBPREP_ASR_LANGUAGE` 分发（`converters/asr.py`）。subtitle-first 不变（YouTube 有字幕先字幕，本路由只管无字幕 media fallback）。
 - **单 venv**：`qwen-asr` + `openai-whisper` 装进 kbprep 主 venv（`.[asr]` extra），复用 cuda extra 的 `torch==2.8.0+cu126`。dry-run + 实测验证装这两个包**不动 cu126 torch**（不重蹈 e18cf9a torch 被降级 CPU）。
 - **配置出处**：参考 MediaCrawler `postcrawl/processors/transcript.py` 已验证的 Qwen3-ASR GPU 配置（device cuda:0 / bfloat16 / 长 max_new_tokens / Chinese）。
 
@@ -29,14 +29,16 @@
 
 样本放在本地 `.kbprep/phase-b-test-media/`（gitignored，不入仓库）。下载短片段 + 转写：
 
+> `node scripts/python-venv.mjs` 是项目封装的跨平台 venv 入口（`python-venv.mjs` 自动按平台选 `Scripts/python.exe` / `bin/python`），Windows / macOS / Linux 通用——不写死平台路径。
+
 ```bash
 # 中文样本 → Qwen3-ASR
-.kbprep/venv/Scripts/python.exe -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
+node scripts/python-venv.mjs -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
   -f ba -x --audio-format wav --no-playlist --postprocessor-args "-ar 16000 -ac 1" \
   -o ".kbprep/phase-b-test-media/yt-zh.%(ext)s" "https://www.youtube.com/watch?v=_L2Filt7l-s"
 
 # 英文样本 → Whisper
-.kbprep/venv/Scripts/python.exe -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
+node scripts/python-venv.mjs -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
   -f ba -x --audio-format wav --no-playlist --postprocessor-args "-ar 16000 -ac 1" \
   -o ".kbprep/phase-b-test-media/yt-en.%(ext)s" "https://www.youtube.com/watch?v=FBHhmqBs894"
 ```
