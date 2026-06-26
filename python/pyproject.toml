@@ -16,6 +16,13 @@ dependencies = [
 # 锁 torch 2.8.0：lmdeploy 0.11.1（mineru[all] 含）要求 torch==2.8.0；装最新会和 lmdeploy 冲突被降级成 CPU 版。
 # CUDA 加速走 cu126 index（见 python/kbprep_worker/setup_env.py 的 CUDA_TORCH_INDEX_URL）。
 cuda = ["torch==2.8.0", "torchvision==0.23.0"]
+# ASR 双链路：qwen-asr(transformers 后端，中文) 共用 cuda extra 的 torch
+# （dry-run 实测 qwen-asr 满足 torch>=2.0.0，不动 cu126）；openai-whisper(英文链路 whisper CLI)。
+# 配置见 setup_env + external_tools.transcribe_media（按 KBPREP_ASR_LANGUAGE 路由）。
+asr = [
+    "qwen-asr>=0.0.6",
+    "openai-whisper>=20231117",
+]
 dev = [
     "coverage[toml]>=7.6,<8",
     "mypy>=1.17,<2",

@@ -103,7 +103,7 @@ class TestMediaYoutubeRoute(unittest.TestCase):
 
             self.assertTrue(result.ok)
             self.assertEqual(result.report["route_decision"]["external_route"], "media_to_transcript")
-            self.assertEqual(result.report["whisper_model"], "base")
+            self.assertEqual(result.report["whisper_model"], "large-v3")
             self.assertEqual(result.artifact_path.read_text(encoding="utf-8").strip(), "Step 1: keep threshold=0.8.")
             self.assertEqual(get_capability_for_extension(".mp4")["status"], "partial")
 
