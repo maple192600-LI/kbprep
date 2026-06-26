@@ -209,7 +209,12 @@ def _pptx_slide_text(root: _Element) -> list[tuple[str | None, str]]:
 
 
 def drawing_shapes(root: _Element) -> list[tuple[str, list[str]]]:
-    """Return (shape_id, paragraph_texts) for each shape that carries text."""
+    """Return (shape_id, paragraph_texts) for each shape that carries text.
+
+    Duplicate paragraph text within a slide is collapsed (mirrors the pre-existing
+    drawing_paragraphs behavior) so the same line is not emitted twice; shapes with
+    identical text therefore share their first occurrence's shape_id.
+    """
     shapes: list[tuple[str, list[str]]] = []
     for sp in iter_by_local_name(root, "sp"):
         shape_id = _shape_identifier(sp)

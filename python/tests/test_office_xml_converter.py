@@ -178,6 +178,47 @@ class OfficeXmlConverterTests(unittest.TestCase):
         self.assertEqual(native[0]["converted_line_start"], 3)
         self.assertEqual(native[0]["converted_line_end"], 5)
 
+    def test_docx_paragraph_without_runs_emits_no_native_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "bare.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:t>Bare text without run wrapper</w:t></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("Bare text without run wrapper", markdown)
+        self.assertEqual(native, [])
+
+    def test_xlsx_cells_without_refs_emit_no_native_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "noref.xlsx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets><sheet name="Data" sheetId="1"/></sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/sharedStrings.xml",
+                    '<sst xmlns="main"><si><t>Name</t></si><si><t>Value</t></si></sst>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row><c t="s"><v>0</v></c><c t="s"><v>1</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("| Name | Value |", markdown)
+        self.assertEqual(native, [])
+
 
 if __name__ == "__main__":
     unittest.main()

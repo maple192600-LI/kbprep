@@ -303,7 +303,7 @@ def _span_location(
     if source_kind == "transcript":
         _add_transcript_location(location, node, transcript_cues)
     if native_precision is not None:
-        add_native_location(location, native_evidence)
+        location = add_native_location(location, native_evidence)
     return location
 
 

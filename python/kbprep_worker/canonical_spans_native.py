@@ -16,7 +16,14 @@ def match_native_evidence(
     node: Any,
     native_source_spans: list[dict[str, object]] | None,
 ) -> dict[str, object] | None:
-    """Return the first native evidence whose converted line range overlaps the typed node."""
+    """Return the first native evidence whose converted line range overlaps the typed node.
+
+    Matching is non-consuming: if several typed nodes overlap one evidence entry's
+    range (e.g. a multi-line shape or paragraph split into several nodes), each
+    receives the same native coordinates. This is acceptable because the evidence
+    describes the source structure a block came from (which shape/paragraph/cell),
+    not a 1:1 node mapping; the coordinates are always real, never fabricated.
+    """
     if not native_source_spans:
         return None
     for evidence in native_source_spans:
@@ -43,12 +50,10 @@ def native_evidence_precision(evidence: dict[str, object] | None, source_kind: s
     return precision if NATIVE_PRECISION_SOURCE_KIND.get(precision) == source_kind else None
 
 
-def add_native_location(location: dict[str, object], native_evidence: dict[str, object] | None) -> None:
-    """Merge converter-native coordinate fields into the span location."""
-    if not isinstance(native_evidence, dict):
-        return
-    native_location = native_evidence.get("location")
-    if not isinstance(native_location, dict):
-        return
-    for key, value in native_location.items():
-        location[key] = value
+def add_native_location(location: dict[str, object], native_evidence: dict[str, object] | None) -> dict[str, object]:
+    """Return the location merged with converter-native coordinate fields (new dict)."""
+    if isinstance(native_evidence, dict):
+        native_location = native_evidence.get("location")
+        if isinstance(native_location, dict):
+            return {**location, **native_location}
+    return location
