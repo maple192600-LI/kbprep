@@ -115,6 +115,69 @@ class OfficeXmlConverterTests(unittest.TestCase):
         self.assertIn("Flat Body", markdown)
         self.assertEqual(native, [])
 
+    def test_docx_native_source_spans_record_paragraph_and_run_range(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "doc.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+                    '<w:r><w:t>Heading text</w:t></w:r></w:p>'
+                    '<w:p><w:r><w:t>First run</w:t></w:r>'
+                    '<w:r><w:t>Second run</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("# Heading text", markdown)
+        self.assertEqual(len(native), 2)
+        self.assertEqual([entry["precision"] for entry in native], ["docx_run_range", "docx_run_range"])
+        self.assertEqual(native[0]["location"]["paragraph_index"], 0)
+        self.assertEqual(native[0]["location"]["run_start"], 0)
+        self.assertEqual(native[0]["location"]["run_end"], 0)
+        self.assertEqual(native[0]["converted_line_start"], 1)
+        self.assertEqual(native[0]["converted_line_end"], 1)
+        self.assertEqual(native[1]["location"]["paragraph_index"], 1)
+        self.assertEqual(native[1]["location"]["run_start"], 0)
+        self.assertEqual(native[1]["location"]["run_end"], 1)
+        self.assertEqual(native[1]["converted_line_start"], 3)
+        self.assertEqual(native[1]["converted_line_end"], 3)
+
+    def test_xlsx_native_source_spans_record_cell_range(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "book.xlsx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets><sheet name="Data" sheetId="1"/></sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/sharedStrings.xml",
+                    '<sst xmlns="main"><si><t>Name</t></si><si><t>Score</t></si><si><t>Alice</t></si></sst>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                    '<row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>9</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _warnings, artifacts = office_xml_to_markdown(path, run_dir)
+            native = artifacts.get("native_source_spans", [])
+
+        self.assertIn("# Data", markdown)
+        self.assertIn("| Alice | 9 |", markdown)
+        self.assertEqual(len(native), 1)
+        self.assertEqual(native[0]["precision"], "xlsx_cell_range")
+        self.assertEqual(native[0]["location"]["sheet"], "Data")
+        self.assertEqual(native[0]["location"]["start"], "A1")
+        self.assertEqual(native[0]["location"]["end"], "B2")
+        self.assertEqual(native[0]["converted_line_start"], 3)
+        self.assertEqual(native[0]["converted_line_end"], 5)
+
 
 if __name__ == "__main__":
     unittest.main()

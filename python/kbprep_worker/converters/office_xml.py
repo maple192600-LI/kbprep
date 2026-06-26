@@ -30,11 +30,11 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
     try:
         with open_safe_zip(input_p) as zf:
             if ext == ".docx":
-                markdown, image_artifacts = docx_to_markdown(zf, run_dir)
+                markdown, image_artifacts, native_source_spans = docx_to_markdown(zf, run_dir)
             elif ext == ".pptx":
                 markdown, image_artifacts, native_source_spans = pptx_to_markdown(zf, run_dir)
             elif ext == ".xlsx":
-                markdown = xlsx_to_markdown(zf)
+                markdown, native_source_spans = xlsx_to_markdown(zf)
                 image_artifacts = []
             else:
                 raise ValueError(f"Unsupported Office XML extension: {ext}")
@@ -74,26 +74,41 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
     return markdown.strip() + "\n", warnings, artifacts
 
 
-def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
+def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], list[dict]]:
     import xml.etree.ElementTree as ET
 
     root = ET.fromstring(zf.read_bytes("word/document.xml"))
     body = first_child_by_local_name(root, "body")
     if body is None:
-        return "", []
+        return "", [], []
 
-    lines: list[str] = []
+    builder = _MarkdownLineBuilder()
+    native_source_spans: list[dict] = []
+    paragraph_index = -1
     for child in list(body):
         local = local_name(child.tag)
         if local == "p":
-            text = xml_text(child)
+            paragraph_index += 1
+            text, run_range = _docx_paragraph_text_and_runs(child)
             if text:
                 heading = docx_heading_level(child)
-                lines.append(("#" * heading + " " + text) if heading else text)
+                block = ("#" * heading + " " + text) if heading else text
+                start_line, end_line = builder.append_block(block)
+                if run_range is not None:
+                    native_source_spans.append({
+                        "converted_line_start": start_line,
+                        "converted_line_end": end_line,
+                        "precision": "docx_run_range",
+                        "location": {
+                            "paragraph_index": paragraph_index,
+                            "run_start": run_range[0],
+                            "run_end": run_range[1],
+                        },
+                    })
         elif local == "tbl":
             table = word_table_to_markdown(child)
             if table:
-                lines.append(table)
+                builder.append_block(table)
     image_lines, image_artifacts = extract_office_images(
         zf=zf,
         part_name="word/document.xml",
@@ -103,8 +118,28 @@ def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str]]:
         alt_prefix="DOCX Image",
     )
     if image_lines:
-        lines.extend(["## Embedded Images", *image_lines])
-    return "\n\n".join(lines), image_artifacts
+        builder.append_block("## Embedded Images")
+        for image_line in image_lines:
+            builder.append_block(image_line)
+    return builder.build(), image_artifacts, native_source_spans
+
+
+def _docx_paragraph_text_and_runs(paragraph: _Element) -> tuple[str, tuple[int, int] | None]:
+    """Return (paragraph text, run index range) for a DOCX paragraph."""
+    text = xml_text(paragraph)
+    runs = list(iter_by_local_name(paragraph, "r"))
+    if not runs:
+        return text, None
+    first_run = -1
+    last_run = -1
+    for index, run in enumerate(runs):
+        if xml_text(run):
+            if first_run < 0:
+                first_run = index
+            last_run = index
+    if first_run < 0:
+        return text, None
+    return text, (first_run, last_run)
 
 
 def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], list[dict]]:
@@ -329,7 +364,7 @@ def write_pptx_content_list(text: str, run_dir: Path) -> dict:
     }
 
 
-def xlsx_to_markdown(zf: SafeZipReader) -> str:
+def xlsx_to_markdown(zf: SafeZipReader) -> tuple[str, list[dict]]:
     import xml.etree.ElementTree as ET
 
     shared_strings = xlsx_shared_strings(zf)
@@ -344,20 +379,49 @@ def xlsx_to_markdown(zf: SafeZipReader) -> str:
         key=sheet_index,
     )
 
-    sections: list[str] = []
+    builder = _MarkdownLineBuilder()
+    native_source_spans: list[dict] = []
     for idx, name in enumerate(worksheet_names, start=1):
         root = ET.fromstring(zf.read_bytes(name))
-        rows: list[list[str]] = []
-        for row_el in iter_by_local_name(root, "row"):
-            values: list[str] = []
-            for cell in [c for c in list(row_el) if local_name(c.tag) == "c"]:
-                values.append(xlsx_cell_value(cell, shared_strings))
-            if any(value.strip() for value in values):
-                rows.append(values)
+        rows, cell_range = _xlsx_rows_and_cell_range(root, shared_strings)
         if rows:
             title = sheet_names[idx - 1] if idx - 1 < len(sheet_names) else f"Sheet {idx}"
-            sections.append("\n\n".join([f"# {title}", rows_to_markdown_table(rows)]))
-    return "\n\n".join(sections)
+            builder.append_block(f"# {title}")
+            table_start, table_end = builder.append_block(rows_to_markdown_table(rows))
+            if cell_range is not None:
+                native_source_spans.append({
+                    "converted_line_start": table_start,
+                    "converted_line_end": table_end,
+                    "precision": "xlsx_cell_range",
+                    "location": {"sheet": title, "start": cell_range[0], "end": cell_range[1]},
+                })
+    return builder.build(), native_source_spans
+
+
+def _xlsx_rows_and_cell_range(
+    root: _Element, shared_strings: list[str]
+) -> tuple[list[list[str]], tuple[str, str] | None]:
+    """Return worksheet rows and the (start_cell, end_cell) range of non-empty rows."""
+    rows: list[list[str]] = []
+    first_cell: str | None = None
+    last_cell: str | None = None
+    for row_el in iter_by_local_name(root, "row"):
+        values: list[str] = []
+        row_refs: list[str] = []
+        for cell in [c for c in list(row_el) if local_name(c.tag) == "c"]:
+            values.append(xlsx_cell_value(cell, shared_strings))
+            ref = xml_attr_by_local_name(cell, "r")
+            if ref:
+                row_refs.append(ref)
+        if any(value.strip() for value in values):
+            rows.append(values)
+            if row_refs:
+                if first_cell is None:
+                    first_cell = row_refs[0]
+                last_cell = row_refs[-1]
+    if first_cell is None or last_cell is None:
+        return rows, None
+    return rows, (first_cell, last_cell)
 
 
 def docx_heading_level(p_el: _Element) -> int:

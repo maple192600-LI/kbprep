@@ -1116,6 +1116,87 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
         self.assertTrue(all(precision == "converted_line_range" for precision in precisions))
         self.assertIn("pdf_bbox", gap["missing"])
 
+    def test_docx_converter_native_spans_align_with_typed_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "doc.docx"
+            with zipfile.ZipFile(source, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+                    '<w:r><w:t>Doc heading</w:t></w:r></w:p>'
+                    '<w:p><w:r><w:t>Doc body</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _office_warnings, office_artifacts = office_xml_to_markdown(source, run_dir)
+            native = office_artifacts["native_source_spans"]
+            converted = run_dir / "converted.md"
+            converted.write_text(markdown, encoding="utf-8")
+            (run_dir / "conversion_report.json").write_text(json.dumps({
+                "converter": "office_xml",
+                "converted_md": str(converted),
+                "converted_bytes": converted.stat().st_size,
+                "mineru_artifacts": {"native_source_spans": native},
+            }), encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="office_xml",
+                file_hash="docxhash123456789",
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            spans_payload = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+
+        precisions = [span["evidence"]["precision"] for span in spans_payload["spans"]]
+        self.assertEqual(precisions.count("docx_run_range"), 2)
+
+    def test_xlsx_converter_native_spans_align_with_typed_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "book.xlsx"
+            with zipfile.ZipFile(source, "w") as zf:
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets><sheet name="Data" sheetId="1"/></sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/sharedStrings.xml",
+                    '<sst xmlns="main"><si><t>Name</t></si><si><t>Value</t></si></sst>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _office_warnings, office_artifacts = office_xml_to_markdown(source, run_dir)
+            native = office_artifacts["native_source_spans"]
+            converted = run_dir / "converted.md"
+            converted.write_text(markdown, encoding="utf-8")
+            (run_dir / "conversion_report.json").write_text(json.dumps({
+                "converter": "office_xml",
+                "converted_md": str(converted),
+                "converted_bytes": converted.stat().st_size,
+                "mineru_artifacts": {"native_source_spans": native},
+            }), encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="office_xml",
+                file_hash="xlsxhash123456789",
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            spans_payload = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+
+        precisions = [span["evidence"]["precision"] for span in spans_payload["spans"]]
+        self.assertIn("xlsx_cell_range", precisions)
+
 
 if __name__ == "__main__":
     unittest.main()
