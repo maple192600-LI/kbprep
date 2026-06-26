@@ -30,9 +30,18 @@ non-empty evidence objects cannot pass the conversion gate. The SourceSpan
 schema now accepts route-native precision records only when the corresponding
 location fields are present: PDF page bounding boxes, DOCX paragraph/run
 ranges, PPTX slide shape ids, XLSX cell ranges, and future YouTube cue ids.
-When converters do not provide that native evidence, the writer keeps
-converted-line precision and the coverage report lists the missing native
-precision kinds instead of fabricating coordinates.
+The Office XML converter now emits that native evidence for PPTX slide shape
+ids, DOCX paragraph/run ranges, and XLSX cell ranges, threading it through
+`conversion_report.mineru_artifacts.native_source_spans` into the span writer,
+which attaches the route-native precision only when the evidence overlaps a
+typed node and its precision matches the span source kind. The PDF text-layer
+route still emits no native bbox evidence because `page.get_text("text")`
+carries no coordinates and line normalization breaks bbox alignment; it keeps
+converted-line precision and the coverage report lists `pdf_bbox` as a missing
+native kind, with route-native PDF bbox deferred to the MinerU OCR path. When
+any route omits native evidence, the writer keeps converted-line precision and
+the coverage report lists the missing native precision kinds instead of
+fabricating coordinates.
 The manifest also embeds `coverage.report`, which records typed-node counts,
 source-span counts, coverage ratio, span precision summaries,
 TransformationLedger availability, and remaining target gaps. The conversion
