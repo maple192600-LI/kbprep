@@ -55,15 +55,23 @@ evidence before they can be considered complete for every route. The
 TransformationLedger currently records ordered conversion-phase evidence for
 route decisions, converted Markdown, typed nodes, and source spans, and the
 pre-clean conversion gate validates it when the manifest claims the artifact.
-C2 relationships record content-safe `contains` and `next_sibling` structure
-links between typed-node ids. C2 assets record content-safe image references
-from figure nodes without copying alt text or title text. C2 annotations record
-content-safe coverage warnings. The coverage report now marks these three gap
-areas as `partial` only when the corresponding artifact has records; empty or
-missing artifacts remain `target_work`. Full route-wide gate use of IR
-semantics, complete route-native relationship and asset semantics, richer
-quality annotations, and full Markdown regeneration coverage are still target
-work.
+C2 relationships record content-safe `contains`, `next_sibling`, and
+`references` structure links between typed-node ids; `references` links a
+paragraph to an adjacent figure or table node. C2 assets record content-safe
+image and table references from figure/table nodes, each carrying a
+`source_path` and a `referenced_by` node-id list, without copying alt text,
+title text, or table cell content. C2 annotations record the content-safe
+coverage warning plus dynamic `quality_warning` annotations (for example
+`W_EMPTY_HEADING`, `W_SHORT_PARAGRAPH`) targeted at specific typed-node ids.
+The coverage report now marks these three gap areas as `partial` only when the
+corresponding artifact has records, and each section also reports a
+`distribution` of the record type/kind values; empty or missing artifacts
+remain `target_work`. Remaining target work: route-native relationship
+semantics that require source-structure containers without a typed-node id
+(such as PPTX shape `embeds` or notes `annotates`), transcript speaker
+segmentation, node-level `coverage_gap` annotations that depend on
+source-kind-aware native precision gaps, and full Markdown regeneration
+coverage.
 
 The standard Markdown render path now has a minimal IR regeneration slice:
 when a valid `clean_view.json` and `canonical_ir/typed_nodes.json` are present,
@@ -71,9 +79,11 @@ when a valid `clean_view.json` and `canonical_ir/typed_nodes.json` are present,
 entries carrying accepted patch identity render from the accepted in-memory
 cleanup block content. `cleaning_patches.jsonl` remains content-safe and does
 not copy source text, cleaned text, or private rule bodies. This is not the
-complete Canonical IR contract: converter-native extraction, route-wide
-relationship and asset semantics, richer annotations, every output profile, and
-universal fact-layer usage remain partial or target work.
+complete Canonical IR contract: route-native relationship semantics requiring
+source-structure containers, transcript speaker segmentation, node-level
+coverage-gap annotations, every output profile, and universal fact-layer usage
+remain partial or target work. (Converter-native source-span extraction for
+PPTX/DOCX/XLSX landed in C1R; PDF bbox stays deferred to MinerU.)
 
 ## Contract
 
@@ -95,6 +105,21 @@ The contract must preserve source order, source evidence, asset links, and node 
 - Every converted source can identify the route that produced its IR.
 - Every cleanup target can point back to a source span when the converter provides one.
 - Rendered Markdown can be regenerated from IR plus accepted changes.
+
+## Route-Wide Semantics
+
+The C2 relationship, asset, and annotation artifacts carry route-wide semantics
+on top of typed-node identity. The current shipped boundary is:
+
+| Artifact | Shipped semantics | Deferred semantics |
+| --- | --- | --- |
+| relationships | `contains`, `next_sibling`, `references` (paragraph -> adjacent figure/table) | PPTX shape `embeds`, notes `annotates`, transcript `speaker_segment` (need source-structure containers without typed-node ids) |
+| assets | image + table `asset_type`, `reference`, `reference_kind` (`markdown_image`, `inline_table`), `source_path`, `referenced_by` node-id list | `office_embed` `reference_kind` with original media part paths (needs `office_image_assets` threading), multi-route asset provenance |
+| annotations | `coverage_warning` (regeneration gap), dynamic `quality_warning` (`W_EMPTY_HEADING`, `W_SHORT_PARAGRAPH`) targeted at typed-node ids | node-level `coverage_gap` (`W_NATIVE_PRECISION_MISSING`) for source-kind-aware native precision gaps |
+
+All relationship, asset, and annotation records remain content-safe: they
+reference typed-node ids and structural fields only, never source text, alt
+text, title text, table cell content, or private rule bodies.
 
 ## Risk And Rollback
 

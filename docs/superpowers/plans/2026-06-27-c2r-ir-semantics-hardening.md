@@ -38,8 +38,9 @@
 
 新增 type（保留现有 `contains`/`next_sibling`）：
 
-- `references`：段落节点引用 figure/table 节点（基于 typed_nodes 的 figure/table 出现 + Markdown 图片/表格语法关联）。evidence 带 `basis`。
-- `embeds`（pptx route）：shape 节点包含其内部 paragraph 节点。evidence 带 `shape_id`（从 native_source_spans 的 `pptx_shape` precision 反查同 shape_id 的节点聚合）。
+- `references`（核心）：段落节点引用 figure/table 节点（基于 typed_nodes 的 figure/table 出现 + Markdown 图片/表格语法关联）。evidence `basis` 编码引用源（如 `figure_reference`）。**只需 typed_nodes**，无需 native_source_spans 透传。
+
+**不做** `embeds`（pptx shape → paragraphs）：代码审阅后确认 shape 不是 typed_node（无 node_id），无法用 source_node_id/target_node_id 表达二元关系，强做会扭曲 relationship 模型。推迟到未来 slice（需先给 shape 一个节点表示）。
 
 **不做** `annotates`（notes → slide）：需扩展 office_xml 暴露 notes 的 slide 归属，侵入 C1R 已合并转换器，边界模糊——推迟到独立 slice。
 **不做** transcript `speaker_segment`：typed_nodes metadata.speaker 虽存在，但 speaker 聚合逻辑 + 真实媒体验证属 Wave 4 范畴，C2R 不伪造。
@@ -84,9 +85,9 @@ writer 签名扩展为接收 `typed_nodes` + `coverage_report`（或 coverage ga
 ## 实施步骤（TDD）
 
 - [ ] **Step 1**：开 worktree `git worktree add .worktrees/c-ir-semantics-hardening -b codex/c-ir-semantics-hardening main`，`npm ci`，基线 `npm run dev:check`。
-- [ ] **Step 2 通道 RED**：测试——pptx 输入 → relationships writer 收到 native_source_spans → 产出 `embeds` 关系（evidence 带 shape_id）。先跑红。
-- [ ] **Step 3 通道 GREEN**：`canonical_ir.py` 透传 + relationships writer 消费 native_source_spans 产 `embeds`。跑绿。
-- [ ] **Step 4 relationships**：`references` type（段落 → figure/table）+ 测试。
+- [ ] **Step 2 references RED**：测试——markdown 输入含 figure/table → relationships.json 出现 `references` type（段落 → figure/table node_id）。先跑红。
+- [ ] **Step 3 references GREEN**：relationships writer 加 references 逻辑（基于 typed_nodes 的 figure/table 关联）。跑绿。
+- [ ] **Step 4 通道 GREEN**：annotations writer 加 `typed_nodes_path` + `source_spans_path` 参数，`canonical_ir.py:206` 透传。为 Step 6 铺路。
 - [ ] **Step 5 assets RED/GREEN**：`referenced_by`/`source_path`/`asset_type:table`/`reference_kind:office_embed` + 测试。需把 office_image_assets 经 conversion_report 透传给 assets writer（若未在 report 中，补流；若补流侵入 office_xml，降级为只读 typed_nodes figure Markdown 引用 + source_path 可选）。
 - [ ] **Step 6 annotations RED/GREEN**：writer 接收 coverage report + typed_nodes → 动态 `coverage_gap`/`quality_warning` + 测试。
 - [ ] **Step 7 schema 同步**：更新 `canonical_record_artifacts.py` 的 frozenset 锁，确保新字段不被 validator 拒绝。
