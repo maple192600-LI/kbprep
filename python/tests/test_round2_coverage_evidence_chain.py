@@ -76,6 +76,23 @@ class EvidenceChainRound2CoverageTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     pdf_text.convert_text_layer_pdf(source, root / "missing.md", root)
 
+    def test_pdf_text_layer_does_not_emit_native_bbox_evidence(self):
+        # page.get_text("text") carries no coordinates and _normalize_page_text
+        # merges hard-wrapped lines, so line-level bbox alignment to typed nodes
+        # is unreliable. The route therefore emits no native_source_spans; the
+        # coverage report records pdf_bbox as a missing native kind instead of
+        # fabricating coordinates. Route-native PDF bbox is deferred to MinerU.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "text.pdf"
+            source.write_bytes(b"%PDF-")
+            output = root / "converted.md"
+            doc = self._Doc([self._Page("PDF paragraph one\nsecond line\n\n1. item")])
+            fake_fitz = types.SimpleNamespace(open=lambda path: doc)
+            with patch.dict(sys.modules, {"fitz": fake_fitz}):
+                result = pdf_text.convert_text_layer_pdf(source, output, root)
+        self.assertNotIn("native_source_spans", result)
+
     def test_normalize_reports_tables_code_images_and_ocr_fixes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

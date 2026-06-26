@@ -1079,6 +1079,43 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
         self.assertIn("3", shape_ids)
         self.assertEqual(issues, [])
 
+    def test_pdf_text_layer_route_records_pdf_bbox_as_missing_native_kind(self):
+        # The PDF text-layer route has no coordinates, so it emits no
+        # native_source_spans. Spans stay on converted-line precision and the
+        # coverage report must list pdf_bbox as a missing native kind rather
+        # than letting a writer fabricate a bounding box.
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "text.pdf"
+            converted = run_dir / "converted.md"
+            converted.write_text(
+                "<!-- page: 1 -->\n\nPDF paragraph one\n\nSecond paragraph\n",
+                encoding="utf-8",
+            )
+            source.write_bytes(b"%PDF-")
+            (run_dir / "conversion_report.json").write_text(json.dumps({
+                "converter": "pdf_text_layer",
+                "converted_md": str(converted),
+                "converted_bytes": converted.stat().st_size,
+            }), encoding="utf-8")
+
+            write_canonical_ir_manifests(
+                run_dir=run_dir,
+                input_path=source,
+                source_type="pdf_like",
+                file_hash="pdftexthash12345",
+                file_size=source.stat().st_size,
+                run_id="run_test",
+            )
+
+            manifest = json.loads((run_dir / "canonical_ir" / "manifest.json").read_text(encoding="utf-8"))
+            spans_payload = json.loads((run_dir / "canonical_ir" / "source_spans.json").read_text(encoding="utf-8"))
+
+        precisions = [span["evidence"]["precision"] for span in spans_payload["spans"]]
+        gap = manifest["coverage"]["report"]["gaps"]["route_native_precision"]
+        self.assertTrue(all(precision == "converted_line_range" for precision in precisions))
+        self.assertIn("pdf_bbox", gap["missing"])
+
 
 if __name__ == "__main__":
     unittest.main()
