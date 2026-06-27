@@ -15,7 +15,7 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - At least one successful child can produce `completed_with_warnings`.
 - All children failed means parent `failed`.
 - Rerun uses existing run metadata only when the source can be safely located.
-- Current public selective rerun execution includes single-source feedback rerun and batch failed/pending rerun from `batch_manifest.json`. Playlist rerun uses the same parent manifest path and preserves playlist source-collection evidence in `batch_rerun_manifest.json`.
+- Current public selective rerun execution includes single-source feedback rerun and batch failed/pending rerun from `batch_manifest.json`. Playlist rerun uses the same parent manifest path and preserves playlist source-collection evidence in `batch_rerun_manifest.json`. The worker additionally supports a programmatic `rerun_scope=policy_affected` rerun that filters children by run-evidence identity; it is not yet exposed as a CLI flag.
 - `batch_manifest.json` records parent status, per-file status, skipped unsupported files, source hashes, source URLs when available, artifact paths, command defaults, and rerun scope.
 - Batch rerun writes `batch_rerun_manifest.json` with selected children, successes, failures, skipped unsupported visibility, source-manifest evidence, and playlist source-collection evidence when rerunning explicit playlist child descriptors.
 - Playlist input expands into bounded local `.url` child jobs that reuse the YouTube subtitle-first route and keep per-video status visible through `source_collection` metadata.
@@ -26,7 +26,7 @@ This stage supports batch or Playlist controller, child job execution, and paren
 - Child jobs publish source-side results independently.
 - Rerun reports unavailable metadata instead of pretending evidence exists.
 - Single-source feedback rerun can execute one evidence-backed `rules_only` rerun.
-- Batch rerun can execute `failed_only`, `pending_only`, `failed_and_pending`, or recommended parent-manifest scope without rerunning unrelated successful children. Policy-affected and Canonical IR id-level batch targeting are separate later work.
+- Batch rerun can execute `failed_only`, `pending_only`, `failed_and_pending`, or recommended parent-manifest scope without rerunning unrelated successful children. The worker-level `policy_affected` scope additionally selects only children whose run evidence (canonical_ir `document_id`, `cleaning_policy_snapshot_hash`, or stable `source_identity` fields) matches a caller-supplied affected identity; a child's evidence is located via the manifest `run_id`, or by scanning `<output_root>/runs/*/run_metadata.json` for failed children that recorded no run_id. Canonical IR id-level (node-id) narrowing and CLI exposure of `policy_affected` remain future work.
 - Batch rerun refuses missing or changed source files and records the failure in `batch_rerun_manifest.json` instead of claiming success.
 - Batch status manifest exists for successful, partially successful, and sample-failed runs.
 - Playlist status records every child video, preserves successful child deliverables, and reports mixed success as completed with warnings.

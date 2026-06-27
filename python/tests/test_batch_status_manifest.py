@@ -41,6 +41,123 @@ def _successful_child(file_path: Path, output_root: str, *_args: Any, **_kwargs:
     }
 
 
+def _write_policy_affected_run_evidence(
+    run_dir: Path,
+    *,
+    document_id: str,
+    policy_snapshot_hash: str,
+    source_identity: dict[str, Any],
+    document_type: str = "course",
+) -> None:
+    """Write run_metadata + canonical_ir binding artifacts under run_dir.
+
+    Mirrors feedback/_write_canonical_ir_binding_artifacts (test_feedback.py) so
+    canonical_ir_binding(run_dir) returns status="bound" with the given document_id.
+    """
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "schema": "kbprep.run_metadata.v1",
+                "run_id": run_dir.name,
+                "source_identity": source_identity,
+                "document_type": document_type,
+                "cleaning_policy_snapshot_hash": policy_snapshot_hash,
+                "prepare_payload": {"input_path": "", "output_root": "", "profile": "standard"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "quality_report.json").write_text(
+        json.dumps({"profile": "standard", "document_type": document_type}),
+        encoding="utf-8",
+    )
+    (run_dir / "converted.md").write_text("# Converted\n", encoding="utf-8")
+    (run_dir / "conversion_report.json").write_text(
+        json.dumps({"converted_md": "converted.md"}),
+        encoding="utf-8",
+    )
+    canonical_dir = run_dir / "canonical_ir"
+    canonical_dir.mkdir(exist_ok=True)
+    (canonical_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "kbprep.canonical_ir_manifest.v1",
+                "document_id": document_id,
+                "status": "partial",
+                "artifacts": {
+                    "typed_nodes": "canonical_ir/typed_nodes.json",
+                    "source_spans": "canonical_ir/source_spans.json",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "document_manifest.json").write_text(
+        json.dumps(
+            {
+                "schema": "kbprep.document_manifest.v1",
+                "canonical_ir_manifest": "canonical_ir/manifest.json",
+                "conversion_report": "conversion_report.json",
+                "converted_md": "converted.md",
+                "created_from_run": str(run_dir),
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _build_policy_affected_fixture(root: Path) -> tuple[Path, Path, dict[str, dict[str, Any]]]:
+    """Build a batch manifest + child run evidence for policy_affected rerun tests.
+
+    alpha/beta are succeeded children (manifest records run_id); gamma is a failed child
+    (manifest records no run_id, so its evidence is reached only by scanning runs/);
+    delta is pending (no output_root). Returns (manifest_path, input_dir, children) where
+    children maps relative_path -> {document_id, policy_snapshot_hash, source_identity}.
+    """
+    input_dir = root / "sources"
+    output_root = root / "batch"
+    input_dir.mkdir()
+    for name in ("alpha.md", "beta.md", "gamma.md"):
+        (input_dir / name).write_text(f"# {name.removesuffix('.md')}", encoding="utf-8")
+
+    identities = {
+        "alpha.md": ("doc-alpha", "hash-alpha", {"source_name": "alpha.md", "source_domain": "example.com"}, "succeeded", "run_alpha"),
+        "beta.md": ("doc-beta", "hash-beta", {"source_name": "beta.md", "source_domain": "example.com"}, "succeeded", "run_beta"),
+        "gamma.md": ("doc-gamma", "hash-gamma", {"source_name": "gamma.md", "source_domain": "gamma.example.com"}, "failed", None),
+    }
+    items: list[dict[str, Any]] = []
+    children: dict[str, dict[str, Any]] = {}
+    for name, (doc_id, policy_hash, source_identity, status, run_id) in identities.items():
+        child_out = output_root / "files" / name.removesuffix(".md")
+        _write_policy_affected_run_evidence(
+            child_out / "runs" / (run_id or "run_gamma_001"),
+            document_id=doc_id,
+            policy_snapshot_hash=policy_hash,
+            source_identity=source_identity,
+        )
+        item: dict[str, Any] = {"relative_path": name, "file": name, "status": status, "rerunnable": True, "output_root": str(child_out)}
+        if run_id:
+            item["run_id"] = run_id
+        items.append(item)
+        children[name] = {"document_id": doc_id, "policy_snapshot_hash": policy_hash, "source_identity": source_identity}
+    items.append({"relative_path": "delta.md", "file": "delta.md", "status": "pending", "rerunnable": True})
+    manifest_path = output_root / "batch_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema": "kbprep.batch_manifest.v1",
+                "input_dir": str(input_dir),
+                "output_root": str(output_root),
+                "items": items,
+                "rerun": {"recommended_scope": "none"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path, input_dir, children
+
+
 class BatchStatusManifestTests(unittest.TestCase):
     def test_all_successful_children_write_completed_parent_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -741,7 +858,10 @@ class BatchStatusManifestTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(envelope["error"]["code"], "E_BATCH_RERUN_EMPTY")
 
-    def test_batch_rerun_rejects_policy_affected_scope_until_binding_exists(self) -> None:
+    def test_batch_rerun_rejects_bare_affected_scope_to_avoid_manifest_field_collision(self) -> None:
+        # The bare scope name "affected" stays rejected on purpose: manifest already has a
+        # rerun.affected field (failed+pending union). Policy-identity targeting uses the
+        # distinct scope name "policy_affected" so the two cannot be confused.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             input_dir = root / "sources"
@@ -769,6 +889,237 @@ class BatchStatusManifestTests(unittest.TestCase):
 
             self.assertEqual(code, 1)
             self.assertEqual(envelope["error"]["code"], "E_INVALID_INPUT")
+
+    def test_batch_rerun_policy_affected_scope_rejects_without_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_dir = root / "sources"
+            output_root = root / "batch"
+            input_dir.mkdir()
+            (input_dir / "alpha.md").write_text("# Alpha", encoding="utf-8")
+
+            with patch.object(prepare_batch, "_process_one_file", return_value={"ok": False, "error": {"code": "E_TEST"}}):
+                _code, first = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "input_dir": str(input_dir),
+                        "output_root": str(output_root),
+                        "force": True,
+                        "min_free_memory_gb": 0,
+                        "convert_jobs": 1,
+                    },
+                )
+            manifest_path = Path(first["error"]["details"]["batch_manifest_json"])
+
+            code, envelope = _capture_envelope(
+                prepare_batch.run,
+                {
+                    "rerun": True,
+                    "batch_manifest_path": str(manifest_path),
+                    "rerun_scope": "policy_affected",
+                    "min_free_memory_gb": 0,
+                },
+            )
+
+            self.assertEqual(code, 1)
+            self.assertEqual(envelope["error"]["code"], "E_INVALID_INPUT")
+            self.assertIn("identity", envelope["error"]["message"].lower())
+
+    def test_batch_rerun_policy_affected_scope_selects_matching_children_by_policy_hash(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path, input_dir, _children = _build_policy_affected_fixture(Path(tmp))
+            rerun_calls: list[str] = []
+
+            def rerun_child(file_path: Path, out_root: str, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+                rerun_calls.append(file_path.relative_to(input_dir).as_posix())
+                return _successful_child(file_path, out_root)
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=rerun_child):
+                code, envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "rerun": True,
+                        "batch_manifest_path": str(manifest_path),
+                        "rerun_scope": "policy_affected",
+                        "affected_policy_snapshot_hash": "hash-alpha",
+                        "min_free_memory_gb": 0,
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_calls, ["alpha.md"])
+            rerun_manifest = json.loads(Path(envelope["data"]["batch_rerun_manifest_json"]).read_text(encoding="utf-8"))
+            self.assertEqual(rerun_manifest["scope"], "policy_affected")
+            self.assertEqual(rerun_manifest["selected"], ["alpha.md"])
+
+    def test_batch_rerun_policy_affected_scope_matches_by_document_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path, input_dir, children = _build_policy_affected_fixture(Path(tmp))
+            rerun_calls: list[str] = []
+
+            def rerun_child(file_path: Path, out_root: str, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+                rerun_calls.append(file_path.relative_to(input_dir).as_posix())
+                return _successful_child(file_path, out_root)
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=rerun_child):
+                code, _envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "rerun": True,
+                        "batch_manifest_path": str(manifest_path),
+                        "rerun_scope": "policy_affected",
+                        "affected_document_id": children["beta.md"]["document_id"],
+                        "min_free_memory_gb": 0,
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_calls, ["beta.md"])
+
+    def test_batch_rerun_policy_affected_scope_matches_failed_child_via_runs_scan_by_source_identity(self) -> None:
+        # gamma is a failed child with no manifest run_id; its evidence is reached only by
+        # scanning <output_root>/runs/*/. Match it via a stable source_identity field to prove
+        # both the runs/ scan fallback and the source_identity matching dimension work.
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path, input_dir, _children = _build_policy_affected_fixture(Path(tmp))
+            rerun_calls: list[str] = []
+
+            def rerun_child(file_path: Path, out_root: str, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+                rerun_calls.append(file_path.relative_to(input_dir).as_posix())
+                return _successful_child(file_path, out_root)
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=rerun_child):
+                code, _envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "rerun": True,
+                        "batch_manifest_path": str(manifest_path),
+                        "rerun_scope": "policy_affected",
+                        "affected_source_identity": {"source_domain": "gamma.example.com"},
+                        "min_free_memory_gb": 0,
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_calls, ["gamma.md"])
+
+    def test_batch_rerun_policy_affected_scope_skips_child_without_run_evidence(self) -> None:
+        # A failed child whose runs/ dir does not exist (early-stage failure) must be skipped
+        # without crashing; children whose evidence is reachable and matches are still selected.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_dir = root / "sources"
+            output_root = root / "batch"
+            input_dir.mkdir()
+            (input_dir / "alpha.md").write_text("# Alpha", encoding="utf-8")
+            (input_dir / "gamma.md").write_text("# Gamma", encoding="utf-8")
+
+            child_out_alpha = output_root / "files" / "alpha"
+            _write_policy_affected_run_evidence(
+                child_out_alpha / "runs" / "run_alpha",
+                document_id="doc-alpha",
+                policy_snapshot_hash="hash-alpha",
+                source_identity={"source_name": "alpha.md"},
+            )
+            # gamma is a failed child whose output_root has no runs/ dir at all.
+            child_out_gamma = output_root / "files" / "gamma"
+
+            manifest_path = output_root / "batch_manifest.json"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "schema": "kbprep.batch_manifest.v1",
+                        "input_dir": str(input_dir),
+                        "output_root": str(output_root),
+                        "items": [
+                            {
+                                "relative_path": "alpha.md",
+                                "file": "alpha.md",
+                                "status": "succeeded",
+                                "run_id": "run_alpha",
+                                "output_root": str(child_out_alpha),
+                                "rerunnable": True,
+                            },
+                            {
+                                "relative_path": "gamma.md",
+                                "file": "gamma.md",
+                                "status": "failed",
+                                "output_root": str(child_out_gamma),
+                                "rerunnable": True,
+                            },
+                        ],
+                        "rerun": {"recommended_scope": "none"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            rerun_calls: list[str] = []
+
+            def rerun_child(file_path: Path, out_root: str, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+                rerun_calls.append(file_path.relative_to(input_dir).as_posix())
+                return _successful_child(file_path, out_root)
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=rerun_child):
+                code, _envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "rerun": True,
+                        "batch_manifest_path": str(manifest_path),
+                        "rerun_scope": "policy_affected",
+                        "affected_policy_snapshot_hash": "hash-alpha",
+                        "min_free_memory_gb": 0,
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_calls, ["alpha.md"])
+
+    def test_batch_rerun_policy_affected_scope_rejects_unstable_source_identity_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path, _input_dir, _children = _build_policy_affected_fixture(Path(tmp))
+
+            code, envelope = _capture_envelope(
+                prepare_batch.run,
+                {
+                    "rerun": True,
+                    "batch_manifest_path": str(manifest_path),
+                    "rerun_scope": "policy_affected",
+                    "affected_source_identity": {"source_path": "/x/y.md"},
+                    "min_free_memory_gb": 0,
+                },
+            )
+
+            self.assertEqual(code, 1)
+            self.assertEqual(envelope["error"]["code"], "E_INVALID_INPUT")
+            self.assertIn("non-stable key", envelope["error"]["message"])
+
+    def test_batch_rerun_policy_affected_scope_matches_by_multi_key_source_identity_subset(self) -> None:
+        # Subset semantics: every supplied white-listed key must match. alpha matches both
+        # source_name and source_domain; beta shares source_domain but differs in source_name,
+        # so it must not be selected.
+        with tempfile.TemporaryDirectory() as tmp:
+            manifest_path, input_dir, _children = _build_policy_affected_fixture(Path(tmp))
+            rerun_calls: list[str] = []
+
+            def rerun_child(file_path: Path, out_root: str, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+                rerun_calls.append(file_path.relative_to(input_dir).as_posix())
+                return _successful_child(file_path, out_root)
+
+            with patch.object(prepare_batch, "_process_one_file", side_effect=rerun_child):
+                code, _envelope = _capture_envelope(
+                    prepare_batch.run,
+                    {
+                        "rerun": True,
+                        "batch_manifest_path": str(manifest_path),
+                        "rerun_scope": "policy_affected",
+                        "affected_source_identity": {"source_name": "alpha.md", "source_domain": "example.com"},
+                        "min_free_memory_gb": 0,
+                    },
+                )
+
+            self.assertEqual(code, 0)
+            self.assertEqual(rerun_calls, ["alpha.md"])
 
     def test_single_file_prepare_does_not_create_batch_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

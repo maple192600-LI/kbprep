@@ -12,9 +12,12 @@ from typing import Any
 from . import prepare_batch as batch
 from .atomic_io import atomic_write_json
 from .envelope import fail, ok
+from .feedback.canonical_ir_binding import canonical_ir_binding
+from .feedback.support import _optional_string, _read_json_file
 from .fs_safety import is_safe_input_path, is_safe_output_root
 
 BATCH_RERUN_MANIFEST_SCHEMA = "kbprep.batch_rerun_manifest.v1"
+_AFFECTED_SOURCE_IDENTITY_KEYS = frozenset({"source_url", "source_domain", "site_name", "source_name"})
 
 
 def run_batch_rerun(data: dict[str, Any]) -> None:
@@ -24,7 +27,7 @@ def run_batch_rerun(data: dict[str, Any]) -> None:
     config = _batch_rerun_config(data, manifest, defaults)
     input_p, output_p = Path(config.input_dir), Path(config.output_root)
     requested_scope = str(data.get("rerun_scope") or "recommended")
-    selected_items = _selected_rerun_items(manifest, requested_scope)
+    selected_items = _selected_rerun_items(manifest, requested_scope, data)
     selected = [str(item.get("relative_path")) for item in selected_items]
     if not selected:
         fail("E_BATCH_RERUN_EMPTY", "Batch manifest has no rerunnable items for the requested scope.")
@@ -142,7 +145,11 @@ def _force_value(data: dict[str, Any], defaults: dict[str, Any]) -> bool:
     return bool(value)
 
 
-def _selected_rerun_items(manifest: dict[str, Any], requested_scope: str) -> list[dict[str, Any]]:
+def _selected_rerun_items(
+    manifest: dict[str, Any],
+    requested_scope: str,
+    data: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     rerun = _dict_value(manifest.get("rerun"))
     items_by_path = _items_by_path(manifest)
     scope = _effective_rerun_scope(manifest, requested_scope)
@@ -152,6 +159,8 @@ def _selected_rerun_items(manifest: dict[str, Any], requested_scope: str) -> lis
         return _manifest_items_for_paths(items_by_path, _string_list(rerun.get("pending")))
     if scope == "failed_and_pending":
         return _manifest_items_for_paths(items_by_path, _string_list(rerun.get("affected")))
+    if scope == "policy_affected":
+        return _policy_affected_items(manifest, data)
     return []
 
 
@@ -175,12 +184,140 @@ def _effective_rerun_scope(manifest: dict[str, Any], requested_scope: str) -> st
     if normalized == "recommended":
         rerun = _dict_value(manifest.get("rerun"))
         normalized = str(rerun.get("recommended_scope") or "none")
+    if normalized == "policy_affected":
+        return "policy_affected"
     if normalized == "failed_and_pending":
         return "failed_and_pending"
     if normalized in {"failed_only", "pending_only", "none"}:
         return normalized
     fail("E_INVALID_INPUT", f"Unsupported batch rerun scope: {requested_scope}")
     return "none"
+
+
+def _policy_affected_items(manifest: dict[str, Any], data: dict[str, Any] | None) -> list[dict[str, Any]]:
+    affected = _affected_identity_from_data(data or {})
+    items = manifest.get("items")
+    if not isinstance(items, list):
+        return []
+    selected: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict) or item.get("status") in {"pending", "skipped_unsupported"}:
+            continue
+        evidence = _child_run_evidence(item)
+        if evidence is None:
+            continue
+        if _child_matches_affected(evidence, affected):
+            selected.append(item)
+    return selected
+
+
+def _affected_identity_from_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract and validate the policy_affected identity selector from the rerun payload."""
+    document_id = _optional_string(data.get("affected_document_id"))
+    policy_hash = _optional_string(data.get("affected_policy_snapshot_hash"))
+    source_identity = _affected_source_identity(data.get("affected_source_identity"))
+    if not document_id and not policy_hash and not source_identity:
+        fail(
+            "E_INVALID_INPUT",
+            "rerun_scope=policy_affected requires at least one affected_* identity field "
+            "(affected_document_id, affected_policy_snapshot_hash, affected_source_identity).",
+        )
+    return {
+        "document_id": document_id,
+        "policy_snapshot_hash": policy_hash,
+        "source_identity": source_identity,
+    }
+
+
+def _affected_source_identity(raw: Any) -> dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        fail("E_INVALID_INPUT", "affected_source_identity must be an object.")
+    identity: dict[str, Any] = {}
+    for key, value in raw.items():
+        key_text = str(key)
+        if key_text not in _AFFECTED_SOURCE_IDENTITY_KEYS:
+            fail(
+                "E_INVALID_INPUT",
+                f"affected_source_identity uses non-stable key '{key_text}'. "
+                f"Allowed keys: {sorted(_AFFECTED_SOURCE_IDENTITY_KEYS)}.",
+            )
+        if not isinstance(value, (str, int, float, bool)):
+            fail("E_INVALID_INPUT", f"affected_source_identity '{key_text}' must be a scalar value.")
+        identity[key_text] = value
+    return identity
+
+
+def _child_run_dir(item: dict[str, Any]) -> Path | None:
+    """Locate the run_dir holding this child's run evidence.
+
+    Prefers the manifest-recorded run_id (succeeded children). Falls back to scanning
+    <output_root>/runs/*/run_metadata.json for the most recent run (failed children have no
+    run_id and no latest.json). Returns None when no evidence can be located.
+    """
+    output_root = _optional_string(item.get("output_root"))
+    if not output_root:
+        return None
+    base = Path(output_root)
+    run_id = _optional_string(item.get("run_id"))
+    if run_id and (base / "runs" / run_id).is_dir():
+        return base / "runs" / run_id
+    runs_dir = base / "runs"
+    try:
+        candidates = [path.parent for path in runs_dir.glob("*/run_metadata.json") if path.is_file()]
+    except OSError:
+        return None
+    if not candidates:
+        return None
+    return max(candidates, key=_run_evidence_mtime)
+
+
+def _run_evidence_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _child_run_evidence(item: dict[str, Any]) -> dict[str, Any] | None:
+    """Read policy/source identity evidence for a child run.
+
+    Semantics align with feedback/rerun_verification._run_evidence_from_metadata; only the
+    fields needed for policy_affected matching are extracted. document_id comes from the
+    canonical_ir binding (empty when binding is pending), policy_snapshot_hash and
+    source_identity come from run_metadata.json.
+    """
+    run_dir = _child_run_dir(item)
+    if run_dir is None:
+        return None
+    metadata = _read_json_file(run_dir / "run_metadata.json")
+    binding = canonical_ir_binding(run_dir)
+    document_id = binding.get("document_id") if binding.get("status") == "bound" else ""
+    source_identity = metadata.get("source_identity")
+    return {
+        "document_id": _optional_string(document_id),
+        "policy_snapshot_hash": _optional_string(metadata.get("cleaning_policy_snapshot_hash")),
+        "source_identity": source_identity if isinstance(source_identity, dict) else {},
+    }
+
+
+def _child_matches_affected(evidence: dict[str, Any], affected: dict[str, Any]) -> bool:
+    """OR-match: child is selected when any supplied identity dimension matches."""
+    affected_document_id = affected.get("document_id")
+    if affected_document_id and evidence.get("document_id") == affected_document_id:
+        return True
+    affected_hash = affected.get("policy_snapshot_hash")
+    if affected_hash and evidence.get("policy_snapshot_hash") == affected_hash:
+        return True
+    affected_identity = affected.get("source_identity")
+    if affected_identity and _source_identity_is_subset(affected_identity, evidence.get("source_identity") or {}):
+        return True
+    return False
+
+
+def _source_identity_is_subset(affected: dict[str, Any], child: dict[str, Any]) -> bool:
+    return all(child.get(key) == value for key, value in affected.items())
 
 
 def _execute_batch_rerun_items(
