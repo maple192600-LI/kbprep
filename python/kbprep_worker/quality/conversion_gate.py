@@ -271,9 +271,15 @@ def _converted_quality(
 def _canonical_ir_quality_artifacts(canonical_ir_gate_evidence: dict[str, Any]) -> dict[str, Any]:
     typed_nodes = _dict_or_empty(canonical_ir_gate_evidence.get("typed_nodes"))
     source_spans = _dict_or_empty(canonical_ir_gate_evidence.get("source_spans"))
+    relationships = _dict_or_empty(canonical_ir_gate_evidence.get("relationships"))
+    assets = _dict_or_empty(canonical_ir_gate_evidence.get("assets"))
+    annotations = _dict_or_empty(canonical_ir_gate_evidence.get("annotations"))
     return {
         "typed_nodes": typed_nodes.get("artifact"),
         "source_spans": source_spans.get("artifact"),
+        "relationships": relationships.get("artifact"),
+        "assets": assets.get("artifact"),
+        "annotations": annotations.get("artifact"),
     }
 
 

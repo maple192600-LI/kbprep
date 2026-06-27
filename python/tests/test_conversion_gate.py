@@ -336,6 +336,33 @@ class ConversionGateTests(unittest.TestCase):
         self.assertTrue(report["canonical_ir_gate_evidence"]["complete"])
         self.assertEqual(report["strict_errors"], [])
 
+    def test_pre_clean_conversion_gate_complete_rejects_route_wide_section_claimed_available_but_not_validated(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            converted = run_dir / "converted.md"
+            converted.write_text("body content here " * 80, encoding="utf-8")
+            _write_conversion_report(run_dir, converted)
+            _write_valid_manifests(run_dir, converted)
+            _enable_canonical_artifacts(run_dir)
+            _write_single_heading_canonical_artifacts(run_dir)
+            _add_coverage_report(run_dir)
+            # Manifest declares a route-wide artifact available, but its coverage section
+            # is not validated. complete must consume route-wide IR, not only typed/spans.
+            manifest_path = run_dir / "canonical_ir" / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["coverage"]["relationships_available"] = True
+            manifest["coverage"]["report"]["relationships"] = {
+                "artifact": "canonical_ir/relationships.json",
+                "available": True,
+                "status": "not_validated",
+                "record_count": 1,
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            report = run_pre_clean_conversion_gate(run_dir, diagnosis={})
+
+        self.assertFalse(report["canonical_ir_gate_evidence"]["complete"])
+
     def test_pre_clean_conversion_gate_falls_back_to_rendered_markdown_when_ir_coverage_is_incomplete(self):
         with tempfile.TemporaryDirectory() as tmp:
             run_dir = Path(tmp)

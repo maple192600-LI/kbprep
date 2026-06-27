@@ -19,6 +19,9 @@ def build_canonical_ir_gate_evidence(run_dir: Path) -> dict[str, Any]:
     report = _dict_value(coverage.get("report"))
     typed_section = _dict_value(report.get("typed_nodes"))
     spans_section = _dict_value(report.get("source_spans"))
+    relationships_section = _dict_value(report.get("relationships"))
+    assets_section = _dict_value(report.get("assets"))
+    annotations_section = _dict_value(report.get("annotations"))
     issues = _coverage_report_artifact_issues(artifacts, typed_section, spans_section)
     typed_nodes_ref = artifacts.get("typed_nodes")
     source_spans_ref = artifacts.get("source_spans")
@@ -26,13 +29,19 @@ def build_canonical_ir_gate_evidence(run_dir: Path) -> dict[str, Any]:
     source_spans_path = _resolve_run_artifact(run_p, source_spans_ref)
     typed_nodes = _read_json_object(typed_nodes_path) if typed_nodes_path is not None else None
     source_spans = _read_json_object(source_spans_path) if source_spans_path is not None else None
-    complete = not issues and _has_complete_ir_evidence(coverage, typed_section, spans_section, typed_nodes, source_spans)
+    route_wide_sections = (relationships_section, assets_section, annotations_section)
+    complete = not issues and _has_complete_ir_evidence(
+        coverage, typed_section, spans_section, route_wide_sections, typed_nodes, source_spans,
+    )
     text = _joined_typed_node_text(typed_nodes) if complete else ""
     return {
         "complete": complete,
         "quality_source": "canonical_ir" if complete else "unavailable",
         "typed_nodes": _typed_nodes_summary(typed_section, typed_nodes, typed_nodes_ref),
         "source_spans": _source_spans_summary(spans_section, source_spans, source_spans_ref),
+        "relationships": _route_wide_summary(relationships_section, artifacts.get("relationships")),
+        "assets": _route_wide_summary(assets_section, artifacts.get("assets")),
+        "annotations": _route_wide_summary(annotations_section, artifacts.get("annotations")),
         "issues": issues,
         "text_quality": analyze_text_quality(text) if complete else {},
     }
@@ -42,9 +51,11 @@ def _has_complete_ir_evidence(
     coverage: dict[str, Any],
     typed_section: dict[str, Any],
     spans_section: dict[str, Any],
+    route_wide_sections: tuple[dict[str, Any], dict[str, Any], dict[str, Any]],
     typed_nodes: dict[str, Any] | None,
     source_spans: dict[str, Any] | None,
 ) -> bool:
+    relationships_section, assets_section, annotations_section = route_wide_sections
     return (
         coverage.get("typed_nodes_available") is True
         and coverage.get("source_spans_available") is True
@@ -54,9 +65,38 @@ def _has_complete_ir_evidence(
         and spans_section.get("status") == "validated"
         and spans_section.get("typed_node_coverage_ratio") == 1.0
         and spans_section.get("span_count") == spans_section.get("typed_node_count")
+        and _declared_section_validated(coverage, "relationships_available", relationships_section)
+        and _declared_section_validated(coverage, "assets_available", assets_section)
+        and _declared_section_validated(coverage, "annotations_available", annotations_section)
         and typed_nodes is not None
         and source_spans is not None
     )
+
+
+def _declared_section_validated(
+    coverage: dict[str, Any],
+    available_flag: str,
+    section: dict[str, Any],
+) -> bool:
+    """When the manifest declares a route-wide artifact available, its coverage section must be validated.
+
+    Routes that never declare the artifact (pure-text with no figure/table) are not
+    penalized — only an available claim that the section contradicts breaks completeness.
+    """
+    if coverage.get(available_flag) is not True:
+        return True
+    return section.get("available") is True and section.get("status") == "validated"
+
+
+def _route_wide_summary(section: dict[str, Any], manifest_ref: object) -> dict[str, Any]:
+    return {
+        "artifact": manifest_ref,
+        "report_artifact": section.get("artifact"),
+        "available": section.get("available") is True,
+        "status": str(section.get("status") or "unavailable"),
+        "record_count": _int_value(section.get("record_count")),
+        "distribution": _dict_value(section.get("distribution")),
+    }
 
 
 def _typed_nodes_summary(
