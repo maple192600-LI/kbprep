@@ -615,6 +615,24 @@ npm run check:development-docs
 git diff --check
 ```
 
+## Test Sample Sources
+
+All Wave 4 (F1/F2/F3) + PLAYLIST2 real-sample evidence comes from the owner's local Obsidian vault — **do not ask the owner for samples** (confirmed 2026-06-27; this has been asked for redundantly in the past and is a known error). Sample inventory verified to exist.
+
+**Location:** `F:\Obsidian-Vault` (owner's local vault; machine-local path — documents may reference it as a resource pointer, but **code must NOT hardcode it**; pass via input/config per the path-portability rule).
+
+| Route | Sample type | Path / source |
+|---|---|---|
+| F1 media ASR (video) | mp4 | `F:\Obsidian-Vault\69cbf59e000000001a025299.mp4`, `F:\Obsidian-Vault\codex教程.mp4`, `F:\Obsidian-Vault\YouTube\` |
+| F1 media ASR (audio) | mp3 | `F:\Obsidian-Vault\03-Resources\audio_3DlXq9nsQOE.mp3`, or extract from any video: `ffmpeg -i <video>.mp4 -vn -acodec libmp3lame <audio>.mp3` |
+| F2 image OCR | png/jpg | `F:\Obsidian-Vault\image-*.png`, `F:\Obsidian-Vault\04-Archive\base64-docs\kbprep-output\runs\*\images\*.jpg` |
+| F2 legacy Office | pptx/docx | `F:\Obsidian-Vault\03-Resources\财务的变革与重塑11.pptx`, `F:\Obsidian-Vault\03-Resources\财务知识库建设手册_v2.0.docx` |
+| PDF real evidence | pdf | `F:\Obsidian-Vault\03-Resources\*.pdf` (AI 编程实战三卷书, Loop-Engineering 橙皮书, Claude Code 从入门到精通, 会计准则分录大全, etc.) |
+| F3 YouTube real-network | video | `https://www.youtube.com/watch?v=CAQ2pfhoPcs` (owner-designated test video, 2026-06-27) |
+| PLAYLIST2 playlist evidence | playlist | derive from `F:\Obsidian-Vault\YouTube\` or an owner-provided playlist URL |
+
+**Audio extraction (F1):** the owner explicitly said "any video → ffmpeg extract → audio sample". Do not block F1 on missing audio files; extract from an existing video.
+
 ## Final Integration Sequence
 
 Merge order:
