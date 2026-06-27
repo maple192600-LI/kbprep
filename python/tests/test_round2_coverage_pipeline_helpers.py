@@ -111,6 +111,43 @@ class PipelineHelperRound2CoverageTests(unittest.TestCase):
                     pipeline_core._run_mineru_conversion(source, run_dir / "missing-converted.md", run_dir, "zh", "auto")
             self.assertEqual(raised.exception.code, "E_CONVERT_OUTPUT_MISSING")
 
+    def test_mineru_conversion_emits_pdf_bbox_native_source_spans_from_content_list(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "scan.pdf"
+            source.write_bytes(b"%PDF-")
+            run_dir = root / "run"
+            run_dir.mkdir()
+            converted = run_dir / "converted.md"
+            mineru_md = root / "mineru" / "source.md"
+            mineru_md.parent.mkdir(parents=True)
+            converted_text = "# Title\n\nFirst paragraph.\n\nSecond paragraph.\n"
+            mineru_md.write_text(converted_text, encoding="utf-8")
+            content_list_path = mineru_md.parent / "content_list.json"
+            content_list_path.write_text(json.dumps([
+                {"type": "text", "text": "First paragraph.", "page_idx": 0, "bbox": [10.0, 20.0, 100.0, 40.0]},
+                {"type": "text", "text": "Second paragraph.", "page_idx": 1, "bbox": [5.0, 15.0, 90.0, 35.0]},
+            ], ensure_ascii=False), encoding="utf-8")
+            fake_result = {
+                "source_md_path": str(mineru_md),
+                "content_list_path": str(content_list_path),
+                "assets_dir": str(mineru_md.parent),
+                "warnings": [],
+            }
+            with patch("kbprep_worker.mineru_adapter.run_mineru", return_value=fake_result):
+                result = pipeline_core._run_mineru_conversion(source, converted, run_dir, "zh", "ocr")
+
+        native = result.get("native_source_spans")
+        self.assertIsNotNone(native)
+        assert native is not None
+        self.assertEqual(len(native), 2)
+        self.assertEqual(native[0]["precision"], "pdf_bbox")
+        self.assertEqual(native[0]["location"]["page"], 1)
+        self.assertEqual(native[0]["location"]["bbox"], [10.0, 20.0, 100.0, 40.0])
+        # 1-based line numbers align with typed_node (canonical_nodes._parse_markdown_blocks uses start_index + 1).
+        self.assertEqual(native[0]["converted_line_start"], 3)
+        self.assertEqual(native[1]["converted_line_start"], 5)
+
     def test_conversion_reports_existing_run_scan_and_primary_quality_issue(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

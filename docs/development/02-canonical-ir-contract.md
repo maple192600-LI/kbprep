@@ -34,14 +34,17 @@ The Office XML converter now emits that native evidence for PPTX slide shape
 ids, DOCX paragraph/run ranges, and XLSX cell ranges, threading it through
 `conversion_report.mineru_artifacts.native_source_spans` into the span writer,
 which attaches the route-native precision only when the evidence overlaps a
-typed node and its precision matches the span source kind. The PDF text-layer
-route still emits no native bbox evidence because `page.get_text("text")`
-carries no coordinates and line normalization breaks bbox alignment; it keeps
-converted-line precision and the coverage report lists `pdf_bbox` as a missing
-native kind, with route-native PDF bbox deferred to the MinerU OCR path. When
-any route omits native evidence, the writer keeps converted-line precision and
-the coverage report lists the missing native precision kinds instead of
-fabricating coordinates.
+typed node and its precision matches the span source kind. The MinerU OCR route
+extracts block-level `bbox` + `page_idx` from its `content_list.json` and threads
+those as `pdf_bbox` native evidence through the same channel (lines mapped 1-based
+to align with typed nodes; page stored 1-based because the validator requires
+page > 0). The PDF text-layer route still emits no native bbox evidence because
+`page.get_text("text")` carries no coordinates and line normalization breaks bbox
+alignment; it keeps converted-line precision and the coverage report lists
+`pdf_bbox` as a missing native kind only on that route. When any route omits
+native evidence, the writer keeps converted-line precision and the coverage
+report lists the missing native precision kinds instead of fabricating
+coordinates.
 The manifest also embeds `coverage.report`, which records typed-node counts,
 source-span counts, coverage ratio, span precision summaries,
 TransformationLedger availability, and remaining target gaps. The conversion
@@ -83,7 +86,9 @@ complete Canonical IR contract: route-native relationship semantics requiring
 source-structure containers, transcript speaker segmentation, node-level
 coverage-gap annotations, every output profile, and universal fact-layer usage
 remain partial or target work. (Converter-native source-span extraction for
-PPTX/DOCX/XLSX landed in C1R; PDF bbox stays deferred to MinerU.)
+PPTX/DOCX/XLSX landed in C1R; PDF bbox via MinerU OCR `content_list` landed in
+Wave 1; the PDF text-layer route still lacks a coordinate source and stays
+converted-line only.)
 
 ## Contract
 

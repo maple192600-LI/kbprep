@@ -164,6 +164,69 @@ class CoreHelperRound2CoverageTests(unittest.TestCase):
             blocks = blockify(text, "abcdef1234567890", {"content_list_path": str(content_list)}, str(root))
             self.assertTrue(any(item["type"] == "image_evidence" for item in blocks))
 
+    def test_extract_pdf_native_source_spans_from_mineru_content_list(self):
+        from kbprep_worker.blockify import extract_pdf_native_source_spans
+
+        converted_text = "# Title\n\nFirst paragraph.\n\nSecond paragraph.\n"
+        content_items = [
+            {"type": "text", "text": "First paragraph.", "page_idx": 0, "bbox": [10.0, 20.0, 100.0, 40.0]},
+            {"type": "text", "text": "Second paragraph.", "page_idx": 1, "bbox": [5.0, 15.0, 90.0, 35.0]},
+            {"type": "text", "text": "orphan block absent from converted text", "page_idx": 2, "bbox": [0.0, 0.0, 1.0, 1.0]},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            content_list_path = Path(tmp) / "content.json"
+            content_list_path.write_text(json.dumps(content_items, ensure_ascii=False), encoding="utf-8")
+            spans = extract_pdf_native_source_spans(content_list_path, converted_text)
+
+        # Orphan block (text absent from converted_text) is skipped — no fabricated positions.
+        self.assertEqual(len(spans), 2)
+        first, second = spans
+        self.assertEqual(first["precision"], "pdf_bbox")
+        # page is 1-based (MinerU page_idx 0 -> IR pdf_bbox page 1; validator requires page > 0).
+        self.assertEqual(first["location"]["page"], 1)
+        self.assertEqual(first["location"]["bbox"], [10.0, 20.0, 100.0, 40.0])
+        # Lines are 1-based to align with typed_node (canonical_nodes._parse_markdown_blocks uses start_index + 1).
+        self.assertEqual(first["converted_line_start"], 3)
+        self.assertEqual(first["converted_line_end"], 3)
+        self.assertEqual(second["location"]["page"], 2)
+        self.assertEqual(second["location"]["bbox"], [5.0, 15.0, 90.0, 35.0])
+        self.assertEqual(second["converted_line_start"], 5)
+
+    def test_extract_pdf_native_source_spans_skips_block_with_non_numeric_bbox(self):
+        from kbprep_worker.blockify import extract_pdf_native_source_spans
+
+        converted_text = "# Title\n\nFirst paragraph.\n"
+        content_items = [
+            {"type": "text", "text": "First paragraph.", "page_idx": 0, "bbox": ["bad", 20.0, 100.0, 40.0]},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            content_list_path = Path(tmp) / "content.json"
+            content_list_path.write_text(json.dumps(content_items, ensure_ascii=False), encoding="utf-8")
+            spans = extract_pdf_native_source_spans(content_list_path, converted_text)
+
+        # A non-numeric bbox element would otherwise fabricate a 0.0 coordinate — skip the whole block instead.
+        self.assertEqual(spans, [])
+
+    def test_extract_pdf_native_source_spans_advances_cursor_for_repeated_text(self):
+        from kbprep_worker.blockify import extract_pdf_native_source_spans
+
+        converted_text = "Repeat\n\nRepeat\n"
+        content_items = [
+            {"type": "text", "text": "Repeat", "page_idx": 0, "bbox": [10.0, 20.0, 100.0, 40.0]},
+            {"type": "text", "text": "Repeat", "page_idx": 1, "bbox": [5.0, 15.0, 90.0, 35.0]},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            content_list_path = Path(tmp) / "content.json"
+            content_list_path.write_text(json.dumps(content_items, ensure_ascii=False), encoding="utf-8")
+            spans = extract_pdf_native_source_spans(content_list_path, converted_text)
+
+        # Repeated text (headers/buttons/table cells) must each match its own occurrence, not collapse to the first.
+        self.assertEqual(len(spans), 2)
+        self.assertEqual(spans[0]["converted_line_start"], 1)
+        self.assertEqual(spans[0]["location"]["page"], 1)
+        self.assertEqual(spans[1]["converted_line_start"], 3)
+        self.assertEqual(spans[1]["location"]["page"], 2)
+
     def test_classification_cleaning_and_split_paths_with_fake_rules(self):
         rules = _fake_rules()
         blocks = [

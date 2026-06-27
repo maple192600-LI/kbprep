@@ -4,6 +4,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
+from kbprep_worker.blockify import extract_pdf_native_source_spans
 from kbprep_worker.canonical_ir import write_canonical_ir_manifests
 from kbprep_worker.canonical_nodes import write_typed_nodes_artifact
 from kbprep_worker.canonical_spans import (
@@ -1196,6 +1197,54 @@ class CanonicalIrSourceSpanTests(unittest.TestCase):
 
         precisions = [span["evidence"]["precision"] for span in spans_payload["spans"]]
         self.assertIn("xlsx_cell_range", precisions)
+
+    def test_pdf_mineru_native_spans_align_with_typed_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            source = run_dir / "source.pdf"
+            converted = run_dir / "converted.md"
+            source.write_bytes(b"%PDF placeholder")
+            converted_text = "# Title\n\nFirst paragraph.\n\nSecond paragraph.\n"
+            converted.write_text(converted_text, encoding="utf-8")
+            content_list_path = run_dir / "content_list.json"
+            content_list_path.write_text(json.dumps([
+                {"type": "text", "text": "First paragraph.", "page_idx": 0, "bbox": [10.0, 20.0, 100.0, 40.0]},
+                {"type": "text", "text": "Second paragraph.", "page_idx": 1, "bbox": [5.0, 15.0, 90.0, 35.0]},
+            ], ensure_ascii=False), encoding="utf-8")
+            native_spans = extract_pdf_native_source_spans(content_list_path, converted_text)
+            typed_nodes = write_typed_nodes_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                converted_path=converted,
+                source_type="pdf_like",
+            )
+            artifact = write_source_spans_artifact(
+                run_dir=run_dir,
+                document_id="doc_test",
+                input_path=source,
+                converted_path=converted,
+                typed_nodes_path=typed_nodes,
+                source_type="pdf_like",
+                converter="mineru",
+                conversion_route="mineru_ocr",
+                native_source_spans=native_spans,
+            )
+            payload = json.loads(artifact.read_text(encoding="utf-8"))
+            issues = validate_source_spans_artifact(
+                run_dir=run_dir,
+                source_spans_path=artifact,
+                typed_nodes_path=typed_nodes,
+                document_id="doc_test",
+                converted_path=converted,
+            )
+
+        pdf_bbox_spans = [s for s in payload["spans"] if s["evidence"]["precision"] == "pdf_bbox"]
+        self.assertEqual(len(pdf_bbox_spans), 2)
+        self.assertEqual(pdf_bbox_spans[0]["source_kind"], "pdf")
+        self.assertEqual(pdf_bbox_spans[0]["location"]["page"], 1)
+        self.assertEqual(pdf_bbox_spans[0]["location"]["bbox"], [10.0, 20.0, 100.0, 40.0])
+        self.assertEqual(pdf_bbox_spans[1]["location"]["page"], 2)
+        self.assertEqual(issues, [])
 
 
 if __name__ == "__main__":

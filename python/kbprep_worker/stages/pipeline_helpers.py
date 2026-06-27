@@ -94,6 +94,9 @@ def _run_mineru_conversion(
         )
     _copy_mineru_image_assets(source_md, run_dir, result)
     shutil.copy2(str(source_md), str(converted_path))
+    from ..blockify import attach_pdf_native_source_spans
+
+    attach_pdf_native_source_spans(result, converted_path)
     return result
 
 

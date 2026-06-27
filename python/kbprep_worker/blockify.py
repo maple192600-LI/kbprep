@@ -315,6 +315,96 @@ def _build_page_map(text: str, mineru_artifacts: dict | None = None) -> list[dic
         return []
 
 
+def extract_pdf_native_source_spans(content_list_path: Path | str, converted_text: str) -> list[dict]:
+    """Extract ``pdf_bbox`` native source spans from a MinerU content_list.
+
+    Maps each content block's text to its converted-Markdown line and emits a
+    ``pdf_bbox`` native span aligned with typed_node numbering (1-based). See
+    ``_parse_pdf_bbox_item`` and ``attach_pdf_native_source_spans`` for the
+    no-fabrication guardrails: orphan blocks are skipped, a non-numeric bbox skips
+    the whole block, and the text search advances a cursor so repeated blocks
+    (headers, buttons, table cells) each map to their own occurrence.
+    """
+    try:
+        content_list = json.loads(Path(content_list_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(content_list, list):
+        return []
+    line_offsets = _line_start_offsets(converted_text)
+    spans: list[dict] = []
+    search_from = 0
+    for item in content_list:
+        parsed = _parse_pdf_bbox_item(item)
+        if parsed is None:
+            continue
+        bbox, page_idx, text = parsed
+        needle = text[:40]
+        pos = converted_text.find(needle, search_from)
+        if pos < 0:
+            continue
+        search_from = pos + len(needle)
+        spans.append(_pdf_bbox_span(page_idx, bbox, _offset_to_line(pos, line_offsets)))
+    return spans
+
+
+def _parse_pdf_bbox_item(item: object) -> tuple[list, int, str] | None:
+    """Validate a MinerU content block and return ``(bbox, page_idx, text)``.
+
+    Returns ``None`` when the block lacks a 4-element numeric bbox, an integer
+    ``page_idx``, or non-empty text — these blocks are skipped so the extractor
+    never fabricates coordinates from malformed OCR output.
+    """
+    if not isinstance(item, dict):
+        return None
+    bbox = item.get("bbox")
+    page_idx = item.get("page_idx", item.get("page"))
+    text = item.get("text", "")
+    if (
+        not isinstance(bbox, list)
+        or len(bbox) != 4
+        or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in bbox)
+        or isinstance(page_idx, bool)
+        or not isinstance(page_idx, int)
+        or not isinstance(text, str)
+        or not text
+    ):
+        return None
+    return bbox, page_idx, text
+
+
+def _pdf_bbox_span(page_idx: int, bbox: list, line: int) -> dict:
+    """Build a ``pdf_bbox`` native span from a 0-based ``page_idx`` and 0-based line.
+
+    Both are stored 1-based: lines align with typed_node numbering
+    (``canonical_nodes._parse_markdown_blocks`` uses ``start_index + 1``) and the
+    source_spans validator requires ``page > 0`` while MinerU ``page_idx`` is 0-based.
+    """
+    return {
+        "converted_line_start": line + 1,
+        "converted_line_end": line + 1,
+        "precision": "pdf_bbox",
+        "location": {"page": page_idx + 1, "bbox": [float(v) for v in bbox]},
+    }
+
+
+def attach_pdf_native_source_spans(artifacts: dict, converted_path: Path) -> None:
+    """Attach pdf_bbox native source spans to a MinerU artifacts dict in place.
+
+    Only MinerU OCR routes carry block-level bbox coordinates. When
+    ``content_list_path`` is absent (e.g. text-layer routes) nothing is attached,
+    keeping the C1R pdf_bbox gap honest. The span writer gates evidence by
+    source_kind=pdf, so non-PDF routes that reuse this conversion ignore the
+    candidate evidence instead of emitting fabricated coordinates.
+    """
+    content_list_path = artifacts.get("content_list_path")
+    if not content_list_path or not converted_path.exists():
+        return
+    converted_text = converted_path.read_text(encoding="utf-8")
+    if converted_text:
+        artifacts["native_source_spans"] = extract_pdf_native_source_spans(content_list_path, converted_text)
+
+
 def _find_page_range(line_start: int, line_end: int, page_map: list[dict]) -> tuple[int | None, int | None]:
     """Find page range for given line positions."""
     if not page_map:
