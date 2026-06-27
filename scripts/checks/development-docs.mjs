@@ -96,9 +96,7 @@ for (const file of requiredDocs.filter((file) => /^docs\/development\/\d{2}-/.te
 for (const file of currentDocs) {
   const text = read(file);
   for (const { text: phrase, wordBoundary } of stalePhrases) {
-    const found = wordBoundary
-      ? new RegExp(`\\b${phrase}\\b`).test(text)
-      : text.includes(phrase);
+    const found = wordBoundary ? new RegExp(`\\b${phrase}\\b`).test(text) : text.includes(phrase);
     if (found) {
       failures.push({ file, reason: `stale architecture wording remains: ${phrase}` });
     }
