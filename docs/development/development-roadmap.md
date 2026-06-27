@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | partial | Gate validates manifest evidence, typed-node evidence, source-span evidence, claimed transformation-ledger evidence, C4 coverage-report claims, and C5 complete-IR text-quality evidence when available; full route-wide IR semantics remain future work. |
-| canonical_ir_contract | partial | Manifest plus `typed_nodes.json`, `source_spans.json`, `transformation_ledger.json`, embedded coverage report evidence, pre-clean gate use of complete typed-node/source-span text evidence, and a minimal standard Markdown IR regeneration path exist for heading, paragraph, list, table, code, quote, formula, figure, metadata, transcript cues, and conversion-phase ledger evidence. SourceSpan schema now validates route-native precision records when provided and reports missing native precision kinds without fabricating evidence; converter-native extraction, full renderer/profile coverage, and full fact-layer usage are not shipped. |
+| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete; YouTube/media/image optional routes remain partial (Wave 4). |
+| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/media/image optional routes, full Markdown renderer/profile coverage, and universal fact-layer usage remain partial (Wave 4). |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -295,7 +295,7 @@ sample evidence agree.
 | Plan milestone | Roadmap phase | Status |
 | --- | --- | --- |
 | M1 Design Source Aligned | Phase A | implemented, kept aligned |
-| M2 Canonical IR Contract | Phase C | in progress (partial) |
+| M2 Canonical IR Contract | Phase C | implemented |
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
 | M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | partial |

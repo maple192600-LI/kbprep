@@ -352,7 +352,7 @@ def _canonical_manifest_payload(
             transformation_ledger_path=transformation_ledger_path,
             transformation_ledger_available=transformation_ledger_available,
         ),
-        "status": "partial",
+        "status": "implemented",
     }
 
 
@@ -517,11 +517,11 @@ def _validate_canonical_manifest(
             run_dir=run_dir, artifacts=artifacts, coverage=coverage, document_id=document_id,
         ):
             _add_issue(issues, record_issue.code, record_issue.message, record_issue.evidence)
-    if manifest.get("status") != "partial":
+    if manifest.get("status") not in ("partial", "implemented"):
         _add_issue(
             issues,
             "E_CANONICAL_IR_MANIFEST_INVALID",
-            "canonical_ir/manifest.json status must be partial for this slice",
+            "canonical_ir/manifest.json status must be partial or implemented",
             {"status": manifest.get("status")},
         )
 

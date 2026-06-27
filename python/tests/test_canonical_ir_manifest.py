@@ -138,7 +138,7 @@ class CanonicalIrManifestTests(unittest.TestCase):
             typed_nodes_path = run_dir / "canonical_ir" / "typed_nodes.json"
             ledger_path = run_dir / "canonical_ir" / "transformation_ledger.json"
             self.assertEqual(canonical_manifest["schema"], "kbprep.canonical_ir_manifest.v1")
-            self.assertEqual(canonical_manifest["status"], "partial")
+            self.assertEqual(canonical_manifest["status"], "implemented")
             self.assertEqual(canonical_manifest["source_snapshot"]["input_name"], source.name)
             self.assertEqual(canonical_manifest["source_snapshot"]["input_size"], source.stat().st_size)
             self.assertEqual(canonical_manifest["conversion"]["actual_route"], "direct_text")

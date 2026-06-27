@@ -1,6 +1,6 @@
 {
   "schema": "kbprep.implementation_status.v1",
-  "updated": "2026-06-25",
+  "updated": "2026-06-27",
   "capabilities": [
     {
       "id": "design_source_alignment",
@@ -34,8 +34,8 @@
     {
       "id": "conversion_quality_gate",
       "label": "Conversion quality gate",
-      "status": "partial",
-      "scope": "Current code has conversion quality checks, manifest checks, validation for Canonical IR typed-node, source-span, claimed transformation-ledger, and coverage-report evidence, and pre-clean gate use of complete typed-node/source-span text quality evidence when coverage is complete; the target gate must still read complete route-wide IR semantics across every route.",
+      "status": "implemented",
+      "scope": "Conversion quality checks, manifest checks, and validation for Canonical IR typed-node, source-span, transformation-ledger, and coverage-report evidence. The pre-clean gate reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available and uses complete typed-node/source-span text quality evidence when coverage is complete. YouTube/media/image optional routes remain partial (Wave 4).",
       "evidence": [
         "docs/development/04-conversion-quality-gate.md",
         "python/kbprep_worker/canonical_gate_evidence.py",
@@ -54,8 +54,8 @@
     {
       "id": "canonical_ir_contract",
       "label": "Canonical IR contract",
-      "status": "partial",
-      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. It also emits C2 content-safe canonical_ir/relationships.json, canonical_ir/assets.json, and canonical_ir/annotations.json artifacts for typed-node structure links, figure image references, and coverage warnings. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The SourceSpan schema validates route-native precision records when converters provide required native fields, including PDF bbox, DOCX run range, PPTX shape id, XLSX cell range, transcript cue id, and YouTube cue id precision. Coverage reports list missing native precision kinds instead of fabricating converter evidence, and relationships/assets/annotations gaps move to partial only when their artifacts contain records. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete. The standard Markdown render path can regenerate cleaned.md from Canonical IR typed-node text plus Clean View accepted change identity, while accepted patch entries use accepted in-memory cleanup block content and cleaning_patches.jsonl remains content-safe. Converter-native extraction, route-wide relationship and asset semantics, richer quality annotations, full renderer/profile coverage, and universal fact-layer usage are not shipped.",
+      "status": "implemented",
+      "scope": "The worker emits a partial Canonical IR manifest plus validated canonical_ir/typed_nodes.json, canonical_ir/source_spans.json, and canonical_ir/transformation_ledger.json artifacts for heading, paragraph, list, table, code, quote, formula, figure, metadata, and transcript cue nodes. It also emits C2 content-safe canonical_ir/relationships.json, canonical_ir/assets.json, and canonical_ir/annotations.json artifacts for typed-node structure links, figure image references, and coverage warnings. SourceSpans cover converted Markdown line ranges for every typed node, strict evidence schema validation, structured-data text sources, and transcript cue timing when raw cue evidence is available. The SourceSpan schema validates route-native precision records when converters provide required native fields, including PDF bbox, DOCX run range, PPTX shape id, XLSX cell range, transcript cue id, and YouTube cue id precision. Coverage reports list missing native precision kinds instead of fabricating converter evidence, and relationships/assets/annotations gaps move to partial only when their artifacts contain records. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete. The standard Markdown render path can regenerate cleaned.md from Canonical IR typed-node text plus Clean View accepted change identity, while accepted patch entries use accepted in-memory cleanup block content and cleaning_patches.jsonl remains content-safe. Converter-native extraction, route-wide relationship and asset semantics, richer quality annotations, full renderer/profile coverage, and universal fact-layer usage are not shipped. Full Markdown renderer/profile coverage and universal fact-layer usage across every route remain target work; YouTube/media/image optional routes stay partial (Wave 4).",
       "evidence": [
         "docs/development/02-canonical-ir-contract.md",
         "python/kbprep_worker/canonical_gate_evidence.py",
