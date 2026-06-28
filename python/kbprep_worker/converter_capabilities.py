@@ -248,21 +248,30 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "source_type": "generic_block",
         "extensions": sorted(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS),
         "route": "media_to_transcript",
-        "dependencies": ["ffmpeg", "local Whisper CLI"],
+        "dependencies": ["ffmpeg", "qwen3-asr (zh route, cuda:0/bfloat16)", "local Whisper CLI (en route)"],
         "fallback": "Install ffmpeg and Whisper locally, or provide .srt, .vtt, .ass, .lrc, .txt, or .md transcript.",
         "status": "partial",
         "test_evidence": [
             CAPABILITY_DIAGNOSIS_EVIDENCE,
             MEDIA_YOUTUBE_EVIDENCE,
         ],
+        "real_fixture_evidence": (
+            "Real 90s zh audio fixture transcribed via qwen3-asr (cuda:0/bfloat16); "
+            "1885-char accurate transcript enters cleanup + final outputs; "
+            "quality gates pass with 0 strict errors. English Whisper route also passed "
+            "manual acceptance; verified needs a reproducible fixture "
+            "(see docs/development/asr-dual-track-acceptance.md)."
+        ),
         "required_evidence": [
-            "golden MP3/MP4 fixtures with stable transcript snapshots",
-            "quality gate checks proving transcript text enters cleanup and final outputs",
+            "reproducible version-controlled ASR fixture for verified promotion",
         ],
-        "promotion_blocker": "Needs real local ASR fixtures and timing evidence before this route can be marked verified.",
+        "promotion_blocker": (
+            "Needs a reproducible version-controlled fixture (manual acceptance on "
+            "external sample is recorded but is not a verified golden fixture)."
+        ),
         "preserves": ["transcript text", "ASR command evidence", "Whisper model metadata"],
         "risk": (
-            "ASR quality and runtime depend on local Whisper model and media quality; "
+            "ASR quality and runtime depend on local qwen3-asr/Whisper model and media quality; "
             "batch processing still excludes media by default."
         ),
     },

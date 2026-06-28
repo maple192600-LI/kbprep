@@ -107,6 +107,36 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertEqual(result.artifact_path.read_text(encoding="utf-8").strip(), "Step 1: keep threshold=0.8.")
             self.assertEqual(get_capability_for_extension(".mp4")["status"], "partial")
 
+    def test_media_transcript_reports_missing_ffmpeg(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.mp4"
+            source.write_bytes(b"golden media placeholder")
+            result = transcribe_media_with_whisper(
+                source,
+                root / "run",
+                which=lambda tool: "whisper" if tool == "whisper" else "",
+            )
+        self.assertFalse(result.ok)
+        self.assertEqual(result.report["route_decision"]["external_route"], "media_to_transcript")
+        self.assertEqual(result.report["failure_reason"]["code"], "E_ENV_MISSING")
+        self.assertEqual(result.report["failure_reason"]["dependency"], "ffmpeg")
+
+    def test_media_transcript_reports_missing_whisper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "lesson.mp4"
+            source.write_bytes(b"golden media placeholder")
+            result = transcribe_media_with_whisper(
+                source,
+                root / "run",
+                which=lambda tool: "ffmpeg" if tool == "ffmpeg" else "",
+            )
+        self.assertFalse(result.ok)
+        self.assertEqual(result.report["route_decision"]["external_route"], "media_to_transcript")
+        self.assertEqual(result.report["failure_reason"]["code"], "E_ENV_MISSING")
+        self.assertEqual(result.report["failure_reason"]["dependency"], "whisper")
+
     def test_youtube_prefers_subtitles_when_available(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -33,10 +33,11 @@
       "expected_route": "media_to_transcript",
       "expected_status": "partial",
       "required_tools": ["ffmpeg", "whisper"],
-      "real_fixture": false,
-      "manual_acceptance_evidence": false,
+      "real_fixture": true,
+      "manual_acceptance_evidence": true,
       "promote_to_verified": false,
-      "promotion_blocker": "Has mocked golden route evidence; needs a real MP3/MP4 fixture and local ASR transcript-quality evidence for verified promotion."
+      "promotion_blocker": "Manual acceptance evidence recorded on a real 90s zh sample (qwen3-asr); needs a reproducible version-controlled fixture before verified promotion.",
+      "real_fixture_evidence": "Real 90s zh audio fixture transcribed via qwen3-asr (cuda:0/bfloat16); 1885-char accurate transcript enters cleanup + final outputs; quality gates pass with 0 strict errors. Manual acceptance on external sample (see docs/development/asr-dual-track-acceptance.md)."
     },
     {
       "id": "youtube_descriptor_subtitle_first",
