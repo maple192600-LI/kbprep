@@ -203,11 +203,14 @@ def analyze_office(input_path: str, detected_format: str) -> dict:
 
     return {
         "page_count": 0,
-        "text_layer_health": "needs_conversion",
+        "text_layer_health": "unsupported",
         "needs_ocr": False,
-        "recommended_pipeline": "legacy_office_to_pdf",
-        "conversion_strategy": "legacy_office_to_pdf_route",
-        "warnings": [f"{detected_format} will be converted to PDF with local LibreOffice before KBPrep routes the generated PDF."],
+        "recommended_pipeline": "unsupported",
+        "conversion_strategy": "unsupported_extension",
+        "warnings": [
+            f"Legacy Office .{detected_format} is intentionally not adapted by KBPrep. "
+            "Convert it to PDF or modern Office (.docx/.pptx/.xlsx) first."
+        ],
     }
 
 

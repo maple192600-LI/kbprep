@@ -18,13 +18,13 @@
       "id": "legacy_office_minimal_ppt",
       "capability_id": "legacy_office_pdf_bridge",
       "extension": ".ppt",
-      "expected_route": "legacy_office_to_pdf_route",
-      "expected_status": "experimental",
-      "required_tools": ["soffice"],
+      "expected_route": "unsupported",
+      "expected_status": "unsupported",
+      "required_tools": [],
       "real_fixture": false,
       "manual_acceptance_evidence": false,
       "promote_to_verified": false,
-      "promotion_blocker": "Needs a real DOC/PPT/XLS fixture and LibreOffice-to-PDF preservation evidence."
+      "promotion_blocker": "Legacy Office is intentionally out of scope (owner declined adaptation); convert to PDF or modern Office (.docx/.pptx/.xlsx) first."
     },
     {
       "id": "media_local_transcript_minimal_mp4",

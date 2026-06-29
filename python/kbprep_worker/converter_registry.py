@@ -18,7 +18,6 @@ from .supported_formats import (
     EPUB_EXTENSIONS,
     HTML_EXTENSIONS,
     IMAGE_EXTENSIONS,
-    LEGACY_OFFICE_EXTENSIONS,
     MEDIA_EXTENSIONS,
     OFFICE_XML_EXTENSIONS,
     PDF_EXTENSIONS,
@@ -180,14 +179,10 @@ _REGISTRATIONS = (
         converter="image_to_pdf_ocr",
         conversion_strategy="image_to_pdf_then_mineru_ocr",
     ),
-    ConverterRegistration(
-        id="legacy_office_to_pdf",
-        kind=ConversionRouteKind.LEGACY_OFFICE_TO_PDF,
-        priority=70,
-        extensions=tuple(sorted(LEGACY_OFFICE_EXTENSIONS)),
-        converter="legacy_office_to_pdf",
-        conversion_strategy="legacy_office_to_pdf_route",
-    ),
+    # Legacy Office (.doc/.ppt/.xls) is intentionally unsupported (owner declined
+    # adaptation). No ConverterRegistration here, so select_conversion_route()
+    # returns UNSUPPORTED for these extensions. The legacy bridge code in
+    # converters/external_tools.py is kept but unreachable from normal routing.
     ConverterRegistration(
         id="media_transcript",
         kind=ConversionRouteKind.MEDIA_TRANSCRIPT,

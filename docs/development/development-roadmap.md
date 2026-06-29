@@ -434,8 +434,9 @@ Current truth:
   and mocked failure fixtures exist; verified promotion
   still needs broader real-network, timeout, dependency-variance, fallback, and
   transcript-quality evidence.
-- Image OCR and legacy Office routes are also experimental and need real
-  fixtures before promotion.
+- Image OCR route is also experimental and needs real fixtures before
+  promotion. Legacy Office is intentionally unsupported (owner declined
+  adaptation).
 
 Required slices:
 
@@ -470,7 +471,7 @@ honest and aligned:
 - `npm run check:flowchart`
 - `npm run check:development-docs`
 - real sample or vault checks for routes whose quality depends on external
-  tools, especially PDF, media, image OCR, legacy Office, and YouTube.
+  tools, especially PDF, media, image OCR, and YouTube.
 
 The project is fully complete only when no capability remains `partial`,
 `experimental`, or `design_only` unless the owner explicitly accepts that scope

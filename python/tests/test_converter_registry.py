@@ -34,7 +34,7 @@ class ConverterRegistryTests(unittest.TestCase):
 
     def test_media_and_external_formats_do_not_resolve_to_mineru(self):
         self.assertEqual(select_conversion_route(".png", {}).kind, ConversionRouteKind.IMAGE_TO_PDF_OCR)
-        self.assertEqual(select_conversion_route(".doc", {}).kind, ConversionRouteKind.LEGACY_OFFICE_TO_PDF)
+        self.assertEqual(select_conversion_route(".doc", {}).kind, ConversionRouteKind.UNSUPPORTED)
         self.assertEqual(select_conversion_route(".mp3", {}).kind, ConversionRouteKind.MEDIA_TRANSCRIPT)
         mobi = select_conversion_route(".mobi", {})
         self.assertEqual(mobi.kind, ConversionRouteKind.UNSUPPORTED)

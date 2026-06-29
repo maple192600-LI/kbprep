@@ -130,7 +130,7 @@ class CoreHelperRound2CoverageTests(unittest.TestCase):
             bad_docx = root / "bad.docx"
             bad_docx.write_text("not zip", encoding="utf-8")
             self.assertEqual(format_detect.analyze_office(str(bad_docx), "docx")["text_layer_health"], "invalid_container")
-            self.assertEqual(format_detect.analyze_office(str(root / "old.doc"), "doc")["recommended_pipeline"], "legacy_office_to_pdf")  # noqa: E501
+            self.assertEqual(format_detect.analyze_office(str(root / "old.doc"), "doc")["recommended_pipeline"], "unsupported")  # noqa: E501
             self.assertEqual(format_detect.analyze_audio_video("a.mp3", "audio")["recommended_pipeline"], "media_transcript")
             mobi_analysis = format_detect.analyze_ebook("book.mobi", ".mobi")
             self.assertEqual(mobi_analysis["text_layer_health"], "unsupported")

@@ -183,9 +183,9 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
         source_type: "auto",
       });
       expect(legacyDiagnosis.ok).toBe(true);
-      expect(legacyDiagnosis.data.capability.status).toBe("experimental");
-      expect(legacyDiagnosis.data.recommended_pipeline).toBe("legacy_office_to_pdf");
-      expect(legacyDiagnosis.data.conversion_strategy).toBe("legacy_office_to_pdf_route");
+      expect(legacyDiagnosis.data.capability.status).toBe("unsupported");
+      expect(legacyDiagnosis.data.recommended_pipeline).toBe("unsupported");
+      expect(legacyDiagnosis.data.conversion_strategy).toBe("unsupported_extension");
 
       for (const inputPath of [mobiPath]) {
         const diagnosis = runWorker("diagnose", {

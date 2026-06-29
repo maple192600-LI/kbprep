@@ -41,7 +41,6 @@ def main() -> int:
             "pdf_text_layer_or_mineru_ocr",
             "mineru_auto_diagnosis_strategy",
             "image_to_pdf_then_mineru_ocr",
-            "legacy_office_to_pdf_route",
             "media_to_transcript",
             "epub_xhtml_safe_zip",
             "frontmatter_yaml_escape",
