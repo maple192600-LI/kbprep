@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete; YouTube/media/image optional routes remain partial (Wave 4). |
-| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/media/image optional routes, full Markdown renderer/profile coverage, and universal fact-layer usage remain partial (Wave 4). |
+| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
+| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
 | document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -148,12 +148,15 @@ Slices:
   cleanup block content, while `cleaning_patches.jsonl` remains content-safe
   and does not carry source or cleaned text.
 
-Phase C remains partial until converter-native SourceSpan extraction,
-route-wide relationship/asset semantics, richer annotations,
-full renderer/profile coverage, and universal fact-layer use are implemented
-with named evidence. Content-safe relationship, asset, and annotation artifacts
-already exist; the remaining work is breadth and semantics. Only then can
-`canonical_ir_contract` move from partial to implemented.
+Phase C baseline is implemented: typed nodes, source spans, the transformation
+ledger, and content-safe relationship/asset/annotation artifacts are validated
+with named evidence, so `canonical_ir_contract` and `conversion_quality_gate`
+are promoted to `implemented`. The remaining work is the depth registered in
+their `prohibitedClaims`, not a partial baseline: converter-native SourceSpan
+precision emission, route-wide relationship/asset semantics breadth, richer
+annotations, full renderer/profile coverage, and universal fact-layer use.
+These depth items stay explicit todos until named evidence closes them; they
+do not roll the baseline back to partial.
 
 ### Phase D — CleaningPolicySnapshot, CleaningPatch, Clean View
 
@@ -303,9 +306,14 @@ sample evidence agree.
 
 Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
 M1-M6. Phase B (PDF routing), Phase D (cleanup), and Phase E (job status)
-landed while Phase C remains partial because their slices could ship against
-the current Canonical IR artifacts without completing every route-native span,
-relationship, asset, annotation, and IR-regeneration requirement in M2.
+landed while Phase C depth work was still open because their slices could ship
+against the current Canonical IR artifacts without completing every
+route-native span, relationship, asset, annotation, and IR-regeneration
+requirement in M2. Phase C baseline has since been promoted to `implemented`
+(typed nodes, source spans, ledger, and content-safe relationship/asset/
+annotation artifacts are validated); the remaining route-native span,
+relationship, asset, annotation, renderer/profile, and fact-layer work is
+tracked as `prohibitedClaims` depth, not as a partial baseline.
 
 ## Current Completion Flow
 
@@ -313,10 +321,14 @@ This is the ordered path from the current repository state to the completed
 protected design. Status must move only when `kbprep-implementation-status.json`,
 `docs/capability-matrix.md`, code, and named tests agree.
 
-### 1. Close M2 / Phase C
+### 1. Deepen M2 / Phase C (baseline implemented, depth open)
 
-Goal: make Canonical IR the complete internal fact layer instead of a partial
-evidence layer.
+Goal: close the `prohibitedClaims` depth items so Canonical IR becomes the
+complete internal fact layer. The baseline (`canonical_ir_contract` and
+`conversion_quality_gate` = `implemented`) already ships typed nodes, source
+spans, the transformation ledger, and content-safe relationship/asset/
+annotation artifacts; this section tracks the remaining depth, not a partial
+baseline.
 
 Required slices:
 
@@ -333,16 +345,19 @@ Required slices:
 - Extend Markdown regeneration from the minimal standard path to all required
   output profiles and route cases, with named tests proving accepted changes
   and IR ordering stay coherent.
-- Promote `canonical_ir_contract` and `conversion_quality_gate` only after
-  named tests cover the above across representative routes.
+- Close the `prohibitedClaims` depth items on `canonical_ir_contract` and
+  `conversion_quality_gate` only after named tests cover the above across
+  representative routes.
 
 Execution: run converter-native SourceSpan extraction and Canonical IR
 relationship/asset/annotation semantics hardening in parallel when they avoid
 overlapping files. Run full IR fact-layer closure after those evidence branches
 merge.
 
-Acceptance: `canonical_ir_contract` and `conversion_quality_gate` can move from
-`partial` to `implemented`; no route claims complete IR coverage without tests.
+Acceptance: the `prohibitedClaims` depth items on `canonical_ir_contract` and
+`conversion_quality_gate` are closed with named tests; no route claims complete
+IR coverage without tests, and no stale `partial` wording remains for these two
+capabilities.
 
 ### 2. Close M5 / Feedback And Selective Rerun
 
@@ -369,10 +384,13 @@ identity binding starts with current run/source/policy evidence and run-level
 Canonical IR manifest evidence, then finishes when stable Canonical IR node ids
 or cleaning-unit identity are available.
 
-Acceptance: `feedback_rule_learning` moves from `partial` once proposal,
-acceptance, rerun, rejection, and failed-promotion paths have named tests
-and manual operator guidance. Canonical IR node-id or cleaning-unit id-level
-selective narrowing is tracked as future work (run-level binding ships now).
+Acceptance: `feedback_rule_learning` is `implemented` — proposal, acceptance,
+rerun, rejection, and failed-promotion paths have named tests, and run-level
+Canonical IR manifest binding ships (document_id, source, document type,
+policy snapshot hash). Canonical IR node-id or cleaning-unit id-level selective
+narrowing remains future work (`id_level_narrowing=false`); this section closes
+when that narrowing lands with named tests and the future-work caveat is
+removed from the status scope.
 
 ### 3. Close Batch / Playlist Rerun Gaps
 

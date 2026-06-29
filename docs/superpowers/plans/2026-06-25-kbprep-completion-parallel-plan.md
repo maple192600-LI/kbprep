@@ -22,11 +22,11 @@ Source of truth:
 Current completion state:
 
 - M1 is implemented.
-- M2 / Phase C is partial.
+- M2 / Phase C baseline is `implemented` (`canonical_ir_contract` and `conversion_quality_gate` = `implemented`: typed nodes, source spans, ledger, and content-safe relationship/asset/annotation artifacts are validated). The `prohibitedClaims` depth items remain open: converter-native SourceSpan precision emission, route-wide relationship/asset semantics breadth, richer annotations, full renderer/profile coverage, and universal fact-layer use.
 - M3 / Phase D is implemented.
 - M4 is implemented.
 - Phase E / `job_status_envelope` is implemented.
-- M5 is partial.
+- M5 `feedback_rule_learning` is `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). Canonical IR node-id or cleaning-unit id-level selective narrowing remains future work (`id_level_narrowing=false` is explicit in the binding payload).
 - M6 / Phase F is not closed: local media and YouTube are implemented as `partial` optional routes, image OCR and legacy Office remain `experimental`, and MOBI stays explicitly `unsupported` unless the owner reopens that scope.
 
 ## Parallelization Rules
@@ -220,7 +220,7 @@ git diff --check
 
 - [ ] **Step 5: Reviewer gate**
 
-Reviewer checks that no route-native span is fabricated, no optional YouTube evidence is claimed before route support exists, and status remains partial unless all required evidence is present.
+Reviewer checks that no route-native span is fabricated, no optional YouTube evidence is claimed before route support exists, and the `prohibitedClaims` depth items on `canonical_ir_contract` stay open unless all required native-span evidence is present (the baseline is already `implemented`; this branch closes depth, not the baseline).
 
 ### Branch C2R: Relationship, Asset, And Annotation Semantics
 
@@ -283,7 +283,7 @@ Reviewer checks content safety, manifest consistency, and no status overpromotio
 
 ### Branch C7: Full IR Fact-Layer Closure
 
-**Parallel:** Must wait until C1R and C2R merge because it promotes the shared `canonical_ir_contract` and `conversion_quality_gate` status rows.
+**Parallel:** Must wait until C1R and C2R merge because it closes the shared `prohibitedClaims` depth items on `canonical_ir_contract` and `conversion_quality_gate` (the status rows are already `implemented`; this branch closes depth, not status).
 
 **Branch:** `codex/c-ir-fact-layer-closure`
 
@@ -316,9 +316,9 @@ Expected before implementation: full fact-layer coverage fails even though the n
 
 Use the assembled Clean View and Canonical IR artifacts across the required output profiles and route cases. Keep existing fallback only for routes whose capability status remains partial or experimental.
 
-- [ ] **Step 3: Promote status only if evidence is complete**
+- [ ] **Step 3: Close prohibitedClaims depth only if evidence is complete**
 
-Change `canonical_ir_contract` and `conversion_quality_gate` from `partial` to `implemented` only when every required C1R, C2R, and C7 test passes and capability matrix claims remain honest.
+The baseline is already `implemented`; this step closes the `prohibitedClaims` depth items on `canonical_ir_contract` and `conversion_quality_gate` (converter-native spans, route-wide relationship/asset/annotation semantics, full renderer/profile coverage, and universal fact-layer use) only when every required C1R, C2R, and C7 test passes and capability matrix claims remain honest. Remove the closed items from `prohibitedClaims` and drop any residual `partial` wording for these two capabilities.
 
 - [ ] **Step 4: Verify branch**
 
@@ -337,7 +337,7 @@ Reviewer verifies M2 completion evidence, no fabricated source spans, no target-
 
 ## Wave 2: M5 Feedback And Selective Rerun
 
-Proposal state hardening and public single-source selective rerun scaffolding are already in the current implementation evidence. Wave 2 now focuses on affected-scope identity binding and promotion evidence; do not rebuild proposal states or the public rerun command unless current tests prove a regression.
+Proposal state hardening and public single-source selective rerun scaffolding are already in the current implementation evidence. Wave 2 now focuses on affected-scope identity binding and closing the id-level narrowing depth (`feedback_rule_learning` is already `implemented`; promotion is not the goal); do not rebuild proposal states or the public rerun command unless current tests prove a regression.
 
 ### M5 Preflight: Existing Feedback And Command Coverage
 
@@ -370,9 +370,9 @@ Require selective rerun to bind accepted proposals to affected run ids, source i
 
 Use current stable run/source/document/policy evidence plus Canonical IR manifest evidence for the baseline binding. Add stable Canonical IR node ids or cleaning-unit ids later to avoid document-wide reruns when the changed rule affects only a known source span or cleaning unit.
 
-- [ ] **Step 3: Promote M5 status only if complete**
+- [ ] **Step 3: Close M5 depth only if complete**
 
-Move `feedback_rule_learning` from `partial` only when proposal, acceptance, rejection, rerun, failed promotion, and operator docs all pass.
+`feedback_rule_learning` is already `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). This step closes the remaining depth — Canonical IR node-id or cleaning-unit id-level selective narrowing (currently `id_level_narrowing=false`) — only when stable identity evidence and named tests exist, then removes that future-work caveat from the status scope.
 
 - [ ] **Step 4: Verify branch**
 
@@ -640,7 +640,7 @@ Merge order:
 1. Wave 0 is already closed; skip it unless a new regression is found.
 2. C1R, C2R, M5B2, F1, F2, F3, and PLAYLIST2 may merge in the order they become reviewed and verified, as long as the branch merged later synchronizes with latest `main`.
 3. C7 full IR fact-layer closure after C1R and C2R.
-4. M5B2 Canonical IR id-level narrowing or status promotion after the required Canonical IR or cleaning-unit identity semantics are stable, if the baseline M5B2 branch could not already include it.
+4. M5B2 Canonical IR id-level narrowing (closing the `feedback_rule_learning` depth caveat) after the required Canonical IR or cleaning-unit identity semantics are stable, if the baseline M5B2 branch could not already include it.
 5. BATCH2 after baseline M5B2; policy/CIR targeting can add deeper Canonical IR id narrowing when those ids are stable.
 7. Capability-status promotion branches after their implementation evidence exists.
 
