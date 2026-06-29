@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess, type SpawnOptionsWithoutStdio } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess, type SpawnOptionsWithoutStdio } from "node:child_process";
 
 export type ManagedProcessResult = {
   code: number | null;
@@ -102,10 +102,10 @@ function collectManagedProcess(child: ChildProcess, options: ManagedProcessOptio
 
     const timeoutTimer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGTERM");
+      terminateProcessTree(child, false);
       terminateTimer = setTimeout(() => {
         forcedKill = true;
-        child.kill("SIGKILL");
+        terminateProcessTree(child, true);
         settle(() =>
           reject(
             new ManagedProcessTimeoutError(options.label, options.timeoutMs, {
@@ -151,6 +151,49 @@ function collectManagedProcess(child: ChildProcess, options: ManagedProcessOptio
     child.stdin?.on("error", () => {});
     child.stdin?.end(options.stdin ?? "");
   });
+}
+
+// taskkill.exe normally returns near-instantly. Bound it so a hung cleanup
+// call cannot block the Node event loop inside the timeout path.
+const TASKKILL_TIMEOUT_MS = 5000;
+
+function terminateProcessTree(child: ChildProcess, force: boolean): void {
+  if (process.platform !== "win32" || !child.pid) {
+    child.kill(force ? "SIGKILL" : "SIGTERM");
+    return;
+  }
+  const pid = String(child.pid);
+  const killWith = (forceKill: boolean) => {
+    // `/t` kills the whole process tree (Node's child.kill cannot reach
+    // shell-launched grandchildren on Windows).
+    const args = ["/pid", pid, "/t"];
+    if (forceKill) {
+      args.push("/f");
+    }
+    return spawnSync("taskkill.exe", args, {
+      stdio: "ignore",
+      windowsHide: true,
+      timeout: TASKKILL_TIMEOUT_MS,
+    });
+  };
+  // Graceful stage: try without `/f` first so windowed workers can clean up.
+  // Console workers (the Python worker) have no window, so taskkill without
+  // `/f` returns non-zero and we retry with `/f` to keep teardown deterministic.
+  let result = killWith(force);
+  if (!force && (Boolean(result.error) || (result.status !== null && result.status !== 0))) {
+    result = killWith(true);
+  }
+  // spawnSync only sets `error` when taskkill.exe could not be launched; a
+  // non-zero exit status also means termination failed and we must fall back.
+  const failed = Boolean(result.error) || (result.status !== null && result.status !== 0);
+  if (failed) {
+    // Last-resort fallback when taskkill itself is unavailable or the pid is
+    // already gone. On Windows child.kill only reaches the direct child, not
+    // shell-launched grandchildren; the common path above (taskkill /t /f)
+    // handles grandchildren, and a full fallback would need a Job Object or
+    // descendant-pid enumeration, which is out of scope for the timeout path.
+    child.kill(force ? "SIGKILL" : "SIGTERM");
+  }
 }
 
 function tailText(text: string): string {

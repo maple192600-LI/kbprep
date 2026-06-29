@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -39,6 +39,52 @@ describe("managed subprocess timeout behavior", () => {
         stderrTail: expect.stringContaining("before-timeout"),
       });
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  const itOnWindows = process.platform === "win32" ? it : it.skip;
+
+  itOnWindows("terminates shell-launched child processes after timeout", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "kbprep-subprocess-shell-timeout-"));
+    const scriptPath = path.join(root, "slow-child.mjs");
+    const pidPath = path.join(root, "child.pid");
+    writeFileSync(
+      scriptPath,
+      [
+        "import { writeFileSync } from 'node:fs';",
+        "writeFileSync(process.argv[2], String(process.pid), 'utf8');",
+        "process.stderr.write('shell-child-started\\n');",
+        "setInterval(() => {}, 1000);",
+      ].join("\n"),
+      "utf8",
+    );
+
+    let childPid: number | undefined;
+    try {
+      await expect(
+        runManagedProcess({
+          command: [process.execPath, scriptPath, pidPath].map((part) => JSON.stringify(part)).join(" "),
+          label: "test shell timeout",
+          // Give the shell + nested Node enough headroom to start and write the
+          // pid file before the timeout fires, so the assertion proves process-
+          // tree termination rather than startup speed.
+          timeoutMs: 1500,
+          terminateGraceMs: 500,
+          shell: true,
+        }),
+      ).rejects.toMatchObject({
+        name: "ManagedProcessTimeoutError",
+        timeoutMs: 1500,
+        stderrTail: expect.stringContaining("shell-child-started"),
+      });
+      expect(existsSync(pidPath)).toBe(true);
+      childPid = Number(readFileSync(pidPath, "utf8"));
+      expect(isProcessAlive(childPid)).toBe(false);
+    } finally {
+      if (childPid !== undefined && isProcessAlive(childPid)) {
+        process.kill(childPid, "SIGKILL");
+      }
       rmSync(root, { recursive: true, force: true });
     }
   });
@@ -116,3 +162,12 @@ describe("managed subprocess timeout behavior", () => {
     }
   });
 });
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
