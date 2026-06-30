@@ -27,7 +27,7 @@ Current completion state:
 - M4 is implemented.
 - Phase E / `job_status_envelope` is implemented.
 - M5 `feedback_rule_learning` is `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). Canonical IR node-id or cleaning-unit id-level selective narrowing remains future work (`id_level_narrowing=false` is explicit in the binding payload).
-- M6 / Phase F is not closed: local media and YouTube are implemented as `partial` optional routes, image OCR and legacy Office remain `experimental`, and MOBI stays explicitly `unsupported` unless the owner reopens that scope.
+- M6 / Phase F is not closed: local media and YouTube are implemented as `partial` optional routes, image OCR remains `experimental`, legacy Office is `unsupported` (owner declined adaptation), and MOBI stays explicitly `unsupported` unless the owner reopens that scope.
 
 ## Parallelization Rules
 
