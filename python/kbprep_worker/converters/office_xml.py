@@ -3,7 +3,6 @@ from __future__ import annotations
 import posixpath
 import re
 import zipfile
-from collections.abc import Iterator
 from pathlib import Path
 
 from lxml.etree import _Element
@@ -11,6 +10,18 @@ from lxml.etree import _Element
 from ..atomic_io import atomic_write_bytes, atomic_write_json
 from ..supported_formats import IMAGE_EXTENSIONS
 from ..zip_safety import SafeZipReader, ZipSafetyError, open_safe_zip
+from .office_xml_common import (
+    first_child_by_local_name,
+    iter_by_local_name,
+    local_name,
+    rows_to_markdown_table,
+    xml_attr_by_local_name,
+    xml_text,
+)
+from .office_xml_docx import (
+    _docx_paragraph_styled_text,
+    word_table_to_markdown,
+)
 
 
 class OfficeXmlConversionError(Exception):
@@ -76,38 +87,18 @@ def office_xml_to_markdown(input_p: Path, run_dir: Path) -> tuple[str, list[str]
 def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], list[dict]]:
     import xml.etree.ElementTree as ET
 
+    external_rels = _docx_external_targets(zf, "word/_rels/document.xml.rels")
+    numbering_index = _docx_numbering_index(zf)
+
     root = ET.fromstring(zf.read_bytes("word/document.xml"))
     body = first_child_by_local_name(root, "body")
     if body is None:
         return "", [], []
 
     builder = _MarkdownLineBuilder()
-    native_source_spans: list[dict] = []
-    paragraph_index = -1
-    for child in list(body):
-        local = local_name(child.tag)
-        if local == "p":
-            paragraph_index += 1
-            text, run_range = _docx_paragraph_text_and_runs(child)
-            if text:
-                heading = docx_heading_level(child)
-                block = ("#" * heading + " " + text) if heading else text
-                start_line, end_line = builder.append_block(block)
-                if run_range is not None:
-                    native_source_spans.append({
-                        "converted_line_start": start_line,
-                        "converted_line_end": end_line,
-                        "precision": "docx_run_range",
-                        "location": {
-                            "paragraph_index": paragraph_index,
-                            "run_start": run_range[0],
-                            "run_end": run_range[1],
-                        },
-                    })
-        elif local == "tbl":
-            table = word_table_to_markdown(child)
-            if table:
-                builder.append_block(table)
+    native_spans: list[dict] = []
+    _render_docx_body(body, builder, native_spans, external_rels, numbering_index)
+
     image_lines, image_artifacts = extract_office_images(
         zf=zf,
         part_name="word/document.xml",
@@ -120,12 +111,62 @@ def docx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], 
         builder.append_block("## Embedded Images")
         for image_line in image_lines:
             builder.append_block(image_line)
-    return builder.build(), image_artifacts, native_source_spans
+    return builder.build(), image_artifacts, native_spans
 
 
-def _docx_paragraph_text_and_runs(paragraph: _Element) -> tuple[str, tuple[int, int] | None]:
-    """Return (paragraph text, run index range) for a DOCX paragraph."""
-    text = xml_text(paragraph)
+def _render_docx_body(
+    body: _Element,
+    builder: _MarkdownLineBuilder,
+    native_spans: list[dict],
+    external_rels: dict[str, str],
+    numbering_index: dict[tuple[str, int], str],
+) -> None:
+    """Walk the document body, appending rendered paragraphs/tables and native spans."""
+    paragraph_index = -1
+    list_counter: dict[str, int] = {}
+    for child in list(body):
+        local = local_name(child.tag)
+        if local == "p":
+            paragraph_index += 1
+            text, run_range = _docx_paragraph_text_and_runs(child, external_rels)
+            if not text:
+                continue
+            heading = docx_heading_level(child)
+            list_info = _docx_paragraph_list_info(child, numbering_index)
+            if list_info is None:
+                list_counter.clear()
+            block = _docx_render_paragraph_block(text, heading, list_info, list_counter)
+            start_line, end_line = builder.append_block(block)
+            if run_range is not None:
+                native_spans.append({
+                    "converted_line_start": start_line,
+                    "converted_line_end": end_line,
+                    "precision": "docx_run_range",
+                    "location": {
+                        "paragraph_index": paragraph_index,
+                        "run_start": run_range[0],
+                        "run_end": run_range[1],
+                    },
+                })
+        elif local == "tbl":
+            list_counter.clear()
+            table = word_table_to_markdown(child, external_rels)
+            if table:
+                builder.append_block(table)
+
+
+def _docx_paragraph_text_and_runs(
+    paragraph: _Element, external_rels: dict[str, str] | None = None
+) -> tuple[str, tuple[int, int] | None]:
+    """Return (paragraph text, run index range) for a DOCX paragraph.
+
+    Text carries run-level character styles and resolved hyperlinks so the
+    rendered Markdown preserves emphasis and link targets, not just raw text.
+    The run index range is computed via ``iter_by_local_name`` (recursive), so
+    it includes runs nested inside a ``<w:hyperlink>``; consumers reading the
+    source DOCX by ``run_start``/``run_end`` must use the same recursive walk.
+    """
+    text = _docx_paragraph_styled_text(paragraph, external_rels or {})
     runs = list(iter_by_local_name(paragraph, "r"))
     if not runs:
         return text, None
@@ -139,6 +180,135 @@ def _docx_paragraph_text_and_runs(paragraph: _Element) -> tuple[str, tuple[int, 
     if first_run < 0:
         return text, None
     return text, (first_run, last_run)
+
+
+def _docx_external_targets(zf: SafeZipReader, rels_name: str) -> dict[str, str]:
+    """Map hyperlink relationship ids to external targets from a ``.rels`` part."""
+    import xml.etree.ElementTree as ET
+
+    if rels_name not in zf.namelist():
+        return {}
+    try:
+        rels_root = ET.fromstring(zf.read_bytes(rels_name))
+    except ET.ParseError:
+        return {}
+    targets: dict[str, str] = {}
+    for rel in list(rels_root):
+        rel_id = xml_attr_by_local_name(rel, "Id")
+        target = xml_attr_by_local_name(rel, "Target")
+        mode = (xml_attr_by_local_name(rel, "TargetMode") or "").lower()
+        if rel_id and target and mode == "external":
+            targets[rel_id] = target
+    return targets
+
+
+def _docx_numbering_index(zf: SafeZipReader) -> dict[tuple[str, int], str]:
+    """Resolve ``(numId, ilvl)`` to a numbering format (``bullet``/``decimal``/...).
+
+    Returns an empty map when ``word/numbering.xml`` is absent so list-less
+    documents degrade to plain paragraphs without fabricating markers.
+    """
+    import xml.etree.ElementTree as ET
+
+    if "word/numbering.xml" not in zf.namelist():
+        return {}
+    try:
+        root = ET.fromstring(zf.read_bytes("word/numbering.xml"))
+    except ET.ParseError:
+        return {}
+    abstract_fmt: dict[str, dict[int, str]] = {}
+    for abstract in iter_by_local_name(root, "abstractNum"):
+        abs_id = xml_attr_by_local_name(abstract, "abstractNumId")
+        if abs_id is None:
+            continue
+        lvl_fmt: dict[int, str] = {}
+        for lvl in iter_by_local_name(abstract, "lvl"):
+            ilvl_str = xml_attr_by_local_name(lvl, "ilvl")
+            fmt_node = first_child_by_local_name(lvl, "numFmt")
+            fmt = xml_attr_by_local_name(fmt_node, "val") if fmt_node is not None else None
+            try:
+                ilvl = int(ilvl_str) if ilvl_str else 0
+            except (TypeError, ValueError):
+                ilvl = 0
+            if fmt:
+                lvl_fmt[ilvl] = fmt
+        abstract_fmt[abs_id] = lvl_fmt
+    index: dict[tuple[str, int], str] = {}
+    for num in iter_by_local_name(root, "num"):
+        num_id = xml_attr_by_local_name(num, "numId")
+        abs_node = first_child_by_local_name(num, "abstractNumId")
+        abs_id = xml_attr_by_local_name(abs_node, "val") if abs_node is not None else None
+        if not num_id or abs_id not in abstract_fmt:
+            continue
+        for ilvl, fmt in abstract_fmt[abs_id].items():
+            index[(num_id, ilvl)] = fmt
+    return index
+
+
+def _docx_paragraph_list_info(
+    paragraph: _Element, numbering_index: dict[tuple[str, int], str]
+) -> tuple[str, int, str] | None:
+    """Return ``(numId, ilvl, fmt)`` when a paragraph is a numbered list item."""
+    if not numbering_index:
+        return None
+    p_pr = first_child_by_local_name(paragraph, "pPr")
+    if p_pr is None:
+        return None
+    num_pr = first_child_by_local_name(p_pr, "numPr")
+    if num_pr is None:
+        return None
+    num_id_node = first_child_by_local_name(num_pr, "numId")
+    ilvl_node = first_child_by_local_name(num_pr, "ilvl")
+    num_id = xml_attr_by_local_name(num_id_node, "val") if num_id_node is not None else None
+    ilvl_str = xml_attr_by_local_name(ilvl_node, "val") if ilvl_node is not None else "0"
+    if not num_id:
+        return None
+    try:
+        ilvl = int(ilvl_str) if ilvl_str else 0
+    except (TypeError, ValueError):
+        ilvl = 0
+    fmt = numbering_index.get((num_id, ilvl)) or numbering_index.get((num_id, 0))
+    if fmt is None:
+        return None
+    return (num_id, ilvl, fmt)
+
+
+def _docx_render_paragraph_block(
+    text: str,
+    heading: int,
+    list_info: tuple[str, int, str] | None,
+    list_counter: dict[str, int],
+) -> str:
+    """Render a paragraph as a list item, heading, or plain block."""
+    if list_info is not None:
+        num_id, ilvl, fmt = list_info
+        indent = "  " * ilvl
+        if fmt == "decimal":
+            count = list_counter.get(num_id, 0) + 1
+            list_counter[num_id] = count
+            marker = f"{count}. "
+        else:
+            marker = "- "
+        return f"{indent}{marker}{text}"
+    if heading:
+        return ("#" * heading) + " " + text
+    return text
+
+
+def docx_heading_level(p_el: _Element) -> int:
+    for node in p_el.iter():
+        if local_name(node.tag) == "pStyle":
+            value = xml_attr_by_local_name(node, "val")
+            if not value:
+                continue
+            lowered = value.lower()
+            if lowered.startswith("heading"):
+                digits = "".join(ch for ch in lowered if ch.isdigit())
+                if digits:
+                    return max(1, min(6, int(digits)))
+            if lowered in {"title", "subtitle"}:
+                return 1
+    return 0
 
 
 def pptx_to_markdown(zf: SafeZipReader, run_dir: Path) -> tuple[str, list[str], list[dict]]:
@@ -319,7 +489,10 @@ def extract_office_images(
 def _office_relationship_targets(zf: SafeZipReader, rels_name: str) -> dict[str, str]:
     import xml.etree.ElementTree as ET
 
-    rels_root = ET.fromstring(zf.read_bytes(rels_name))
+    try:
+        rels_root = ET.fromstring(zf.read_bytes(rels_name))
+    except ET.ParseError:
+        return {}
     relationships: dict[str, str] = {}
     for rel in list(rels_root):
         rel_id = xml_attr_by_local_name(rel, "Id")
@@ -428,31 +601,6 @@ def _xlsx_rows_and_cell_range(
     return rows, (first_cell, last_cell)
 
 
-def docx_heading_level(p_el: _Element) -> int:
-    for node in p_el.iter():
-        if local_name(node.tag) == "pStyle":
-            value = xml_attr_by_local_name(node, "val")
-            if not value:
-                continue
-            lowered = value.lower()
-            if lowered.startswith("heading"):
-                digits = "".join(ch for ch in lowered if ch.isdigit())
-                if digits:
-                    return max(1, min(6, int(digits)))
-            if lowered in {"title", "subtitle"}:
-                return 1
-    return 0
-
-
-def word_table_to_markdown(tbl_el: _Element) -> str:
-    rows: list[list[str]] = []
-    for tr in [n for n in tbl_el.iter() if local_name(n.tag) == "tr"]:
-        cells = [xml_text(tc) for tc in list(tr) if local_name(tc.tag) == "tc"]
-        if any(cell.strip() for cell in cells):
-            rows.append(cells)
-    return rows_to_markdown_table(rows)
-
-
 def drawing_paragraphs(root: _Element) -> list[str]:
     paragraphs: list[str] = []
     for p in iter_by_local_name(root, "p"):
@@ -499,63 +647,3 @@ def xlsx_cell_value(cell: _Element, shared_strings: list[str]) -> str:
         except (ValueError, IndexError):
             return raw
     return raw
-
-
-def rows_to_markdown_table(rows: list[list[str]]) -> str:
-    if not rows:
-        return ""
-    max_cols = max(len(row) for row in rows)
-    padded = [row + [""] * (max_cols - len(row)) for row in rows]
-    header = padded[0]
-    body = padded[1:]
-    lines = [
-        "| " + " | ".join(escape_table_cell(cell) for cell in header) + " |",
-        "| " + " | ".join("---" for _ in header) + " |",
-    ]
-    for row in body:
-        lines.append("| " + " | ".join(escape_table_cell(cell) for cell in row) + " |")
-    return "\n".join(lines)
-
-
-def escape_table_cell(text: str) -> str:
-    return text.replace("|", "\\|").replace("\n", " ").strip()
-
-
-def xml_text(element: _Element) -> str:
-    parts: list[str] = []
-    for node in element.iter():
-        local = local_name(node.tag)
-        if local == "t" and node.text:
-            parts.append(node.text)
-        elif local in {"tab"}:
-            parts.append("\t")
-        elif local in {"br", "cr"}:
-            parts.append("\n")
-    text = "".join(parts)
-    text = re.sub(r"[ \t]+\n", "\n", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
-
-
-def iter_by_local_name(element: _Element, local_name_value: str) -> Iterator[_Element]:
-    for node in element.iter():
-        if local_name(node.tag) == local_name_value:
-            yield node
-
-
-def first_child_by_local_name(element: _Element, local_name_value: str) -> _Element | None:
-    for child in list(element):
-        if local_name(child.tag) == local_name_value:
-            return child
-    return None
-
-
-def local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1] if "}" in tag else tag
-
-
-def xml_attr_by_local_name(element: _Element, local_name_value: str) -> str | None:
-    for key, value in element.attrib.items():
-        if local_name(key) == local_name_value:
-            return value
-    return None

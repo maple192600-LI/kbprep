@@ -219,6 +219,265 @@ class OfficeXmlConverterTests(unittest.TestCase):
         self.assertIn("| Name | Value |", markdown)
         self.assertEqual(native, [])
 
+    # --- DOCX structure deepening (format-strategy priority target) ---
+
+    def test_docx_external_hyperlink_resolves_uri_from_rels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "link.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/_rels/document.xml.rels", (
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    '<Relationship Id="rId7" Type="hyperlink" Target="https://example.com/guide" TargetMode="External"/>'
+                    '</Relationships>'
+                ))
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w" xmlns:r="r"><w:body>'
+                    '<w:p><w:hyperlink r:id="rId7"><w:r><w:t>Read the guide</w:t></w:r></w:hyperlink></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("[Read the guide](https://example.com/guide)", markdown)
+
+    def test_docx_anchor_hyperlink_uses_fragment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "anchor.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:hyperlink w:anchor="section1"><w:r><w:t>jump</w:t></w:r></w:hyperlink></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("[jump](#section1)", markdown)
+
+    def test_docx_hyperlink_without_matching_rel_keeps_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "broken_link.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w" xmlns:r="r"><w:body>'
+                    '<w:p><w:hyperlink r:id="rIdMissing"><w:r><w:t>orphan link</w:t></w:r></w:hyperlink></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("orphan link", markdown)
+        self.assertNotIn("]()", markdown)
+
+    def test_docx_bold_and_italic_runs_emit_markdown_emphasis(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "styled.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p>'
+                    '<w:r><w:rPr><w:b/></w:rPr><w:t>Bold word</w:t></w:r>'
+                    '<w:r><w:t> and </w:t></w:r>'
+                    '<w:r><w:rPr><w:i/></w:rPr><w:t>italic word</w:t></w:r>'
+                    '</w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("**Bold word**", markdown)
+        self.assertIn("*italic word*", markdown)
+
+    def test_docx_bold_with_val_false_is_not_emphasized(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "valfalse.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:r><w:rPr><w:b w:val="false"/></w:rPr><w:t>plain</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("plain", markdown)
+        self.assertNotIn("**", markdown)
+
+    def test_docx_strike_run_emits_strikethrough(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "strike.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:r><w:rPr><w:strike/></w:rPr><w:t>deleted</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("~~deleted~~", markdown)
+
+    def test_docx_unordered_list_emits_bullet_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "ulist.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/numbering.xml", (
+                    '<w:numbering xmlns:w="w">'
+                    '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum>'
+                    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
+                    '</w:numbering>'
+                ))
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>First bullet</w:t></w:r></w:p>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>Second bullet</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("- First bullet", markdown)
+        self.assertIn("- Second bullet", markdown)
+
+    def test_docx_ordered_list_emits_decimal_counter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "olist.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/numbering.xml", (
+                    '<w:numbering xmlns:w="w">'
+                    '<w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl></w:abstractNum>'
+                    '<w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num>'
+                    '</w:numbering>'
+                ))
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>First step</w:t></w:r></w:p>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="2"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>Second step</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("1. First step", markdown)
+        self.assertIn("2. Second step", markdown)
+
+    def test_docx_list_paragraph_without_numbering_part_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "dangling_list.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="9"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>Dangling item</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        # No numbering.xml: must not raise, must not fabricate list markers.
+        self.assertIn("Dangling item", markdown)
+        self.assertNotIn("- Dangling", markdown)
+        self.assertNotIn("1. Dangling", markdown)
+
+    def test_docx_gridspan_repeats_value_across_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "gridspan.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:tbl><w:tr>'
+                    '<w:tc><w:tcPr><w:gridSpan w:val="2"/></w:tcPr><w:p><w:r><w:t>Merged</w:t></w:r></w:p></w:tc>'
+                    '</w:tr></w:tbl>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("| Merged | Merged |", markdown)
+
+    def test_docx_vmerge_continue_filled_from_restart(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "vmerge.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:tbl>'
+                    '<w:tr>'
+                    '<w:tc><w:tcPr><w:vMerge w:val="restart"/></w:tcPr><w:p><w:r><w:t>Top</w:t></w:r></w:p></w:tc>'
+                    '<w:tc><w:p><w:r><w:t>Right1</w:t></w:r></w:p></w:tc>'
+                    '</w:tr>'
+                    '<w:tr>'
+                    '<w:tc><w:tcPr><w:vMerge/></w:tcPr><w:p><w:r><w:t></w:t></w:r></w:p></w:tc>'
+                    '<w:tc><w:p><w:r><w:t>Right2</w:t></w:r></w:p></w:tc>'
+                    '</w:tr>'
+                    '</w:tbl>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        # vMerge continue cell must be filled with the restart value "Top".
+        self.assertIn("| Top | Right2 |", markdown)
+
+    def test_docx_corrupt_numbering_xml_degrades_gracefully(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "bad_numbering.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/numbering.xml", "<<not valid xml>>")
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w"><w:body>'
+                    '<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>'
+                    '<w:r><w:t>Still readable</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("Still readable", markdown)
+        self.assertNotIn("- Still readable", markdown)
+
+    def test_docx_corrupt_rels_degrades_gracefully(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "bad_rels.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/_rels/document.xml.rels", "<<not valid xml>>")
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w" xmlns:r="r"><w:body>'
+                    '<w:p><w:hyperlink r:id="rId7"><w:r><w:t>Link text</w:t></w:r></w:hyperlink></w:p>'
+                    '<w:p><w:r><w:t>Body text</w:t></w:r></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("Link text", markdown)
+        self.assertIn("Body text", markdown)
+
+    def test_docx_bold_run_inside_hyperlink_keeps_style_and_link(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "bold_link.docx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("word/_rels/document.xml.rels", (
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    '<Relationship Id="rId1" Type="hyperlink" Target="https://example.com" TargetMode="External"/>'
+                    '</Relationships>'
+                ))
+                zf.writestr("word/document.xml", (
+                    '<w:document xmlns:w="w" xmlns:r="r"><w:body>'
+                    '<w:p><w:hyperlink r:id="rId1">'
+                    '<w:r><w:rPr><w:b/></w:rPr><w:t>BoldLink</w:t></w:r>'
+                    '</w:hyperlink></w:p>'
+                    '</w:body></w:document>'
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("[**BoldLink**](https://example.com)", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()
