@@ -170,9 +170,20 @@ def html_to_markdown(
     soup = _BEAUTIFUL_SOUP(html, "html.parser")
     for tag in soup(list(_SKIP_TAGS)):
         tag.decompose()
-    copier = _EpubImageCopier(base_path, zf, run_dir, image_assets if image_assets is not None else [])
+    footnote_ids, footnote_notes = _collect_footnotes(soup)
+    copier = _EpubImageCopier(
+        base_path,
+        zf,
+        run_dir,
+        image_assets if image_assets is not None else [],
+        footnote_ids,
+    )
     body = soup.body or soup
-    return _clean_markdown_lines(_block_lines(body, copier))
+    markdown = _clean_markdown_lines(_block_lines(body, copier))
+    if footnote_notes:
+        notes_block = "\n".join(f"[^{num}]: {text}" for num, text in footnote_notes)
+        markdown = f"{markdown}\n\n{notes_block}" if markdown else notes_block
+    return markdown
 
 
 class _EpubImageCopier:
@@ -182,11 +193,13 @@ class _EpubImageCopier:
         archive: SafeZipReader | None,
         run_dir: Path | None,
         image_assets: list[str],
+        footnote_ids: dict[str, int] | None = None,
     ) -> None:
         self.base_path = base_path
         self.archive = archive
         self.run_dir = run_dir
         self.image_assets = image_assets
+        self.footnote_ids = footnote_ids or {}
 
     def markdown_src(self, src: str) -> str:
         if self.archive is None or self.run_dir is None or _is_external(src):
@@ -328,6 +341,9 @@ def _inline_text(node: Any, copier: _EpubImageCopier) -> str:
         return f"`{inner}`" if inner else ""
     if name == "a":
         href = _clean(str(node.get("href") or ""))
+        target = href[1:] if href.startswith("#") else ""
+        if target and target in copier.footnote_ids:
+            return f"[^{copier.footnote_ids[target]}]"
         label = _inline_children(node, copier) or href
         return f"[{label}]({href})" if href else label
     if name == "img":
@@ -364,13 +380,30 @@ def _list_lines(node: Any, copier: _EpubImageCopier, ordered: bool) -> list[str]
 
 
 def _table_to_markdown(table: Any) -> str:
-    rows: list[list[str]] = []
-    for tr in table.find_all("tr"):
-        cells = tr.find_all(["th", "td"], recursive=False)
-        if cells:
-            rows.append([_clean(cell.get_text(" ", strip=True)).replace("|", "\\|") for cell in cells])
-    if not rows:
+    row_nodes = table.find_all("tr")
+    if not row_nodes:
         return ""
+    grid: dict[tuple[int, int], str] = {}
+    occupied: set[tuple[int, int]] = set()
+    max_col = 0
+    for r, tr in enumerate(row_nodes):
+        c = 0
+        for cell in tr.find_all(["th", "td"], recursive=False):
+            while (r, c) in occupied:
+                c += 1
+            colspan = _int_attr(cell, "colspan")
+            rowspan = _int_attr(cell, "rowspan")
+            text = _clean(cell.get_text(" ", strip=True)).replace("|", "\\|")
+            for dc in range(colspan):
+                grid[(r, c + dc)] = text
+                if rowspan > 1:
+                    for dr in range(1, rowspan):
+                        grid[(r + dr, c + dc)] = text
+                        occupied.add((r + dr, c + dc))
+            c += colspan
+            if c > max_col:
+                max_col = c
+    rows = [[grid.get((r, col), "") for col in range(max_col)] for r in range(len(row_nodes))]
     return _rows_to_markdown_table(rows)
 
 
@@ -420,3 +453,75 @@ def _tag_name(node: Any) -> str:
 
 def _is_external(src: str) -> bool:
     return bool(re.match(r"^(?:https?:)?//|^data:|^mailto:|^#", src, re.IGNORECASE))
+
+
+def _int_attr(node: Any, name: str) -> int:
+    raw = node.get(name) if hasattr(node, "get") else None
+    try:
+        value = int(raw) if raw else 1
+    except (TypeError, ValueError):
+        return 1
+    return value if value > 0 else 1
+
+
+def _epub_type(node: Any) -> str:
+    raw = node.get("epub:type") if hasattr(node, "get") else None
+    return _clean(str(raw or ""))
+
+
+def _has_class_token(node: Any, tokens: set[str]) -> bool:
+    classes = node.get("class") or []
+    if isinstance(classes, str):
+        classes = classes.split()
+    return any(str(c).lower() in tokens for c in classes)
+
+
+def _is_footnote_container(node: Any) -> bool:
+    if _tag_name(node) not in {"div", "section", "ul", "ol"}:
+        return False
+    return _has_class_token(node, {"footnotes", "endnotes", "fn-list", "footnote-list"})
+
+
+def _is_footnote_definition(node: Any) -> bool:
+    if _epub_type(node) in {"footnote", "endnote"}:
+        return True
+    return _has_class_token(node, {"footnote", "endnote", "fn"})
+
+
+def _collect_footnotes(soup: Any) -> tuple[dict[str, int], list[tuple[int, str]]]:
+    """Identify footnote/endnote definition elements, number them in document
+    order, and remove them from the tree so they no longer render as body text.
+
+    Supports two patterns: a container shell (``<div class="footnotes">`` holding
+    several ``<p>`` children) and standalone definitions
+    (``<aside epub:type="footnote">``). Returns ``(id->number, [(number, text)])``.
+    """
+    id_to_num: dict[str, int] = {}
+    notes: list[tuple[int, str]] = []
+    for idx, elem in enumerate(_collect_footnote_definitions(soup), start=1):
+        note_id = elem.get("id") or elem.get("name")
+        text = _clean(elem.get_text(" ", strip=True))
+        if not text:
+            continue
+        if note_id:
+            id_to_num[str(note_id)] = idx
+        notes.append((idx, text))
+        elem.decompose()
+    return id_to_num, notes
+
+
+def _collect_footnote_definitions(soup: Any) -> list[Any]:
+    definitions: list[Any] = []
+    for elem in soup.find_all(True):
+        if not isinstance(elem, _TAG):
+            continue
+        if _is_footnote_container(elem):
+            for child in elem.children:
+                if isinstance(child, _TAG) and _clean(child.get_text(" ", strip=True)):
+                    definitions.append(child)
+        elif _is_footnote_definition(elem):
+            parent = elem.parent
+            if parent is not None and _is_footnote_container(parent):
+                continue
+            definitions.append(elem)
+    return definitions

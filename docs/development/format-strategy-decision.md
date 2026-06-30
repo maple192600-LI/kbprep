@@ -25,9 +25,11 @@ capability：归在 `office_xml`（partial），是 office_xml 内部的**重点
 
 ## EPUB（直接解析，不默认转 PDF）
 
-做什么：继续提升 XHTML 章节解析质量（脚注、复杂表格、自定义 XHTML 的 fixtures）。
+做什么：剩余工作是更广真实 EPUB 样本 fixtures 证明保真度，再考虑提 verified。
 不做什么：不默认把 EPUB 转 PDF。只有当用户**手工判断**某本 EPUB 解析很差时，才允许作为临时备选转 PDF。
 capability：`epub_xhtml`（partial），默认路线是本地 XHTML 提取，不走 MinerU/PDF。
+
+**进展（2026-07-01，格式策略 ③ 落地）**：EPUB 转换器已支持脚注/尾注（EPUB2 锚点式 `<a href="#fn">` + `<p id="fn">` 与 EPUB3 `epub:type="footnote"/"noteref"`，渲染为 Markdown `[^n]` 脚注语法，定义移至文末）、复杂表格（`colspan`/`rowspan` 合并单元格按 grid 矩阵展开）、`epub:type` 语义信号识别；单元测试覆盖三种结构穿解析层。仍 partial：待更广真实 EPUB 样本证明保真度后提 verified。已知保真度限制（Markdown 固有）：合并单元格值重复（与 DOCX 一致）。
 
 ## PPTX（轻量）
 
