@@ -24,7 +24,7 @@ This stage maps the current codebase against the flowchart contract in `docs/flo
 ## Target Gaps
 
 - Canonical IR now emits validated typed nodes, source spans, a conversion-phase TransformationLedger, and an embedded coverage report. The pre-clean conversion gate can use complete typed-node/source-span text evidence when coverage is complete, but Canonical IR is not yet the complete internal fact layer.
-- SourceSpan variants validate route-native precision records only when required native fields are present, and the coverage report lists missing native precision kinds. Converter-specific evidence for PDF bounding boxes, DOCX run ranges, PPTX shape ids, XLSX cell ranges, transcript cue ids without timing, and YouTube cue ids still needs to be emitted before Phase C can close.
+- SourceSpan variants validate route-native precision records only when required native fields are present, and the coverage report lists missing native precision kinds. Converter-native evidence for DOCX run ranges, PPTX shape ids, and XLSX cell ranges is already emitted (landed in C1R), and PDF bounding boxes are emitted via MinerU OCR `content_list` (Wave 1) — though the PDF text-layer route still lacks a coordinate source and stays converted-line only. Transcript cue ids without timing and YouTube cue ids still need to be emitted before Phase C can close.
 - Canonical IR still needs full route-wide relationship, asset, annotation,
   conversion-gate, renderer/profile, and universal fact-layer coverage before
   Phase C is complete. A minimal standard Markdown path can regenerate

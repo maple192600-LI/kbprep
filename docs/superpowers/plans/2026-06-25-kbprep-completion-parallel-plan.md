@@ -10,6 +10,13 @@
 
 ---
 
+> **Format strategy note:** This plan governs M2/M5/batch/M6 completion
+> parallelism. It does **not** define format-dimension priority. Format
+> investment priority (DOCX deep, EPUB direct, PPTX/XLSX lightweight, Legacy
+> unsupported) is defined in
+> `docs/development/format-strategy-decision.md` and supersedes any
+> format-priority reading of this or any older plan.
+
 ## Current Truth
 
 Source of truth:

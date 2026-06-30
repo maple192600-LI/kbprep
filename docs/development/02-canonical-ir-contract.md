@@ -76,6 +76,13 @@ segmentation, node-level `coverage_gap` annotations that depend on
 source-kind-aware native precision gaps, and full Markdown regeneration
 coverage.
 
+This IR-contract deferral is a schema/completeness gap, **not** a current
+PPTX deepening plan. Per `docs/development/format-strategy-decision.md`,
+PPTX is lightweight only; the PPTX shape `embeds` and notes `annotates`
+relationship semantics would be pursued only if the owner reopens PPTX
+depth. The `transcript speaker_segment` deferral in the same list is
+independent — it follows the media/transcript route, not PPTX strategy.
+
 The standard Markdown render path now has a minimal IR regeneration slice:
 when a valid `clean_view.json` and `canonical_ir/typed_nodes.json` are present,
 `cleaned.md` defaults to Canonical IR node text in Clean View order, while
@@ -125,6 +132,12 @@ on top of typed-node identity. The current shipped boundary is:
 All relationship, asset, and annotation records remain content-safe: they
 reference typed-node ids and structural fields only, never source text, alt
 text, title text, table cell content, or private rule bodies.
+
+> Note: the PPTX `embeds`/`annotates` deferrals are IR schema gaps, not a
+> current PPTX deepening plan (PPTX is lightweight per
+> `format-strategy-decision.md`); they land only if the owner reopens PPTX
+> depth. The `transcript speaker_segment` deferral follows the
+> media/transcript route and is independent of PPTX strategy.
 
 ## Risk And Rollback
 

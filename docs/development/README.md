@@ -8,8 +8,9 @@ This directory turns the protected design into implementation work. The protecte
 
 ## Planning Entry Points
 
+- `docs/development/format-strategy-decision.md` — **current format strategy** (DOCX deep, EPUB direct, PPTX/XLSX lightweight, Legacy unsupported); the format-dimension priority authority. Read this before any format-specific work.
 - `development-roadmap.md` — connected phase-by-phase path from the current state to the completed design (read first).
-- `docs/superpowers/plans/2026-06-25-kbprep-completion-parallel-plan.md` — parallel worktree and subagent execution plan for finishing M2, M5, batch/rerun, and M6 without overstating status.
+- `docs/superpowers/plans/2026-06-25-kbprep-completion-parallel-plan.md` — parallel worktree and subagent execution plan for finishing M2, M5, batch/rerun, and M6 (does not define format priority; see decision doc above).
 - `docs/kbprep-development-implementation-plan.md` — M1–M6 milestones and current-truth rules.
 - `kbprep-implementation-status.json` — capability status source of truth.
 - `docs/capability-matrix.md` — route-level capability status and evidence.

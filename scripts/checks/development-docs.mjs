@@ -39,6 +39,17 @@ const stalePhrases = [
   { text: "\u5927\u8d44\u6599", wordBoundary: false },
   { text: "\u65e7\u9636\u6bb5", wordBoundary: false },
   { text: ["R", "AG"].join(""), wordBoundary: true },
+  // Format-strategy anti-regression guards (see docs/development/format-strategy-decision.md).
+  // These phrases must never reappear in active docs. NOTE: do NOT ban the
+  // capability ID `legacy_office_pdf_bridge` (it is the legitimate unsupported
+  // marker) — only ban phrases that imply Legacy Office is a usable/bridgeable route.
+  { text: "Legacy Office 可桥接", wordBoundary: false },
+  { text: "Legacy Office 可转换", wordBoundary: false },
+  { text: "老 Office 桥接", wordBoundary: false },
+  { text: "EPUB 默认转 PDF", wordBoundary: false },
+  { text: "Office 全部切 MinerU", wordBoundary: false },
+  { text: "PPTX 深度精细化", wordBoundary: false },
+  { text: "XLSX 深度精细化", wordBoundary: false },
 ];
 
 const failures = [];

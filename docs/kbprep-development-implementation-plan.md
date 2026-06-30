@@ -117,6 +117,7 @@ These documents are implementation guidance. They must not override the protecte
 - The source-side output rule is mandatory for the standard profile.
 - Feedback must stay proposal-first.
 - Public rules must stay generic or sanitized; private rules belong under `.kbprep/rules/`.
+- 格式维度的投入优先级见 `docs/development/format-strategy-decision.md`（DOCX 深做、EPUB 直接解析、PPTX/XLSX 轻量、Legacy Office 不支持）；本计划描述 M1-M6 里程碑交付，格式差异化优先级以决策文档为准。
 
 ## 6. Required Checks
 

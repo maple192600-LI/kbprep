@@ -259,6 +259,23 @@ Slices:
 Acceptance: optional routes are clearly marked until verified; no promotion
 without named tests; dependency failure messages are explicit.
 
+## Format Strategy Priority
+
+Per `docs/development/format-strategy-decision.md`, the **format-dimension**
+investment priority is:
+
+1. DOCX deepening (priority target)
+2. EPUB XHTML quality (default route, not PDF)
+3. PPTX lightweight body/outline cleanup
+4. XLSX lightweight sheet/table text
+5. Image / media / YouTube evidence hardening
+
+This is a **format-dimension** priority. It does not override the
+cross-cutting Phase C IR fact-layer work (which serves all formats); it
+constrains **how much** each format gets and **in what order** format-specific
+investment lands. PPTX and XLSX are lightweight only — no complex layout,
+charts, or workbook semantics work.
+
 ## Dependency Order
 
 ```text
@@ -273,7 +290,7 @@ Phase C / M2 remaining IR fact-layer work
       │       └── BATCH2 policy/CIR affected batch targeting
       │
       └── optional-route evidence work can run in parallel:
-          media ASR fixtures, image/legacy fixtures, YouTube/playlist evidence
+          media ASR fixtures, image OCR fixtures, YouTube/playlist evidence
 ```
 
 - Phase D is implemented against the current Canonical IR artifacts. Full
@@ -333,9 +350,13 @@ baseline.
 Required slices:
 
 - Add converter-native SourceSpan extraction for PDF bounding boxes, DOCX run
-  ranges, PPTX shape ids, XLSX cells, transcript cue ids, and future YouTube
-  cue ids when the converter provides that evidence. The schema and coverage
-  gap tracking are in place; converters must still emit real native positions.
+  ranges (DOCX is the priority target per format-strategy-decision.md),
+  transcript cue ids, and future YouTube cue ids when the converter provides
+  that evidence. PPTX shape ids and XLSX cells already ship lightweight
+  converter-native precision (C1R); per the format strategy, no further
+  complex layout/charts/workbook-semantics work is added on PPTX/XLSX beyond
+  this lightweight baseline. The schema and coverage gap tracking are in
+  place; converters must still emit real native positions.
 - Harden route-wide relationship evidence, asset registry evidence, and
   annotation evidence. Content-safe artifacts already exist; the remaining work
   is semantic breadth and representative route coverage, not creating those
@@ -450,7 +471,7 @@ Required slices:
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlist
   expansion, playlist child publication, and final source-side publication.
 
-Execution: start local media fixtures, image/legacy format fixtures, and YouTube
+Execution: start local media fixtures, image OCR fixtures, and YouTube
 technical-contract work now in parallel with M2/M5/batch work when file ownership
 does not collide. Do not wait for M2 or M5 to begin implementation. Wait only
 before promoting the capability status to `verified` or final complete.
