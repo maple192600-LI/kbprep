@@ -21,6 +21,8 @@
 不做什么：（无特殊限制，是主要投入方向）。
 capability：归在 `office_xml`（partial），是 office_xml 内部的**重点提升对象**。
 
+**进展（2026-06-30，格式策略 ② 落地）**：DOCX 转换器已支持外部超链接（`.rels` 解析）、有序/无序列表（`numbering.xml`）、`gridSpan`/`vMerge` 合并单元格、bold/italic/strike 字符样式；golden fixture + 端到端断言验证这些结构穿完整清理 pipeline 保留。仍 partial：待更广真实 DOCX 样本证明保真度后提 verified。已知保真度限制（Markdown 固有）：合并单元格值重复、单元格内多段落合并为一行；headers/footers、脚注、目录不在范围。
+
 ## EPUB（直接解析，不默认转 PDF）
 
 做什么：继续提升 XHTML 章节解析质量（脚注、复杂表格、自定义 XHTML 的 fixtures）。

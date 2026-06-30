@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.3
+
+- Deepened DOCX fidelity: resolve external hyperlinks via `.rels`, render ordered/unordered lists from `numbering.xml`, expand `gridSpan`/`vMerge` merged cells, and emit bold/italic/strike emphasis from run properties.
+- Added DOCX golden fixture coverage asserting the new structures survive the full cleanup pipeline (converted.md and cleaned.md).
+- Split the `office_xml` converter into `office_xml_common` (shared XML helpers) and `office_xml_docx` (DOCX-specific styling/merge helpers) to satisfy file/function size governance without import cycles; graceful degradation on corrupt `numbering.xml`/`.rels`.
+
 ## 0.5.2
 
 - Corrected audit closeout overclaims from 0.5.1 with rule-backed text quality and retention signals.

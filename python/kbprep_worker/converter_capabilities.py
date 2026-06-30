@@ -146,12 +146,32 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "src/test/scenarios/worker-local-formats.test.ts::converts modern Office files through the local XML fallback when MinerU is unnecessary",  # noqa: E501
         ],
         "required_evidence": [
-            "golden DOCX, PPTX, and XLSX fixtures with headings, tables, slides, sheets, embedded images, and charts",
-            "layout-loss and sheet/slide-order assertions",
+            (
+                "broader real-world DOCX samples covering nested lists, complex tables, "
+                "and multi-run styled paragraphs before DOCX verified promotion"
+            ),
+            (
+                "PPTX/XLSX lightweight fixtures (slide notes order, simple sheet tables) "
+                "— no charts or complex workbook semantics per format strategy"
+            ),
         ],
-        "promotion_blocker": "Needs broader Office XML golden fixtures, especially charts and complex workbooks.",
-        "preserves": ["document text", "slide order", "sheet/table text", "embedded images when extractable"],
-        "risk": "layout fidelity, charts, and complex workbook semantics are not fully proven",
+        "promotion_blocker": (
+            "DOCX structure fidelity is deepened (external hyperlinks, ordered/unordered lists, "
+            "gridSpan/vMerge merged cells, bold/italic/strike emphasis) but stays partial until "
+            "broader real-world DOCX samples prove preservation; PPTX and XLSX are intentionally "
+            "lightweight per docs/development/format-strategy-decision.md (no charts or complex workbook work)."
+        ),
+        "preserves": [
+            "DOCX: paragraph/run structure, heading levels, tables with gridSpan/vMerge merged cells, "
+            "embedded images, external hyperlinks, ordered/unordered lists, bold/italic/strike emphasis, docx_run_range source spans",
+            "PPTX: slide order, shape text, titles, speaker notes, readable outline (lightweight)",
+            "XLSX: sheet names, simple tables, key text (lightweight)",
+        ],
+        "risk": (
+            "Markdown has no native merged-cell or multi-paragraph-cell syntax, so merged cells repeat "
+            "values and multi-paragraph cells collapse to one line; DOCX headers/footers, footnotes, "
+            "and TOC are intentionally out of scope; PPTX/XLSX stay lightweight by strategy."
+        ),
     },
     {
         "id": "epub_xhtml",
