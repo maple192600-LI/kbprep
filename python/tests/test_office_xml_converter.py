@@ -478,6 +478,145 @@ class OfficeXmlConverterTests(unittest.TestCase):
 
         self.assertIn("[**BoldLink**](https://example.com)", markdown)
 
+    # --- PPTX/XLSX lightweight coverage (format-strategy ④/⑤) ---
+
+    def test_pptx_notes_slide_appended_to_markdown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "deck.pptx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("ppt/slides/slide1.xml", (
+                    "<p:sld xmlns:p='p' xmlns:a='a'>"
+                    "<p:cSld><p:spTree>"
+                    "<p:sp><p:nvSpPr><p:cNvPr id='2' name='Title 1'/></p:nvSpPr>"
+                    "<p:txBody><a:p><a:r><a:t>Visible Title</a:t></a:r></a:p></p:txBody></p:sp>"
+                    "</p:spTree></p:cSld></p:sld>"
+                ))
+                zf.writestr("ppt/notesSlides/notesSlide1.xml", (
+                    "<p:notes xmlns:p='p' xmlns:a='a'>"
+                    "<p:cSld><p:spTree>"
+                    "<p:sp><p:txBody><a:p><a:r><a:t>Speaker note detail</a:t></a:r></a:p></p:txBody></p:sp>"
+                    "</p:spTree></p:cSld></p:notes>"
+                ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("# Slide 1: Visible Title", markdown)
+        self.assertIn("## Slide 1 Notes", markdown)
+        self.assertIn("Speaker note detail", markdown)
+
+    def test_pptx_multiple_slides_preserve_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "multi.pptx")
+            with zipfile.ZipFile(path, "w") as zf:
+                for idx, title in [(1, "Alpha"), (2, "Beta")]:
+                    zf.writestr(f"ppt/slides/slide{idx}.xml", (
+                        f"<p:sld xmlns:p='p' xmlns:a='a'>"
+                        f"<p:cSld><p:spTree>"
+                        f"<p:sp><p:nvSpPr><p:cNvPr id='{idx}' name='T{idx}'/></p:nvSpPr>"
+                        f"<p:txBody><a:p><a:r><a:t>{title}</a:t></a:r></a:p></p:txBody></p:sp>"
+                        f"</p:spTree></p:cSld></p:sld>"
+                    ))
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("# Slide 1: Alpha", markdown)
+        self.assertIn("# Slide 2: Beta", markdown)
+        self.assertLess(markdown.index("# Slide 1: Alpha"), markdown.index("# Slide 2: Beta"))
+
+    def test_xlsx_multiple_sheets_each_with_title_and_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "multi.xlsx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("[Content_Types].xml", "<Types/>")
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets>'
+                    '<sheet name="First" sheetId="1"/><sheet name="Second" sheetId="2"/>'
+                    '</sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/sharedStrings.xml",
+                    '<sst xmlns="main"><si><t>A</t></si><si><t>B</t></si><si><t>C</t></si><si><t>D</t></si></sst>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet2.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1" t="s"><v>2</v></c><c r="B1" t="s"><v>3</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("# First", markdown)
+        self.assertIn("# Second", markdown)
+        self.assertIn("| A | B |", markdown)
+        self.assertIn("| C | D |", markdown)
+        self.assertLess(markdown.index("# First"), markdown.index("# Second"))
+
+    def test_xlsx_empty_sheet_is_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "sparse.xlsx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("[Content_Types].xml", "<Types/>")
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets>'
+                    '<sheet name="Empty" sheetId="1"/><sheet name="Filled" sheetId="2"/>'
+                    '</sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/sharedStrings.xml",
+                    '<sst xmlns="main"><si><t>Key</t></si><si><t>Val</t></si></sst>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1"/><c r="B1"/></row>'
+                    '</sheetData></worksheet>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet2.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertNotIn("# Empty", markdown)
+        self.assertIn("# Filled", markdown)
+        self.assertIn("| Key | Val |", markdown)
+
+    def test_xlsx_inline_string_cell_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            path = Path(tmp, "inline.xlsx")
+            with zipfile.ZipFile(path, "w") as zf:
+                zf.writestr("[Content_Types].xml", "<Types/>")
+                zf.writestr(
+                    "xl/workbook.xml",
+                    '<workbook xmlns="main"><sheets><sheet name="Inline" sheetId="1"/></sheets></workbook>',
+                )
+                zf.writestr(
+                    "xl/worksheets/sheet1.xml",
+                    '<worksheet xmlns="main"><sheetData>'
+                    '<row r="1">'
+                    '<c r="A1" t="inlineStr"><is><t>Inline value</t></is></c>'
+                    '<c r="B1"><v>42</v></c>'
+                    '</row>'
+                    '</sheetData></worksheet>',
+                )
+            markdown, _w, _a = office_xml_to_markdown(path, run_dir)
+
+        self.assertIn("Inline value", markdown)
+        self.assertIn("42", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()
