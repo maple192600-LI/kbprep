@@ -27,6 +27,16 @@
 - `import lmdeploy` / `import mineru` 正常（accelerate 1.14→1.12 兼容，没坏 mineru）。
 - 真实样本（非 TTS 合成），GPU 推理（非 CPU）。
 
+## F1 Reproducible Fixture（2026-07-01，version-controlled）
+
+> 与上方 manual acceptance 不同：这里是**版本控制 fixture**（transcript 文本入库 `python/tests/golden/formats/media/transcript_zh_90s.txt`），由 `test_media_asr_fixture.py` 锁定。fixture 是 evidence snapshot（ASR 输出会随模型版本变化），不作 deterministic re-run target。`media_local_transcript` 仍 partial，verified 需确定性或跨样本证据。
+
+| 样本 | 语言 | 链路 | 耗时 | 结果 |
+|---|---|---|---|---|
+| YouTube `3DlXq9nsQOE`（中文，前 90s） | zh | Qwen3-ASR 1.7B | ~20s（4060 Ti，完整 GPU venv） | 689 字符（zh transcript），harness engineering 主题，transcript 入库为 fixture |
+
+注：`3DlXq9nsQOE` 与上方 manual acceptance 的 `_L2Filt7l-s` 是**不同的真实样本**——前者是 F1 version-controlled fixture，后者是 manual acceptance 证据。两者独立，不混淆。
+
 ## 复现命令
 
 样本放在本地 `.kbprep/phase-b-test-media/`（gitignored，不入仓库）。
@@ -44,6 +54,11 @@ node scripts/python-venv.mjs -m yt_dlp --download-sections "*0-90" --force-keyfr
 node scripts/python-venv.mjs -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
   -f ba -x --audio-format wav --no-playlist --postprocessor-args "-ar 16000 -ac 1" \
   -o ".kbprep/phase-b-test-media/yt-en.%(ext)s" "https://www.youtube.com/watch?v=FBHhmqBs894"
+
+#    F1 version-controlled fixture 样本（3DlXq9nsQOE，transcript 入库 python/tests/golden/formats/media/）
+node scripts/python-venv.mjs -m yt_dlp --download-sections "*0-90" --force-keyframes-at-cuts \
+  -f ba -x --audio-format wav --no-playlist --postprocessor-args "-ar 16000 -ac 1" \
+  -o ".kbprep/phase-b-test-media/yt-f1.%(ext)s" "https://www.youtube.com/watch?v=3DlXq9nsQOE"
 
 # 2. torch 环境自检（必须在完整 GPU venv，不是 dev venv）
 #    先进入装了 .[cuda,asr] 的 venv，再跑：

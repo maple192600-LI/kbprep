@@ -199,7 +199,7 @@
       "id": "media_local_transcript",
       "label": "Local media transcript route",
       "status": "partial",
-      "scope": "Local audio/video detection, external transcript routing, dependency failure reporting (ffmpeg/whisper missing), command evidence, and mocked golden transcript fixtures exist. Real local ASR dual-track manual acceptance evidence (zh fixture via qwen3-asr + en fixture via Whisper large-v3, transcript enters cleanup and final outputs, quality gates pass with 0 strict errors) is recorded; the route stays partial until a reproducible version-controlled fixture lands (see docs/development/asr-dual-track-acceptance.md).",
+      "scope": "Local audio/video detection, external transcript routing, dependency failure reporting (ffmpeg/whisper missing), command evidence, and mocked golden transcript fixtures exist. Real local ASR dual-track manual acceptance evidence (zh fixture via qwen3-asr + en fixture via Whisper large-v3, transcript enters cleanup and final outputs, quality gates pass with 0 strict errors) is recorded; a reproducible version-controlled zh fixture now ships (python/tests/golden/formats/media/transcript_zh_90s.txt, qwen3-asr Qwen3-ASR-1.7B on a 90s sample); the route stays partial until deterministic or cross-sample ASR evidence supports verified promotion (see docs/development/asr-dual-track-acceptance.md).",
       "evidence": [
         "docs/development/11-multimedia-youtube-optional.md",
         "docs/capability-matrix.md",

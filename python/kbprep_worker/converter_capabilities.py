@@ -276,18 +276,19 @@ _CAPABILITIES: tuple[Capability, ...] = (
             MEDIA_YOUTUBE_EVIDENCE,
         ],
         "real_fixture_evidence": (
-            "Real 90s zh audio fixture transcribed via qwen3-asr (cuda:0/bfloat16); "
-            "1885-char accurate transcript enters cleanup + final outputs; "
-            "quality gates pass with 0 strict errors. English Whisper route also passed "
-            "manual acceptance; verified needs a reproducible fixture "
-            "(see docs/development/asr-dual-track-acceptance.md)."
+            "Real 90s zh audio (YouTube video 3DlXq9nsQOE, public) transcribed via "
+            "qwen3-asr Qwen3-ASR-1.7B (cuda:0/bfloat16, RTX 4060 Ti); a reproducible "
+            "version-controlled fixture ships at python/tests/golden/formats/media/"
+            "transcript_zh_90s.txt (689-character zh transcript). English Whisper route "
+            "also passed manual acceptance (see docs/development/asr-dual-track-acceptance.md)."
         ),
         "required_evidence": [
-            "reproducible version-controlled ASR fixture for verified promotion",
+            "deterministic or cross-sample ASR evidence for verified promotion",
         ],
         "promotion_blocker": (
-            "Needs a reproducible version-controlled fixture (manual acceptance on "
-            "external sample is recorded but is not a verified golden fixture)."
+            "Reproducible version-controlled fixture now ships (transcript_zh_90s.txt); "
+            "verified promotion needs deterministic or cross-sample ASR evidence because "
+            "ASR output can vary across model versions."
         ),
         "preserves": ["transcript text", "ASR command evidence", "Whisper model metadata"],
         "risk": (
