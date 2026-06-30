@@ -46,10 +46,11 @@
       "expected_route": "youtube_subtitle_then_media_transcript",
       "expected_status": "partial",
       "required_tools": ["yt-dlp subtitle route", "yt-dlp Python package", "ffmpeg", "whisper"],
-      "real_fixture": false,
-      "manual_acceptance_evidence": false,
+      "real_fixture": true,
+      "manual_acceptance_evidence": true,
       "promote_to_verified": false,
-      "promotion_blocker": "Only local .url descriptor routing with mocked subtitle and fallback fixtures is covered."
+      "promotion_blocker": "Real YouTube subtitle fixture now ships (subtitle_en_caQ2pfhoPcs.txt, video CAQ2pfhoPcs en auto subs via yt-dlp); verified promotion still needs broader real-network, timeout, dependency-variance, no-subtitle fallback, and transcript-quality evidence.",
+      "real_fixture_evidence": "Real YouTube subtitle downloaded via yt-dlp (project wrapper tool) for owner-designated test video CAQ2pfhoPcs (public, 'How I Turned Claude Into My Personal Assistant'); en auto subs cleaned to transcript committed at python/tests/golden/formats/youtube/subtitle_en_caQ2pfhoPcs.txt (1170-character excerpt from a 25166-character full transcript)."
     },
     {
       "id": "mobi_explicitly_unsupported",
