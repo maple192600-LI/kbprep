@@ -380,7 +380,7 @@ def _list_lines(node: Any, copier: _EpubImageCopier, ordered: bool) -> list[str]
 
 
 def _table_to_markdown(table: Any) -> str:
-    row_nodes = table.find_all("tr")
+    row_nodes = [tr for tr in table.find_all("tr") if _closest_ancestor_table(tr) is table]
     if not row_nodes:
         return ""
     grid: dict[tuple[int, int], str] = {}
@@ -489,23 +489,49 @@ def _is_footnote_definition(node: Any) -> bool:
 
 
 def _collect_footnotes(soup: Any) -> tuple[dict[str, int], list[tuple[int, str]]]:
-    """Identify footnote/endnote definition elements, number them in document
-    order, and remove them from the tree so they no longer render as body text.
+    """Identify footnote/endnote definition elements, number them by first
+    reference order (unreferenced definitions follow in document order), and
+    remove them from the tree so they no longer render as body text.
 
     Supports two patterns: a container shell (``<div class="footnotes">`` holding
     several ``<p>`` children) and standalone definitions
     (``<aside epub:type="footnote">``). Returns ``(id->number, [(number, text)])``.
     """
+    definitions = _collect_footnote_definitions(soup)
+    defs_by_id: dict[str, Any] = {}
+    for elem in definitions:
+        note_id = elem.get("id") or elem.get("name")
+        if note_id and str(note_id) not in defs_by_id:
+            defs_by_id[str(note_id)] = elem
+
+    referenced: list[str] = []
+    seen: set[str] = set()
+    for anchor in soup.find_all("a"):
+        href = _clean(str(anchor.get("href") or ""))
+        target = href[1:] if href.startswith("#") else ""
+        if target and target in defs_by_id and target not in seen:
+            seen.add(target)
+            referenced.append(target)
+
+    ordered: list[tuple[str | None, Any]] = [(tid, defs_by_id[tid]) for tid in referenced]
+    for elem in definitions:
+        note_id = elem.get("id") or elem.get("name")
+        key = str(note_id) if note_id else None
+        if key in seen:
+            continue
+        ordered.append((key, elem))
+
     id_to_num: dict[str, int] = {}
     notes: list[tuple[int, str]] = []
-    for idx, elem in enumerate(_collect_footnote_definitions(soup), start=1):
-        note_id = elem.get("id") or elem.get("name")
+    for idx, (key, elem) in enumerate(ordered, start=1):
         text = _clean(elem.get_text(" ", strip=True))
         if not text:
             continue
-        if note_id:
-            id_to_num[str(note_id)] = idx
+        if key:
+            id_to_num[key] = idx
         notes.append((idx, text))
+
+    for elem in definitions:
         elem.decompose()
     return id_to_num, notes
 
@@ -525,3 +551,12 @@ def _collect_footnote_definitions(soup: Any) -> list[Any]:
                 continue
             definitions.append(elem)
     return definitions
+
+
+def _closest_ancestor_table(node: Any) -> Any:
+    parent = node.parent
+    while parent is not None:
+        if _tag_name(parent) == "table":
+            return parent
+        parent = parent.parent
+    return None

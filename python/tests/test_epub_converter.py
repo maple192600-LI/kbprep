@@ -106,6 +106,45 @@ class EpubConverterTests(unittest.TestCase):
         body_before_notes = markdown.split("[^1]:")[0]
         self.assertNotIn("First EPUB3 footnote detail.", body_before_notes)
 
+    def test_nested_table_keeps_outer_rows_separate_from_inner(self):
+        html = """
+        <html><body>
+          <table>
+            <tr><th>Outer</th><th>Head</th></tr>
+            <tr><td>o1</td><td>
+              <table><tr><th>inner</th></tr><tr><td>in1</td></tr></table>
+            </td></tr>
+          </table>
+        </body></html>
+        """
+        markdown = html_to_markdown(html)
+
+        lines = [ln for ln in markdown.splitlines() if ln.strip().startswith("|")]
+        # outer table only: header + separator + 1 data row = 3 lines
+        self.assertEqual(len(lines), 3)
+        self.assertEqual(lines[0], "| Outer | Head |")
+        self.assertIn("o1", lines[2])
+        # inner table rows must not leak as outer rows
+        for ln in lines:
+            self.assertNotEqual(ln.strip(), "| inner |")
+
+    def test_footnote_numbers_follow_reference_order(self):
+        html = """
+        <html><body>
+          <p>First ref<a href="#b">[1]</a>, second ref<a href="#a">[2]</a>.</p>
+          <aside epub:type="footnote" id="a"><p>Note A text.</p></aside>
+          <aside epub:type="footnote" id="b"><p>Note B text.</p></aside>
+        </body></html>
+        """
+        markdown = html_to_markdown(html)
+
+        # first-referenced note (#b) becomes [^1], second (#a) becomes [^2]
+        # inline text rendering inserts spaces between adjacent text and anchors
+        self.assertIn("First ref [^1]", markdown)
+        self.assertIn("second ref [^2]", markdown)
+        self.assertIn("[^1]: Note B text.", markdown)
+        self.assertIn("[^2]: Note A text.", markdown)
+
 
 if __name__ == "__main__":
     unittest.main()
