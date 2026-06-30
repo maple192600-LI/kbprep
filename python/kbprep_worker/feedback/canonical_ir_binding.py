@@ -1,7 +1,9 @@
 """Run-level Canonical IR binding evidence for feedback rerun plans."""
 
+import json
 from pathlib import Path
 
+from ..canonical_nodes import CANONICAL_IR_TYPED_NODES_SCHEMA
 from .support import _optional_string, _read_json_file
 
 
@@ -17,6 +19,7 @@ def canonical_ir_binding(run_dir: Path) -> dict:
         or not _document_manifest_is_valid(run_dir, document_manifest)
     ):
         return pending_canonical_ir_binding()
+    node_ids = _canonical_node_ids(run_dir)
     return {
         "status": "bound",
         "binding_level": "run",
@@ -27,10 +30,47 @@ def canonical_ir_binding(run_dir: Path) -> dict:
         "artifacts": _canonical_ir_artifact_refs(canonical_manifest),
         "document_manifest_ref": "canonical_ir/manifest.json",
         "created_from_run": str(document_manifest["created_from_run"]),
+        "node_identity_available": bool(node_ids),
         "id_level_narrowing": False,
-        "canonical_node_ids": [],
-        "reason": "Run-level Canonical IR evidence is bound; node-level selective narrowing is not available yet.",
+        "canonical_node_ids": node_ids,
+        "reason": _binding_reason(node_ids),
     }
+
+
+def _canonical_node_ids(run_dir: Path) -> list[str]:
+    """Return stable canonical_node_ids from typed_nodes.json when available.
+
+    The typed_nodes artifact carries the per-document node identity emitted by
+    the Canonical IR builders. When it is present and well-formed, the binding
+    can record node-level identity for selective narrowing scope. Missing,
+    unreadable, or schema-mismatched artifacts fall back to an empty list
+    (run-level only).
+    """
+    typed_nodes_path = run_dir / "canonical_ir" / "typed_nodes.json"
+    try:
+        payload = json.loads(typed_nodes_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict) or payload.get("schema") != CANONICAL_IR_TYPED_NODES_SCHEMA:
+        return []
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+    ids = [str(node.get("node_id") or "").strip() for node in nodes if isinstance(node, dict)]
+    return list(dict.fromkeys(node_id for node_id in ids if node_id))
+
+
+def _binding_reason(node_ids: list[str]) -> str:
+    if node_ids:
+        return (
+            "Canonical IR node-level identity is available (canonical_node_ids recorded "
+            "from typed_nodes). Execution-level selective rerun by node-id remains future "
+            "work; rerun is still run-level (id_level_narrowing=false)."
+        )
+    return (
+        "Run-level Canonical IR evidence is bound; node-level identity is unavailable "
+        "without typed_nodes node_id evidence."
+    )
 
 
 def pending_canonical_ir_binding() -> dict:

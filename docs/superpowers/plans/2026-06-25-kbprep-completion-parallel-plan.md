@@ -33,7 +33,7 @@ Current completion state:
 - M3 / Phase D is implemented.
 - M4 is implemented.
 - Phase E / `job_status_envelope` is implemented.
-- M5 `feedback_rule_learning` is `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). Canonical IR node-id or cleaning-unit id-level selective narrowing remains future work (`id_level_narrowing=false` is explicit in the binding payload).
+- M5 `feedback_rule_learning` is `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). Canonical IR node-level identity (canonical_node_ids from typed_nodes, `node_identity_available=true` when stable) is now recorded in the binding; execution-level selective rerun by node-id remains future work (`id_level_narrowing=false`).
 - M6 / Phase F is not closed: local media and YouTube are implemented as `partial` optional routes, image OCR remains `experimental`, legacy Office is `unsupported` (owner declined adaptation), and MOBI stays explicitly `unsupported` unless the owner reopens that scope.
 
 ## Parallelization Rules
@@ -371,15 +371,15 @@ node scripts/python-venv.mjs -m unittest python.tests.test_feedback -v
 
 - [ ] **Step 1: Add failing affected-scope tests**
 
-Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and run-level Canonical IR manifest evidence when available. Keep node-id or cleaning-unit id-level narrowing explicit as unavailable until those identities are stable.
+Require selective rerun to bind accepted proposals to affected run ids, source ids, document type, policy snapshot hash, and run-level Canonical IR manifest evidence when available. Keep execution-level node-id or cleaning-unit id-level narrowing explicit as unavailable (`id_level_narrowing=false`) until the worker supports node-id filtering; node-level identity (`canonical_node_ids`) is already extractable from typed_nodes.
 
 - [ ] **Step 2: Implement final binding**
 
-Use current stable run/source/document/policy evidence plus Canonical IR manifest evidence for the baseline binding. Add stable Canonical IR node ids or cleaning-unit ids later to avoid document-wide reruns when the changed rule affects only a known source span or cleaning unit.
+Use current stable run/source/document/policy evidence plus Canonical IR manifest evidence for the baseline binding. Stable Canonical IR node ids are already extractable from typed_nodes (`node_identity_available=true`); the remaining work is execution-level worker filtering by node-id to avoid document-wide reruns when the changed rule affects only a known source span or cleaning unit.
 
 - [ ] **Step 3: Close M5 depth only if complete**
 
-`feedback_rule_learning` is already `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). This step closes the remaining depth — Canonical IR node-id or cleaning-unit id-level selective narrowing (currently `id_level_narrowing=false`) — only when stable identity evidence and named tests exist, then removes that future-work caveat from the status scope.
+`feedback_rule_learning` is already `implemented` (proposal, accept, reject, public single-source selective rerun, run-level Canonical IR manifest binding, failed-promotion blocking). Node-level identity (`canonical_node_ids` from typed_nodes, `node_identity_available=true` when stable) is now recorded in the binding. This step closes the remaining execution-level depth — selective rerun that filters the worker to specific node-ids (currently `id_level_narrowing=false`) — only when the worker supports node-id filtering and named tests exist, then removes that future-work caveat from the status scope.
 
 - [ ] **Step 4: Verify branch**
 

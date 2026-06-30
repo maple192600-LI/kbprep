@@ -33,7 +33,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
-| feedback_rule_learning | implemented | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding (document_id, source, document type, policy snapshot hash); Canonical IR node-id or cleaning-unit id-level narrowing remains future work (run-level binding ships now). |
+| feedback_rule_learning | implemented | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding (document_id, source, document type, policy snapshot hash); Canonical IR node-level identity (canonical_node_ids) is recorded in the binding when typed_nodes evidence exists (node_identity_available=true); execution-level selective rerun by node-id remains future work (id_level_narrowing=false). |
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; worker-level policy_affected rerun filters children by run-evidence identity, while Canonical IR id-level (node-id) narrowing and CLI exposure still need implementation and evidence. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | partial | Local media detection, dependency failure reporting (ffmpeg/whisper), command evidence, and mocked golden transcript fixtures exist; real ASR dual-track manual acceptance evidence recorded (zh fixture via qwen3-asr + en fixture via Whisper, transcript enters cleanup + final outputs, quality gates pass); verified promotion still needs a reproducible version-controlled fixture. |
@@ -408,10 +408,12 @@ or cleaning-unit identity are available.
 Acceptance: `feedback_rule_learning` is `implemented` — proposal, acceptance,
 rerun, rejection, and failed-promotion paths have named tests, and run-level
 Canonical IR manifest binding ships (document_id, source, document type,
-policy snapshot hash). Canonical IR node-id or cleaning-unit id-level selective
-narrowing remains future work (`id_level_narrowing=false`); this section closes
-when that narrowing lands with named tests and the future-work caveat is
-removed from the status scope.
+policy snapshot hash). Canonical IR node-level identity (`canonical_node_ids`
+extracted from typed_nodes, `node_identity_available=true` when stable) is now
+recorded in the binding; execution-level selective rerun that filters the
+worker to specific node-ids remains future work (`id_level_narrowing=false`).
+This section closes when worker-level node-id filtering lands with named tests
+and the future-work caveat is removed from the status scope.
 
 ### 3. Close Batch / Playlist Rerun Gaps
 

@@ -89,6 +89,77 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(plan["prepare_payload"]["allow_youtube_media_fallback"], True)
         self.assertTrue(plan["command_evidence"]["standalone_command"])
 
+    def test_canonical_ir_binding_records_node_ids_when_typed_nodes_present(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-nodes")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc-nodes",
+                    "source_artifact": "converted.md",
+                    "node_count": 2,
+                    "nodes": [
+                        {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": "Title", "metadata": {}},
+                        {"node_id": "n_000002", "ordinal": 2, "type": "paragraph", "text": "Body.", "metadata": {}},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+
+            binding = canonical_ir_binding(run_dir)
+
+        self.assertEqual(binding["status"], "bound")
+        self.assertTrue(binding["node_identity_available"])
+        self.assertFalse(binding["id_level_narrowing"])
+        self.assertEqual(binding["canonical_node_ids"], ["n_000001", "n_000002"])
+
+    def test_canonical_ir_binding_without_typed_nodes_stays_run_level(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-no-nodes")
+
+            binding = canonical_ir_binding(run_dir)
+
+        self.assertEqual(binding["status"], "bound")
+        self.assertFalse(binding["node_identity_available"])
+        self.assertFalse(binding["id_level_narrowing"])
+        self.assertEqual(binding["canonical_node_ids"], [])
+
+    def test_canonical_ir_binding_falls_back_when_typed_nodes_corrupt(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-corrupt")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text("not valid json{", encoding="utf-8")
+
+            binding = canonical_ir_binding(run_dir)
+
+        self.assertEqual(binding["status"], "bound")
+        self.assertFalse(binding["node_identity_available"])
+        self.assertEqual(binding["canonical_node_ids"], [])
+
+    def test_canonical_ir_binding_falls_back_when_typed_nodes_schema_mismatch(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-schema")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({"schema": "something.else.v1", "nodes": [{"node_id": "n_1"}]}),
+                encoding="utf-8",
+            )
+
+            binding = canonical_ir_binding(run_dir)
+
+        self.assertFalse(binding["node_identity_available"])
+        self.assertEqual(binding["canonical_node_ids"], [])
+
     def test_selective_rerun_plan_keeps_pending_when_document_manifest_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
