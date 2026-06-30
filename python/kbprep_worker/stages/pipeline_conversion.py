@@ -19,7 +19,6 @@ from .pipeline_state import PipelineError, PipelineState, _stderr_log
 
 _EXTERNAL_CONVERSION_ROUTE_KINDS = {
     ConversionRouteKind.IMAGE_TO_PDF_OCR,
-    ConversionRouteKind.LEGACY_OFFICE_TO_PDF,
     ConversionRouteKind.MEDIA_TRANSCRIPT,
     ConversionRouteKind.YOUTUBE_TRANSCRIPT,
 }
@@ -221,8 +220,6 @@ def _conversion_report_converter(route: ConversionRouteKind, ext: str, artifacts
         return "direct_code"
     if ext in NOTEBOOK_EXTENSIONS:
         return "notebook_json"
-    if route == ConversionRouteKind.LEGACY_OFFICE_TO_PDF:
-        return str(artifacts.get("converter") or "legacy_office_to_pdf")
     if artifacts.get("fallback_from") == "pdf_text_layer":
         return "mineru_after_pdf_text_layer_fallback"
     if artifacts.get("fallback_from") == "pymupdf4llm":

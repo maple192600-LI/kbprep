@@ -100,7 +100,7 @@ Route policy:
 - EPUB uses the declared EPUB route.
 - PDF uses the diagnosis-selected three-tier route defined below.
 - Images use the declared OCR route only when the dependency is available.
-- Legacy Office uses the declared PDF bridge only when the dependency is available.
+- Legacy Office is intentionally unsupported (owner declined adaptation); convert it to PDF or modern Office first.
 - Local audio and video must become transcript evidence before classification.
 - YouTube uses available subtitles first; if subtitles are unavailable, the media transcript route may be used when dependencies are available.
 - MOBI remains unsupported until the owner reopens the scope.

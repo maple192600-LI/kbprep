@@ -236,7 +236,10 @@ _CAPABILITIES: tuple[Capability, ...] = (
             EXTERNAL_FORMATS_EVIDENCE,
         ],
         "required_evidence": [],
-        "promotion_blocker": "Legacy Office is intentionally out of scope (owner declined this adaptation). Convert to PDF or modern Office first.",
+        "promotion_blocker": (
+            "Legacy Office is intentionally out of scope (owner declined this adaptation). "
+            "Convert to PDF or modern Office first."
+        ),
         "preserves": [],
         "risk": "Legacy Office inputs are rejected with explicit guidance instead of being silently converted.",
     },

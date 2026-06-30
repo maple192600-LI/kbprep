@@ -11,13 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from ..converters.direct import normalize_subtitle_transcript
-from ..supported_formats import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, LEGACY_OFFICE_EXTENSIONS, VIDEO_EXTENSIONS
+from ..supported_formats import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from ..youtube_source import is_youtube_url, safe_youtube_stem
 
 DEFAULT_COMMAND_TIMEOUT_SECONDS = 900
 # 媒体转写（whisper + 中文 ASR + 语言路由）见 converters.asr（从本模块拆出避免文件超 800 行）。
 IMAGE_SOURCE_EXTENSIONS = frozenset(IMAGE_EXTENSIONS)
-LEGACY_OFFICE_SOURCE_EXTENSIONS = frozenset(LEGACY_OFFICE_EXTENSIONS)
 MEDIA_SOURCE_EXTENSIONS = frozenset(AUDIO_EXTENSIONS | VIDEO_EXTENSIONS)
 YOUTUBE_MEDIA_SUFFIX = ".mp4"
 
@@ -69,34 +68,6 @@ def wrap_image_as_pdf(
     if not artifact.is_file():
         return _failure_result(source, "image_to_pdf", "mineru_ocr", [command], None, _missing_output_failure(artifact))
     return _success_result(source, "image_to_pdf", "mineru_ocr", [command], artifact)
-
-
-def convert_legacy_office_to_pdf(
-    source_path: Path,
-    run_dir: Path,
-    which: ToolLocator = shutil.which,
-    runner: CommandRunner | None = None,
-    timeout_seconds: int = DEFAULT_COMMAND_TIMEOUT_SECONDS,
-) -> ExternalConversionResult:
-    source = Path(source_path)
-    artifact = _artifact_path(run_dir, "legacy_office_pdf", source, ".pdf")
-    command_template = _libreoffice_command("soffice", source, artifact.parent)
-    if source.suffix.lower() not in LEGACY_OFFICE_SOURCE_EXTENSIONS:
-        return _unsupported_result(source, "legacy_office_to_pdf", "pdf_route", [_sanitize_command(command_template, source, artifact)])
-    executable = _find_command(("soffice", "libreoffice"), which)
-    if not executable:
-        return _failure_result(
-            source,
-            "legacy_office_to_pdf",
-            "pdf_route",
-            [_sanitize_command(command_template, source, artifact)],
-            None,
-            _missing_dependency("libreoffice"),
-        )
-    artifact.parent.mkdir(parents=True, exist_ok=True)
-    command = _libreoffice_command(executable, source, artifact.parent)
-    sanitized = _sanitize_command(command, source, artifact)
-    return _command_pdf_result(source, command, sanitized, artifact, runner or _default_runner, timeout_seconds)
 
 
 def extract_youtube_transcript(
@@ -291,26 +262,6 @@ def _default_runner(command: tuple[str, ...], cwd: Path | None, timeout_seconds:
     )
 
 
-def _command_pdf_result(
-    source: Path,
-    command: tuple[str, ...],
-    sanitized: list[str],
-    artifact: Path,
-    runner: CommandRunner,
-    timeout_seconds: int,
-) -> ExternalConversionResult:
-    result = _safe_run(command, artifact.parent, runner, timeout_seconds)
-    if result.returncode != 0:
-        return _failure_result(
-            source, "legacy_office_to_pdf", "pdf_route", [sanitized], None, _command_failure(result)
-        )
-    if not artifact.is_file():
-        return _failure_result(
-            source, "legacy_office_to_pdf", "pdf_route", [sanitized], None, _missing_output_failure(artifact)
-        )
-    return _success_result(source, "legacy_office_to_pdf", "pdf_route", [sanitized], artifact)
-
-
 def _safe_run(command: tuple[str, ...], cwd: Path, runner: CommandRunner, timeout_seconds: int) -> ExternalCommandResult:
     try:
         return runner(command, cwd, timeout_seconds)
@@ -396,18 +347,6 @@ def _route_decision(source: Path, external_route: str, next_route: str, status: 
 def _artifact_path(run_dir: Path, folder: str, source: Path, suffix: str) -> Path:
     stem = source.stem or "source"
     return Path(run_dir) / "external" / folder / f"{stem}{suffix}"
-
-
-def _find_command(names: tuple[str, ...], which: ToolLocator) -> str | None:
-    for name in names:
-        found = which(name)
-        if found:
-            return found
-    return None
-
-
-def _libreoffice_command(executable: str, source: Path, output_dir: Path) -> tuple[str, ...]:
-    return (executable, "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(source))
 
 
 def _youtube_subtitle_command(ytdlp: str, source_url: str, output_template: Path) -> tuple[str, ...]:

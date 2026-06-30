@@ -459,13 +459,6 @@ def _actual_route_for_converter(converter: str, diagnosis: dict, mineru_artifact
         return "mineru"
     if converter == "image_to_pdf_ocr":
         return "image_to_pdf_then_mineru_ocr"
-    if converter.startswith("legacy_office_"):
-        if isinstance(mineru_artifacts, dict) and mineru_artifacts.get("fallback_from") == "pdf_text_layer":
-            return "legacy_office_to_pdf_then_mineru_ocr"
-        generated = diagnosis.get("generated_pdf_diagnosis")
-        if isinstance(generated, dict):
-            return f"legacy_office_to_pdf_then_{generated.get('conversion_strategy', 'pdf_route')}"
-        return "legacy_office_to_pdf_route"
     if converter == "media_transcript":
         return "media_to_transcript"
     if converter == "youtube_transcript":

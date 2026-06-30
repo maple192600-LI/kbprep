@@ -35,7 +35,6 @@ class ConversionRouteKind(str, Enum):
     PDF_TEXT_LAYER = "pdf_text_layer"
     MINERU_OCR = "mineru_ocr"
     IMAGE_TO_PDF_OCR = "image_to_pdf_ocr"
-    LEGACY_OFFICE_TO_PDF = "legacy_office_to_pdf"
     MEDIA_TRANSCRIPT = "media_transcript"
     YOUTUBE_TRANSCRIPT = "youtube_transcript"
     MEDIA_TRANSCRIPT_REQUIRED = "media_transcript_required"
@@ -181,8 +180,7 @@ _REGISTRATIONS = (
     ),
     # Legacy Office (.doc/.ppt/.xls) is intentionally unsupported (owner declined
     # adaptation). No ConverterRegistration here, so select_conversion_route()
-    # returns UNSUPPORTED for these extensions. The legacy bridge code in
-    # converters/external_tools.py is kept but unreachable from normal routing.
+    # returns UNSUPPORTED for these extensions.
     ConverterRegistration(
         id="media_transcript",
         kind=ConversionRouteKind.MEDIA_TRANSCRIPT,
