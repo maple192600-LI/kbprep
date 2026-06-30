@@ -27,6 +27,12 @@ describe("kbprep worker pipeline - local formats", () => {
             "![DOCX Image 1](images/office/docx/doc-step.png)",
             "| Field | Value |",
             "| retry_count | 3 |",
+            "## Setup Notes",
+            "**Critical:**",
+            "[reference doc](https://example.com/docx-ref)",
+            "1. Install the tool",
+            "2. Set threshold",
+            "| Merged Header | Merged Header |",
           ],
         },
         {
