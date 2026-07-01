@@ -37,10 +37,38 @@ def _extract_pdf_text_pages(input_path: Path) -> tuple[list[str], list[dict]]:
             if not normalized:
                 continue
             markdown_parts.append(f"<!-- page: {page_idx + 1} -->\n\n{normalized}")
-            content_list.append({"type": "text", "page_idx": page_idx, "text": normalized})
+            for block in page.get_text("blocks"):
+                _append_block_content_item(content_list, block, page_idx)
     finally:
         doc.close()
     return markdown_parts, content_list
+
+
+def _append_block_content_item(content_list: list[dict], block: Any, page_idx: int) -> None:
+    """Append a block-level content_list item carrying bbox for pdf_bbox spans.
+
+    PyMuPDF ``get_text("blocks")`` returns ``(x0, y0, x1, y1, text, block_no,
+    block_type)``; ``block_type`` 0 is text. The block text is normalized the
+    same way as the page text so ``extract_pdf_native_source_spans`` can locate
+    it inside the converted Markdown. Blocks without a valid 4-number bbox or
+    with empty text are skipped so no coordinate is fabricated.
+    """
+    bbox = list(block[:4]) if len(block) >= 4 else []
+    block_text = block[4] if len(block) > 4 else ""
+    block_type = block[6] if len(block) > 6 else 0
+    if block_type != 0 or not isinstance(block_text, str):
+        return
+    normalized_block = _normalize_page_text(block_text.strip())
+    if not normalized_block:
+        return
+    if len(bbox) != 4 or not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in bbox):
+        return
+    content_list.append({
+        "type": "text",
+        "page_idx": page_idx,
+        "text": normalized_block,
+        "bbox": [float(v) for v in bbox],
+    })
 
 
 def _open_pymupdf_document(input_path: Path) -> Any:
@@ -58,7 +86,10 @@ def _write_pdf_text_content_list(run_dir: Path, content_list: list[dict]) -> Pat
 
 
 def _pdf_text_artifacts(output_path: Path, content_list_path: Path) -> dict:
-    return {
+    # Delayed import avoids a module-load cycle with blockify.
+    from .blockify import attach_pdf_native_source_spans
+
+    artifacts = {
         "source_md_path": str(output_path),
         "content_list_path": str(content_list_path),
         "content_list_v2_path": None,
@@ -69,6 +100,8 @@ def _pdf_text_artifacts(output_path: Path, content_list_path: Path) -> dict:
             "W_PDF_TEXT_LAYER_CONVERTER_USED: used existing PDF text layer; OCR/image layout extraction was skipped."
         ],
     }
+    attach_pdf_native_source_spans(artifacts, output_path)
+    return artifacts
 
 
 def _normalize_page_text(text: str) -> str:

@@ -29,7 +29,10 @@ class EvidenceChainRound2CoverageTests(unittest.TestCase):
         def __init__(self, text: str):
             self._text = text
 
-        def get_text(self, kind: str) -> str:
+        def get_text(self, kind: str):
+            if kind == "blocks":
+                # Mirror PyMuPDF get_text("blocks") shape: (x0, y0, x1, y1, text, block_no, block_type).
+                return [(0.0, 0.0, 100.0, 20.0, self._text, 0, 0)]
             return self._text
 
     class _Doc:
@@ -76,12 +79,12 @@ class EvidenceChainRound2CoverageTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     pdf_text.convert_text_layer_pdf(source, root / "missing.md", root)
 
-    def test_pdf_text_layer_does_not_emit_native_bbox_evidence(self):
-        # page.get_text("text") carries no coordinates and _normalize_page_text
-        # merges hard-wrapped lines, so line-level bbox alignment to typed nodes
-        # is unreliable. The route therefore emits no native_source_spans; the
-        # coverage report records pdf_bbox as a missing native kind instead of
-        # fabricating coordinates. Route-native PDF bbox is deferred to MinerU.
+    def test_pdf_text_layer_emits_native_bbox_evidence(self):
+        # get_text("blocks") returns block-level (bbox, text) tuples; the route
+        # normalizes each block's text and feeds it through attach_pdf_native_source_spans
+        # so the same pdf_bbox channel MinerU uses also covers trusted text layers.
+        # Blocks whose text cannot be located in the converted Markdown are skipped
+        # rather than fabricating coordinates.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source = root / "text.pdf"
@@ -91,7 +94,13 @@ class EvidenceChainRound2CoverageTests(unittest.TestCase):
             fake_fitz = types.SimpleNamespace(open=lambda path: doc)
             with patch.dict(sys.modules, {"fitz": fake_fitz}):
                 result = pdf_text.convert_text_layer_pdf(source, output, root)
-        self.assertNotIn("native_source_spans", result)
+        self.assertIn("native_source_spans", result)
+        spans = result["native_source_spans"]
+        self.assertIsInstance(spans, list)
+        # The mock block text is the full normalized page text; extract finds it
+        # at the start of the converted Markdown and emits one pdf_bbox span.
+        self.assertEqual(len(spans), 1)
+        self.assertEqual(spans[0]["precision"], "pdf_bbox")
 
     def test_normalize_reports_tables_code_images_and_ocr_fixes(self):
         with tempfile.TemporaryDirectory() as tmp:
