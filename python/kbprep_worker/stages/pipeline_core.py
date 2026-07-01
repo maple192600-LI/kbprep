@@ -458,6 +458,7 @@ def _stage_apply_cleaning_rules(state: PipelineState) -> None:
         profile=state.profile,
         document_type=state.document_type,
         source_identity=json.dumps(state.source_identity, ensure_ascii=False, sort_keys=True),
+        target_node_ids=state.target_node_ids,
     )
     _write_blocks(blocks_path, state.blocks)
     _stderr_log("info", "clean_rules", "Cleaning rules applied")

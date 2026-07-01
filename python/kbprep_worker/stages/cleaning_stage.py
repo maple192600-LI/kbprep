@@ -19,6 +19,7 @@ def apply_cleaning_rules_stage(
     profile: str,
     document_type: str,
     source_identity: str,
+    target_node_ids: list[str] | None = None,
 ) -> list[dict]:
     before_blocks = copy.deepcopy(blocks)
     cleaned_blocks = clean_rules.apply_clean_rules(
@@ -26,6 +27,7 @@ def apply_cleaning_rules_stage(
         profile=profile,
         document_type=document_type,
         source_identity=source_identity,
+        target_node_ids=target_node_ids,
     )
     patches = build_cleaning_patches(before_blocks, cleaned_blocks, policy_snapshot_hash)
     gate_result = apply_patch_quality_gate(before_blocks, cleaned_blocks, patches, compiled_policy)

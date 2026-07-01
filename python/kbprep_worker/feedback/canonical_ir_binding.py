@@ -7,7 +7,7 @@ from ..canonical_nodes import CANONICAL_IR_TYPED_NODES_SCHEMA
 from .support import _optional_string, _read_json_file
 
 
-def canonical_ir_binding(run_dir: Path) -> dict:
+def canonical_ir_binding(run_dir: Path, target_node_ids: object = None) -> dict:
     canonical_manifest_path = run_dir / "canonical_ir" / "manifest.json"
     document_manifest_path = run_dir / "document_manifest.json"
     canonical_manifest = _read_json_file(canonical_manifest_path)
@@ -20,6 +20,8 @@ def canonical_ir_binding(run_dir: Path) -> dict:
     ):
         return pending_canonical_ir_binding()
     node_ids = _canonical_node_ids(run_dir)
+    requested_targets = _normalized_target_node_ids(target_node_ids)
+    narrowing = bool(node_ids) and bool(requested_targets)
     return {
         "status": "bound",
         "binding_level": "run",
@@ -31,10 +33,24 @@ def canonical_ir_binding(run_dir: Path) -> dict:
         "document_manifest_ref": "canonical_ir/manifest.json",
         "created_from_run": str(document_manifest["created_from_run"]),
         "node_identity_available": bool(node_ids),
-        "id_level_narrowing": False,
+        "id_level_narrowing": narrowing,
         "canonical_node_ids": node_ids,
-        "reason": _binding_reason(node_ids),
+        "target_node_ids": requested_targets,
+        "reason": _binding_reason(node_ids, narrowing),
     }
+
+
+def _normalized_target_node_ids(target_node_ids: object) -> list[str]:
+    """Normalize a target_node_ids payload value into a clean list of ids.
+
+    Accepts a list of strings or a comma-separated string. Empty values yield
+    an empty list, which means "no node-level narrowing".
+    """
+    if isinstance(target_node_ids, list):
+        return [str(item).strip() for item in target_node_ids if isinstance(item, str) and item.strip()]
+    if isinstance(target_node_ids, str) and target_node_ids.strip():
+        return [part.strip() for part in target_node_ids.split(",") if part.strip()]
+    return []
 
 
 def _canonical_node_ids(run_dir: Path) -> list[str]:
@@ -60,12 +76,17 @@ def _canonical_node_ids(run_dir: Path) -> list[str]:
     return list(dict.fromkeys(node_id for node_id in ids if node_id))
 
 
-def _binding_reason(node_ids: list[str]) -> str:
+def _binding_reason(node_ids: list[str], narrowing: bool = False) -> str:
+    if narrowing:
+        return (
+            "Canonical IR node-level identity is available and execution-level selective "
+            "rerun is narrowed to the requested target_node_ids (id_level_narrowing=true)."
+        )
     if node_ids:
         return (
             "Canonical IR node-level identity is available (canonical_node_ids recorded "
-            "from typed_nodes). Execution-level selective rerun by node-id remains future "
-            "work; rerun is still run-level (id_level_narrowing=false)."
+            "from typed_nodes). Execution-level selective rerun by node-id is available "
+            "when target_node_ids is specified; otherwise rerun stays run-level."
         )
     return (
         "Run-level Canonical IR evidence is bound; node-level identity is unavailable "

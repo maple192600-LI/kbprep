@@ -489,6 +489,28 @@ describe("standalone KBPrep CLI adapter", () => {
     }
   });
 
+  it("maps feedback selective rerun node-ids option to a list", () => {
+    const parsed = parseStandaloneArgs([
+      "--plan-rerun",
+      "--run-dir",
+      ".kbprep/source/runs/run-1",
+      "--node-ids",
+      "n_000001,n_000003",
+    ]);
+    const plan = buildCliPlan("feedback", parsed.options);
+
+    expect(plan.command).toBe("feedback");
+    expect(plan.input.plan_rerun).toBe(true);
+    expect(plan.input.node_ids).toEqual(["n_000001", "n_000003"]);
+  });
+
+  it("leaves feedback node_ids undefined when the option is absent", () => {
+    const parsed = parseStandaloneArgs(["--plan-rerun", "--run-dir", ".kbprep/source/runs/run-1"]);
+    const plan = buildCliPlan("feedback", parsed.options);
+
+    expect(plan.input.node_ids).toBeUndefined();
+  });
+
   it("maps feedback options to a proposal-only Python worker command", () => {
     const parsed = parseStandaloneArgs([
       "--run-dir",

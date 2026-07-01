@@ -7,7 +7,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .canonical_ir_binding import canonical_ir_binding, pending_canonical_ir_binding
+from .canonical_ir_binding import _normalized_target_node_ids, canonical_ir_binding, pending_canonical_ir_binding
 from .support import (
     _append_jsonl_locked,
     _matches_pattern,
@@ -24,6 +24,7 @@ RERUN_TIMEOUT_SECONDS = 120
 
 
 def _selective_rerun_plan(data: dict) -> dict:
+    target_node_ids = _normalized_target_node_ids(data.get("node_ids") or data.get("target_node_ids"))
     if _optional_string(data.get("accepted_proposal")):
         plan = _selective_plan_from_accepted_proposal(data)
     elif _optional_string(data.get("run_dir")):
@@ -36,8 +37,28 @@ def _selective_rerun_plan(data: dict) -> dict:
         )
     else:
         plan = _selective_plan_from_promotion_history(data)
+    if target_node_ids and plan.get("status") == "planned":
+        plan = _apply_target_node_scope(plan, target_node_ids)
     if plan.get("status") == "blocked":
         _append_blocked_rerun_history(data, plan)
+    return plan
+
+
+def _apply_target_node_scope(plan: dict, target_node_ids: list[str]) -> dict:
+    """Narrow a planned rerun to specific canonical node ids.
+
+    Rebuilds the canonical_ir_binding with the requested target_node_ids and
+    injects them into the prepare_payload so the worker cleaning stage only
+    touches the scoped blocks. Called after a plan reaches "planned" status.
+    """
+    run_dir = Path(str(plan.get("run_dir") or "")).expanduser().resolve()
+    plan["target_node_ids"] = target_node_ids
+    if run_dir.exists():
+        plan["canonical_ir_binding"] = canonical_ir_binding(run_dir, target_node_ids=target_node_ids)
+    payload = plan.get("prepare_payload")
+    if isinstance(payload, dict):
+        payload["target_node_ids"] = target_node_ids
+        plan["command_evidence"] = _command_evidence(payload, {})
     return plan
 
 
@@ -390,6 +411,7 @@ def _safe_prepare_payload(payload: dict) -> dict:
         "allow_youtube_media_fallback",
         "splitter",
         "max_quality_iterations",
+        "target_node_ids",
     }
     return {
         str(key): value

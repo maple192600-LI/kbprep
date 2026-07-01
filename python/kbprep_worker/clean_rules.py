@@ -26,10 +26,16 @@ def apply_clean_rules(
     document_type: str = "",
     rule_templates: list[str] | tuple[str, ...] | None = None,
     source_identity: str = "",
+    target_node_ids: list[str] | None = None,
 ) -> list[dict]:
     """
     Apply cleaning rules to classified blocks.
     Refines classification based on context.
+
+    When ``target_node_ids`` is a non-empty list, only blocks whose canonical
+    node id (``n_{index+1:06d}``) is in the set are passed through the rules;
+    every other block is left untouched so a selective rerun can focus rule
+    verification on the affected nodes.
     """
     rules = load_cleaning_rules(
         profile=profile,
@@ -37,12 +43,29 @@ def apply_clean_rules(
         templates=tuple(rule_templates or ()),
         source_identity=source_identity,
     )
+    scoped_indices = _scoped_block_indices(blocks, target_node_ids)
     derived_blocks: list[dict] = []
-    for block in blocks:
+    for index, block in enumerate(blocks):
+        if scoped_indices is not None and index not in scoped_indices:
+            continue
         derived_blocks.extend(_process_clean_block(block, rules))
     if derived_blocks:
         blocks.extend(derived_blocks)
     return blocks
+
+
+def _scoped_block_indices(blocks: list[dict], target_node_ids: list[str] | None) -> set[int] | None:
+    """Return the set of block indices that match target_node_ids, or None for all.
+
+    Canonical typed_nodes are built one-per-block with ordinal = block index + 1,
+    so the block at index ``i`` maps to node id ``n_{i+1:06d}``.
+    """
+    if not target_node_ids:
+        return None
+    wanted = {str(node_id).strip() for node_id in target_node_ids if isinstance(node_id, str) and node_id.strip()}
+    if not wanted:
+        return None
+    return {index for index in range(len(blocks)) if f"n_{index + 1:06d}" in wanted}
 
 
 def _process_clean_block(block: dict, rules: LoadedCleaningRules) -> list[dict]:

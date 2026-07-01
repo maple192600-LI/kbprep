@@ -160,6 +160,77 @@ class FeedbackTests(unittest.TestCase):
         self.assertFalse(binding["node_identity_available"])
         self.assertEqual(binding["canonical_node_ids"], [])
 
+    def test_canonical_ir_binding_narrows_when_target_node_ids_given(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-narrow")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc-narrow",
+                    "source_artifact": "converted.md",
+                    "node_count": 2,
+                    "nodes": [
+                        {"node_id": "n_000001", "ordinal": 1, "type": "heading", "text": "Title", "metadata": {}},
+                        {"node_id": "n_000002", "ordinal": 2, "type": "paragraph", "text": "Body.", "metadata": {}},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+
+            binding = canonical_ir_binding(run_dir, target_node_ids=["n_000002"])
+
+        self.assertTrue(binding["node_identity_available"])
+        self.assertTrue(binding["id_level_narrowing"])
+        self.assertEqual(binding["target_node_ids"], ["n_000002"])
+
+    def test_canonical_ir_binding_stays_run_level_when_target_empty(self):
+        from kbprep_worker.feedback.canonical_ir_binding import canonical_ir_binding
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            self._write_canonical_ir_binding_artifacts(run_dir, document_id="doc-empty-target")
+            (run_dir / "canonical_ir" / "typed_nodes.json").write_text(
+                json.dumps({
+                    "schema": "kbprep.canonical_ir_typed_nodes.v1",
+                    "document_id": "doc-empty-target",
+                    "source_artifact": "converted.md",
+                    "node_count": 1,
+                    "nodes": [
+                        {"node_id": "n_000001", "ordinal": 1, "type": "paragraph", "text": "Body.", "metadata": {}},
+                    ],
+                }),
+                encoding="utf-8",
+            )
+
+            binding = canonical_ir_binding(run_dir, target_node_ids=[])
+
+        self.assertTrue(binding["node_identity_available"])
+        self.assertFalse(binding["id_level_narrowing"])
+        self.assertEqual(binding["target_node_ids"], [])
+
+    def test_apply_target_node_scope_injects_node_ids_into_payload(self):
+        from kbprep_worker.feedback.rerun_verification import _apply_target_node_scope
+
+        plan = {
+            "status": "planned",
+            "run_dir": "/nonexistent-run-dir-for-scope-test",
+            "prepare_payload": {
+                "input_path": "/input.md",
+                "output_root": "/output",
+                "profile": "standard",
+                "mode": "rules_only",
+            },
+            "canonical_ir_binding": {"id_level_narrowing": False},
+        }
+
+        result = _apply_target_node_scope(plan, ["n_000001", "n_000003"])
+
+        self.assertEqual(result["target_node_ids"], ["n_000001", "n_000003"])
+        self.assertEqual(result["prepare_payload"]["target_node_ids"], ["n_000001", "n_000003"])
+
     def test_selective_rerun_plan_keeps_pending_when_document_manifest_is_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

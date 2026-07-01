@@ -73,6 +73,18 @@ def _stderr_log(level: str, stage: str, message: str, code: str = "") -> None:
     sys.stderr.flush()
 
 
+def _parse_target_node_ids(raw: object) -> list[str]:
+    """Parse target_node_ids from a CLI/payload value into a clean list.
+
+    Accepts a list of strings or a comma-separated string. Used by selective
+    rerun to narrow cleaning to specific canonical node ids.
+    """
+    if isinstance(raw, list):
+        return [str(item).strip() for item in raw if isinstance(item, str) and item.strip()]
+    if isinstance(raw, str) and raw.strip():
+        return [part.strip() for part in raw.split(",") if part.strip()]
+    return []
+
 
 @dataclass
 class PipelineState:
@@ -96,6 +108,7 @@ class PipelineState:
     latest_outputs: dict[str, Any] = field(default_factory=dict)
     document_type: str = "unknown"
     document_type_detection: dict[str, Any] = field(default_factory=dict)
+    target_node_ids: list[str] = field(default_factory=list)
     cleaning_policy_snapshot_hash: str = ""
     cleaning_policy_snapshot: dict[str, Any] = field(default_factory=dict)
     file_hash: str = ""
@@ -144,6 +157,7 @@ class PipelineState:
         self.override_splitter = self.data.get("splitter", "auto")
         self.artifact_policy = self.data.get("artifact_policy", "keep_latest")
         self.max_quality_iterations = self.data.get("max_quality_iterations", 3)
+        self.target_node_ids = _parse_target_node_ids(self.data.get("target_node_ids"))
         self.input_p = Path(self.input_path)
         self.root_p = Path(self.output_root)
         self.input_config = PipelineInputConfig(
