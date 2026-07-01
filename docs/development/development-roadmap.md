@@ -29,7 +29,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
 | conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
 | canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
-| document_type_classification | partial | Code writes `document_classification.json`; status JSON lists it as its own capability with code and test evidence. |
+| document_type_classification | implemented | `document_classification.json` ships the complete DocumentTypeSnapshot contract: document_type, content_form, content_traits, classifier_version, schema version, confidence, evidence refs, and policy-use gating. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
 | job_status_envelope | implemented | Phase E is landed: single-source and worker envelopes carry `completed`, `completed_with_warnings`, or `failed` status, with Python and TypeScript contract tests. |
@@ -64,8 +64,9 @@ regression appears.
 Slices:
 
 - **A1** Landed: `document_type_classification` is its own capability in
-  `kbprep-implementation-status.json` (partial), with evidence pointing at the
-  classification code and tests.
+  `kbprep-implementation-status.json`, now implemented with the complete
+  DocumentTypeSnapshot contract (document_type, content_form, content_traits,
+  classifier_version), with evidence pointing at the classification code and tests.
 - **A2** Landed: `media_local_transcript` and `youtube_url_routes` are separate in
   the status JSON.
 - **A3** Landed: YouTube is represented in `capability-matrix.md` as a

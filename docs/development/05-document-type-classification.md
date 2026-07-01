@@ -14,7 +14,7 @@ The classifier receives a bounded `ClassificationPack`.
 
 The output is `DocumentTypeSnapshot`:
 
-- primary content type
+- primary content type (emitted as `document_type`)
 - content form
 - content traits
 - confidence

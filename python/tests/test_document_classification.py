@@ -35,7 +35,7 @@ class DocumentClassificationTests(unittest.TestCase):
         )
 
         self.assertEqual(artifact["schema"], "kbprep.document_classification.v1")
-        self.assertEqual(artifact["status"], "partial")
+        self.assertEqual(artifact["status"], "complete")
         self.assertEqual(artifact["document_type"], "course")
         self.assertTrue(artifact["usable_for_policy"])
         self.assertEqual(artifact["candidates"][0]["document_type"], "course")
@@ -74,6 +74,95 @@ class DocumentClassificationTests(unittest.TestCase):
                 )
                 self.assertEqual(artifact["document_type"], expected)
                 self.assertEqual(artifact["candidates"][0]["document_type"], expected)
+
+    def test_classification_artifact_exposes_content_form_traits_and_version(self) -> None:
+        text = "# 第 1 课\n\n学习目标：掌握配置步骤。\n\n练习：设置 threshold=0.8。\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertIn(artifact["content_form"], {"prose", "code", "table_heavy", "transcript", "outline", "mixed"})
+        self.assertIsInstance(artifact["content_traits"], dict)
+        self.assertTrue(
+            set(artifact["content_traits"]).issuperset(
+                {
+                    "has_headings",
+                    "has_code_blocks",
+                    "has_tables",
+                    "has_timestamps",
+                    "has_links",
+                    "heading_density",
+                    "line_count",
+                }
+            )
+        )
+        self.assertEqual(artifact["classifier_version"], "1.0")
+
+    def test_classification_content_form_detects_code_heavy(self) -> None:
+        text = "```python\nimport os\nprint(os.getcwd())\n```\n\n```js\nconsole.log(1)\n```\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "code")
+        self.assertTrue(artifact["content_traits"]["has_code_blocks"])
+
+    def test_classification_content_form_detects_table_heavy(self) -> None:
+        text = "\n".join("| a | b |" for _ in range(8)) + "\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "table_heavy")
+        self.assertTrue(artifact["content_traits"]["has_tables"])
+
+    def test_classification_content_form_detects_transcript(self) -> None:
+        text = "00:15 第一句内容\n00:30 第二句内容\n01:00 第三句内容\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "transcript")
+        self.assertTrue(artifact["content_traits"]["has_timestamps"])
+
+    def test_classification_content_form_detects_outline(self) -> None:
+        text = "# A\n# B\n# C\nbody one\nbody two\nbody three\nbody four\nbody five\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "outline")
+        self.assertTrue(artifact["content_traits"]["has_headings"])
+
+    def test_classification_content_form_detects_prose(self) -> None:
+        text = "这是一段普通文字。\n第二行继续叙述。\n第三行结束。\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "prose")
+
+    def test_classification_content_form_falls_back_to_mixed_for_short_text(self) -> None:
+        text = "短文本\n二行\n"
+        artifact = build_document_classification_artifact(
+            text=text,
+            source_type="markdown_note",
+            diagnosis={},
+        )
+
+        self.assertEqual(artifact["content_form"], "mixed")
 
     def test_prepare_writes_document_classification_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

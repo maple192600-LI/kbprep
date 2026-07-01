@@ -87,16 +87,14 @@
     {
       "id": "document_type_classification",
       "label": "Document type classification",
-      "status": "partial",
-      "scope": "The worker writes document_classification.json with conservative policy-use gating; the full target ClassificationPack and DocumentTypeSnapshot contract is not complete.",
+      "status": "implemented",
+      "scope": "The worker writes document_classification.json with the complete DocumentTypeSnapshot contract: document_type (primary content type), content_form (dominant physical layout: prose/code/table_heavy/transcript/outline/mixed), content_traits (structured boolean and density signals), classifier_version (1.0), schema (kbprep.document_classification.v1), confidence, evidence references, and conservative policy-use gating with insufficient_reason warnings. Cleanup rule changes do not force reclassification.",
       "evidence": [
         "docs/development/05-document-type-classification.md",
         "python/kbprep_worker/document_type.py",
         "python/tests/test_document_classification.py"
       ],
-      "prohibitedClaims": [
-        "DocumentTypeSnapshot is the complete shipped classification contract"
-      ]
+      "prohibitedClaims": []
     },
     {
       "id": "cleaning_policy_snapshot",

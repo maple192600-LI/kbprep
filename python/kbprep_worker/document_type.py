@@ -9,6 +9,8 @@ from .document_type_signals import load_document_type_signals
 
 DOCUMENT_CLASSIFICATION_SCHEMA = "kbprep.document_classification.v1"
 SUPPORTED_DOCUMENT_TYPES = {"report", "course", "transcript", "webpage", "ebook", "code", "unknown"}
+CLASSIFIER_VERSION = "1.0"
+SUPPORTED_CONTENT_FORMS = {"prose", "code", "table_heavy", "transcript", "outline", "mixed"}
 
 
 def classify_document_type(text: str, source_type: str = "", diagnosis: dict | None = None) -> dict:
@@ -68,15 +70,20 @@ def build_document_classification_artifact(
     document_type = str(classification.get("document_type") or "unknown")
     confidence = float(classification.get("confidence") or 0)
     usable_for_policy = document_type != "unknown" and confidence >= 0.5 and bool(classification.get("reasons"))
+    evidence = _classification_evidence(text, source_type, diagnosis)
+    content_form, content_traits = _content_form_and_traits(evidence)
     artifact: dict[str, Any] = {
         "schema": DOCUMENT_CLASSIFICATION_SCHEMA,
-        "status": "partial",
+        "status": "complete",
         "document_type": document_type,
+        "content_form": content_form,
+        "content_traits": content_traits,
+        "classifier_version": CLASSIFIER_VERSION,
         "confidence": round(confidence, 3),
         "usable_for_policy": usable_for_policy,
         "candidates": _candidate_rows(classification),
         "reasons": list(classification.get("reasons") or []),
-        "evidence": _classification_evidence(text, source_type, diagnosis),
+        "evidence": evidence,
     }
     if not usable_for_policy:
         artifact["insufficient_reason"] = _insufficient_reason(document_type, confidence)
@@ -91,6 +98,46 @@ def _candidate_rows(classification: dict) -> list[dict[str, Any]]:
         for name, score in scores.items()
     ]
     return sorted(rows, key=lambda item: (-item["score"], item["document_type"]))
+
+
+def _content_form_and_traits(evidence: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Derive a coarse content form flag and structured content traits from evidence signals.
+
+    content_form is the dominant physical layout (prose/code/table_heavy/transcript/outline/mixed);
+    it is orthogonal to document_type, which captures semantic intent.
+    """
+    line_count = int(evidence.get("line_count") or 0)
+    heading_count = int(evidence.get("heading_count") or 0)
+    table_row_count = int(evidence.get("table_row_count") or 0)
+    code_fence_count = int(evidence.get("code_fence_count") or 0)
+    timestamp_count = int(evidence.get("timestamp_count") or 0)
+    link_count = int(evidence.get("link_count") or 0)
+    heading_density = float(evidence.get("heading_density") or 0.0)
+
+    traits: dict[str, Any] = {
+        "has_headings": heading_count > 0,
+        "has_code_blocks": code_fence_count > 0,
+        "has_tables": table_row_count > 0,
+        "has_timestamps": timestamp_count > 0,
+        "has_links": link_count > 0,
+        "heading_density": heading_density,
+        "line_count": line_count,
+    }
+
+    if code_fence_count >= 2:
+        content_form = "code"
+    elif table_row_count >= 5:
+        content_form = "table_heavy"
+    elif timestamp_count >= 3:
+        content_form = "transcript"
+    elif heading_count >= 3 and heading_density >= 0.3:
+        content_form = "outline"
+    elif line_count >= 3:
+        content_form = "prose"
+    else:
+        content_form = "mixed"
+    assert content_form in SUPPORTED_CONTENT_FORMS
+    return content_form, traits
 
 
 def _classification_evidence(text: str, source_type: str, diagnosis: dict) -> dict[str, Any]:
