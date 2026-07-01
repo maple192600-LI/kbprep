@@ -1,0 +1,44 @@
+# Hermes Agent Daily Assistant Prompt Pack
+
+Use this prompt pack with the video: How To Set Up Hermes Agent To Run Your Day.
+
+The goal is simple: stop opening Hermes with a blank chat box. Make Hermes interview you, find the work it can actually help with, separate safe automation fromapproval-only work, and turn the setup into a daily assistant loop.
+
+## How to use this pack
+
+1. Open Hermes in the place you normally talk to it.
+
+2. Copy Prompt 1 and answer Hermes one question at a time.
+
+3. When the interview is done, copy Prompt 2 to turn your answers into a delegation map.
+
+4. Copy Prompt 3 to choose your first three workflows.
+
+5. Copy Prompt 4 to create your morning check-in.
+
+6. Only automate risky actions after you have tested the workflow manually.
+
+Important rule: if the action sends a message, posts publicly, spends money, changes production code, deletes files, trades, buys something, or affects another person, make Hermes draft or prepare it first. You approve before anything happens.
+
+## Prompt 1: Make Hermes interview you
+
+## Copy and paste this into Hermes:
+
+I want you to interview me and figure out where you can help me most.   
+Ask me questions abcut my work, my recurring tasks, my decisicns, my messages, my   
+research, my content, my admin, my calendar, my files, and anything I avoid doing.   
+Ask one question at a time.   
+After each answer, identify possible workflows you could take over or help with.   
+At the end, give me five things:   
+1. The top ten tasks you can help with.   
+2. The three easiest workflows we can set up today.   
+3. The three highest leverage workflows we should build this week.   
+4. The tools, files, permissions, or context you would need for each one.   
+5. A daily check-in prompt I can schedule every morning.   
+Do not suggest vague ideas. Only suggest workflows based on what I actually tell you.
+
+## Prompt 2: Build your delegation map
+
+Use this after Hermes finishes the interview:
+
+Take everything I told you and create a delegation map.

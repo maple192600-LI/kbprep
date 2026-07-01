@@ -51,9 +51,9 @@ capability：`legacy_office_pdf_bridge`（unsupported，owner declined adaptatio
 
 ## 图片 / 音视频 / YouTube（证据门控）
 
-做什么：继续补真实 fixtures 和证据，达到证据标准后才 promoted。
+做什么：image OCR 和 media ASR 已用真实 fixture + content-hash 锁达到 verified；YouTube 继续补真实联网、超时、依赖 variance、fallback 证据后才 promoted。
 不做什么：不因为"能跑"就宣传为稳定/verified 能力。
-capability：`image_ocr`（experimental）、`media_local_transcript`（partial）、`youtube_url_routes`（partial）。
+capability：`image_ocr`（verified）、`media_local_transcript`（verified）、`youtube_url_routes`（partial）。
 
 ## 当前开发顺序约束
 

@@ -274,7 +274,7 @@ investment priority is:
 2. EPUB XHTML quality (default route, not PDF)
 3. PPTX lightweight body/outline cleanup
 4. XLSX lightweight sheet/table text
-5. Image / media / YouTube evidence hardening
+5. YouTube evidence hardening (image OCR and media ASR routes are verified)
 
 This is a **format-dimension** priority. It does not override the
 cross-cutting Phase C IR fact-layer work (which serves all formats); it
@@ -296,7 +296,7 @@ Phase C / M2 remaining IR fact-layer work
       │       └── BATCH2 policy/CIR affected batch targeting
       │
       └── optional-route evidence work can run in parallel:
-          media ASR fixtures, image OCR fixtures, YouTube/playlist evidence
+          media ASR fixtures (done), image OCR fixtures (done), YouTube/playlist evidence
 ```
 
 - Phase D is implemented against the current Canonical IR artifacts. Full
@@ -464,9 +464,11 @@ Current truth:
   and mocked failure fixtures exist; verified promotion
   still needs broader real-network, timeout, dependency-variance, fallback, and
   transcript-quality evidence.
-- Image OCR route is also experimental and needs real fixtures before
-  promotion. Legacy Office is intentionally unsupported (owner declined
-  adaptation).
+- Image OCR route is verified: a real owner-provided English PNG fixture is
+  OCR'd end-to-end (PyMuPDF wraps the PNG as PDF, MinerU auto/en extracts
+  text), with the source image and extracted Markdown content-hash locked
+  (python/tests/test_image_ocr_fixture.py). Legacy Office is intentionally
+  unsupported (owner declined adaptation).
 
 Required slices:
 
@@ -480,7 +482,7 @@ Required slices:
 - Add YouTube fixtures for subtitles, no subtitles, failure modes, playlist
   expansion, playlist child publication, and final source-side publication.
 
-Execution: start local media fixtures, image OCR fixtures, and YouTube
+Execution: media ASR and image OCR fixtures are done; continue YouTube
 technical-contract work now in parallel with M2/M5/batch work when file ownership
 does not collide. Do not wait for M2 or M5 to begin implementation. Wait only
 before promoting the capability status to `verified` or final complete.

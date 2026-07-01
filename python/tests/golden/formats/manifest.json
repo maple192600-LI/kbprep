@@ -7,12 +7,13 @@
       "capability_id": "image_ocr",
       "extension": ".png",
       "expected_route": "image_to_pdf_then_mineru_ocr",
-      "expected_status": "experimental",
+      "expected_status": "verified",
       "required_tools": {"path": ["mineru"], "python": []},
-      "real_fixture": false,
-      "manual_acceptance_evidence": false,
-      "promote_to_verified": false,
-      "promotion_blocker": "Needs a real PNG/JPG/SVG fixture and MinerU OCR text-retention evidence."
+      "real_fixture": true,
+      "manual_acceptance_evidence": true,
+      "promote_to_verified": true,
+      "promotion_blocker": "",
+      "real_fixture_evidence": "Real English Hermes Agent tutorial PNG (owner-provided) OCR'd via the project chain: PyMuPDF wraps the PNG as PDF, MinerU OCR (project venv, auto, en) extracts text. Source image and extracted Markdown ship at python/tests/golden/formats/image/ (ocr_sample_en.png + ocr_sample_en.txt) and are content-hash locked (see python/tests/test_image_ocr_fixture.py FIXTURE_IMAGE_SHA256 + FIXTURE_TEXT_SHA256) so any silent drift fails CI until the fixture is regenerated deliberately."
     },
     {
       "id": "legacy_office_minimal_ppt",

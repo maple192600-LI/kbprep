@@ -83,9 +83,9 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
           "assert gaps['summary']['unsupported'] >= 1, gaps",
           "by_id = {item['id']: item for item in gaps['gaps']}",
           "assert 'pdf_diagnosis_selected' not in by_id, by_id",
-          "assert by_id['image_ocr']['current_status'] == 'experimental', by_id",
-          "assert 'image_to_pdf' in by_id['image_ocr']['current_route'], by_id",
-          "assert by_id['image_ocr']['required_evidence'], by_id",
+          "assert 'image_ocr' not in by_id, by_id",
+          "image_cap = get_capability_for_extension('.png')",
+          "assert image_cap['route'] == 'image_to_pdf_then_mineru_ocr' and image_cap['status'] == 'verified', image_cap",
         ].join("\n"),
         [],
       );
@@ -173,7 +173,7 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
         source_type: "auto",
       });
       expect(imageDiagnosis.ok).toBe(true);
-      expect(imageDiagnosis.data.capability.status).toBe("experimental");
+      expect(imageDiagnosis.data.capability.status).toBe("verified");
       expect(imageDiagnosis.data.recommended_pipeline).toBe("image_to_pdf_ocr");
       expect(imageDiagnosis.data.conversion_strategy).toBe("image_to_pdf_then_mineru_ocr");
 

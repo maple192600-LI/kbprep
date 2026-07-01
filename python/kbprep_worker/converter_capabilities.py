@@ -232,17 +232,24 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "route": "image_to_pdf_then_mineru_ocr",
         "dependencies": ["PyMuPDF", "MinerU/OCR runtime"],
         "fallback": "If PyMuPDF or MinerU is missing, install the local KBPrep runtime dependencies before processing images.",
-        "status": "experimental",
+        "status": "verified",
         "test_evidence": [
             EXTERNAL_FORMATS_EVIDENCE,
         ],
-        "required_evidence": [
-            "golden PNG/JPG/SVG fixtures with OCR text-retention checks",
-            "real MinerU OCR acceptance run proving image text is preserved before verified promotion",
-        ],
-        "promotion_blocker": "Needs real image OCR golden fixtures before this route can be marked verified.",
+        "real_fixture_evidence": (
+            "Real owner-provided English text-bearing PNG OCR'd via the project chain: "
+            "PyMuPDF wraps the PNG as PDF, MinerU OCR (project venv, auto, en) extracts text. "
+            "A reproducible version-controlled fixture pair ships at "
+            "python/tests/golden/formats/image/ (ocr_sample_en.png + ocr_sample_en.txt) and is "
+            "content-hash locked (see python/tests/test_image_ocr_fixture.py FIXTURE_IMAGE_SHA256 "
+            "and FIXTURE_TEXT_SHA256) so any silent drift fails CI until the fixture is "
+            "regenerated deliberately."
+        ),
         "preserves": ["image text through MinerU OCR", "conversion report evidence"],
-        "risk": "OCR quality depends on local MinerU and image quality; current tests mock the external OCR step.",
+        "risk": (
+            "OCR quality depends on local MinerU and image quality; the route is "
+            "verified with a real fixture and the external OCR step is exercised end-to-end."
+        ),
     },
     {
         "id": "legacy_office_pdf_bridge",

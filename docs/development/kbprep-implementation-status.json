@@ -35,7 +35,7 @@
       "id": "conversion_quality_gate",
       "label": "Conversion quality gate",
       "status": "implemented",
-      "scope": "Conversion quality checks, manifest checks, and validation for Canonical IR typed-node, source-span, transformation-ledger, and coverage-report evidence. The pre-clean gate reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available and uses complete typed-node/source-span text quality evidence when coverage is complete. YouTube/media/image optional routes remain partial (Wave 4).",
+      "scope": "Conversion quality checks, manifest checks, and validation for Canonical IR typed-node, source-span, transformation-ledger, and coverage-report evidence. The pre-clean gate reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available and uses complete typed-node/source-span text quality evidence when coverage is complete. YouTube optional routes remain partial (Wave 4); image OCR and media ASR routes are verified with real fixtures.",
       "evidence": [
         "docs/development/04-conversion-quality-gate.md",
         "python/kbprep_worker/canonical_gate_evidence.py",
