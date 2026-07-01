@@ -67,7 +67,7 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
           "assert pdf['status'] == 'verified', pdf",
           "assert pdf['test_evidence'], pdf",
           "assert video['route'] == 'media_to_transcript', video",
-          "assert video['status'] == 'partial', video",
+          "assert video['status'] == 'verified', video",
           "youtube = get_capability_for_extension('.url')",
           "assert youtube['id'] == 'youtube_url_routes', youtube",
           "assert youtube['route'] == 'youtube_subtitle_then_media_transcript', youtube",

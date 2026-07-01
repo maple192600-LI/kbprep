@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
-| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/media/image optional routes stay partial (Wave 4); converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
+| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube/image optional routes stay partial (Wave 4); media was promoted to verified; route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
+| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/image optional routes stay partial (Wave 4); media was promoted to verified; converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
 | document_type_classification | implemented | `document_classification.json` ships the complete DocumentTypeSnapshot contract: document_type, content_form, content_traits, classifier_version, schema version, confidence, evidence refs, and policy-use gating. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -36,7 +36,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | feedback_rule_learning | implemented | Proposal-first model, public single-source selective rerun execution, and run-level Canonical IR manifest binding (document_id, source, document type, policy snapshot hash); Canonical IR node-level identity (canonical_node_ids) is recorded in the binding when typed_nodes evidence exists (node_identity_available=true); execution-level selective rerun can be narrowed to specific node-ids via target_node_ids (--node-ids), scoping cleaning to affected blocks (id_level_narrowing=true when target_node_ids is specified). |
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; worker-level policy_affected rerun filters children by run-evidence identity, while Canonical IR id-level (node-id) narrowing still needs implementation and evidence; `policy_affected` is now exposed through the CLI. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
-| media_local_transcript | partial | Local media detection, dependency failure reporting (ffmpeg/whisper), command evidence, and mocked golden transcript fixtures exist; real ASR dual-track manual acceptance evidence recorded (zh fixture via qwen3-asr + en fixture via Whisper, transcript enters cleanup + final outputs, quality gates pass); verified promotion still needs a reproducible version-controlled fixture. |
+| media_local_transcript | verified | Local media detection, dependency failure reporting (ffmpeg/whisper), command evidence, and mocked golden transcript fixtures are in place; real ASR dual-track manual acceptance evidence recorded (zh fixture via qwen3-asr + en fixture via Whisper, transcript enters cleanup + final outputs, quality gates pass); a reproducible version-controlled zh fixture ships at python/tests/golden/formats/media/transcript_zh_90s.txt and is content-hash locked (FIXTURE_SHA256 in test_media_asr_fixture.py), so verified promotion is supported by locked real-sample evidence. |
 | youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; successful subtitle reports preserve source URL, recorded-equivalent inventory evidence, selected language, subtitle/transcript artifact paths, and sanitized command evidence. Media fallback is explicit, downloads video/media through the `yt-dlp` Python package, and is covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
 
 ## Guiding Principles
@@ -245,7 +245,10 @@ Slices:
 
 - **F1** Landed: `media_local_transcript` moved from experimental to partial
   with mocked golden transcript route evidence, command evidence, and dependency
-  failure reporting. Verified promotion still requires real local ASR samples.
+  failure reporting. Promoted to verified after a reproducible version-controlled
+  zh fixture (python/tests/golden/formats/media/transcript_zh_90s.txt) was
+  content-hash locked (FIXTURE_SHA256 in test_media_asr_fixture.py), pairing the
+  dual-track manual acceptance evidence with a CI-enforced drift guard.
 - **F2** Landed: direct YouTube URLs, explicit video ids, and local `.url` descriptors
   use a subtitle-first route. Successful subtitle reports preserve
   recorded-equivalent inventory evidence, selected language, source URL,
@@ -255,7 +258,9 @@ Slices:
   timeout behavior, dependency variance, and transcript quality still need
   broader evidence before verified promotion.
 - **F3** Landed: `capability-matrix.md`, status JSON, README/operator guidance,
-  and golden format manifest keep media and YouTube partial, not verified.
+  and golden format manifest keep YouTube partial; media was promoted to verified
+  after its zh ASR fixture was content-hash locked. YouTube stays partial until
+  broader real-network, dependency, timeout, and transcript-quality evidence lands.
 
 Acceptance: optional routes are clearly marked until verified; no promotion
 without named tests; dependency failure messages are explicit.
@@ -320,7 +325,7 @@ sample evidence agree.
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
 | M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | implemented |
-| M6 Optional Source Expansion | Phase F | local media and YouTube are partial; verified promotion still needs broader real-sample evidence |
+| M6 Optional Source Expansion | Phase F | local media promoted to verified (zh ASR fixture hash-locked); YouTube stays partial pending broader real-network/timeout/dependency/transcript-quality evidence |
 
 Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
 M1-M6. Phase B (PDF routing), Phase D (cleanup), and Phase E (job status)

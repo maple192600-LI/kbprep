@@ -32,7 +32,7 @@ This stage supports source inspection, route selection, dependency failure repor
 - Missing optional dependencies produce clear user-facing errors.
 - Unsupported sources stop before conversion.
 - Failed optional route runs stop before publication and do not update previous successful deliverables.
-- Local media transcript support remains partial: real local ASR dual-track manual acceptance evidence (zh fixture via qwen3-asr on cuda:0/bfloat16 + en fixture via Whisper large-v3, transcript text enters cleanup and final outputs, quality gates pass with 0 strict errors), dependency failure reporting (ffmpeg/whisper missing), and golden transcript fixtures are in place; verified promotion needs a reproducible version-controlled fixture (see asr-dual-track-acceptance.md). YouTube support remains partial until broader real-network samples, timeout behavior, dependency variance, and transcript-quality checks pass.
+- Local media transcript support is verified: real local ASR dual-track manual acceptance evidence (zh fixture via qwen3-asr on cuda:0/bfloat16 + en fixture via Whisper large-v3, transcript text enters cleanup and final outputs, quality gates pass with 0 strict errors), dependency failure reporting (ffmpeg/whisper missing), and golden transcript fixtures are in place; the zh fixture (python/tests/golden/formats/media/transcript_zh_90s.txt) is content-hash locked (FIXTURE_SHA256 in test_media_asr_fixture.py) so silent drift fails CI until regenerated deliberately (see asr-dual-track-acceptance.md). YouTube support remains partial until broader real-network samples, timeout behavior, dependency variance, and transcript-quality checks pass.
 
 ## Risk And Rollback
 

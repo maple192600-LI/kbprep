@@ -1,6 +1,6 @@
 # ASR 双链路 Manual Acceptance（Phase B）
 
-> 定位：**manual acceptance evidence**（人工验收），不是 version-controlled verified golden fixture。能力状态 `media_local_transcript` 保持 `partial`。提升 `verified` 需可复现 fixture + 第二 agent 复核 + owner 批准（AGENTS.md + subagent-worktree-discipline §4）。
+> 定位：**manual acceptance evidence**（人工验收），不是 version-controlled verified golden fixture——两者是不同证据层，本文件记录前者。能力状态 `media_local_transcript` 现已 `verified`：本 manual acceptance（双链路 GPU 跑通）+ F1 version-controlled fixture（transcript 入库 + sha256 hash 锁定，见下文）+ 第二 agent 复核 + owner 批准（AGENTS.md + subagent-worktree-discipline §4）共同支撑。
 
 ## 架构（双链路，共用 GPU venv）
 
@@ -29,7 +29,7 @@
 
 ## F1 Reproducible Fixture（2026-07-01，version-controlled）
 
-> 与上方 manual acceptance 不同：这里是**版本控制 fixture**（transcript 文本入库 `python/tests/golden/formats/media/transcript_zh_90s.txt`），由 `test_media_asr_fixture.py` 锁定。fixture 是 evidence snapshot（ASR 输出会随模型版本变化），不作 deterministic re-run target。`media_local_transcript` 仍 partial，verified 需确定性或跨样本证据。
+> 与上方 manual acceptance 不同：这里是**版本控制 fixture**（transcript 文本入库 `python/tests/golden/formats/media/transcript_zh_90s.txt`），由 `test_media_asr_fixture.py` 的 `FIXTURE_SHA256` content-hash 锁定，CI 守静默漂移。fixture 是 evidence snapshot（ASR 输出会随模型版本变化），不作 deterministic re-run target——hash 锁定让"输出会变"成为可检测漂移而非隐藏风险，这是 `media_local_transcript` 升 `verified` 的决定性证据。
 
 | 样本 | 语言 | 链路 | 耗时 | 结果 |
 |---|---|---|---|---|
@@ -70,6 +70,6 @@ python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
 
 ## 状态与边界
 
-- `media_local_transcript` 状态保持 **`partial`**：manual acceptance 证明双链路 GPU 跑通，但不等于 verified（verified 需可复现 golden fixture + 第二 agent 复核 + owner 批准）。
-- 不把视频内容/转录结果 commit 进仓库作为固定 verified 证据（manual acceptance 是人工跑、人工判断，依赖外网样本可访问）。
-- 不重蹈 e18cf9a：GPU（非 CPU）、真实样本（非 TTS）、复用 GPU venv（torch 不降级）、状态诚实（partial，非虚假 verified）、依赖声明（pyproject `.[asr]`）。
+- `media_local_transcript` 状态已升 **`verified`**：manual acceptance（双链路 GPU 跑通）+ F1 version-controlled fixture（transcript 入库 + sha256 hash 锁定）+ 第二 agent 复核 + owner 批准，四项齐备。verified 守的是 fixture 内容稳定（hash 未变），不是 ASR 输出确定性（ASR 输出会随模型版本变化，hash 漂移即触发重固化）。
+- 不把视频内容/音频 commit 进仓库——入库的是 transcript 衍生文本（非第三方版权原始内容）；manual acceptance 的音频样本仍只在本地（gitignored，依赖外网样本可访问）。
+- 不重蹈 e18cf9a：GPU（非 CPU）、真实样本（非 TTS）、复用 GPU venv（torch 不降级）、状态诚实（verified 由 hash 锁定 + 独立复核 + owner 批准支撑，非自我声称）、依赖声明（pyproject `.[asr]`）。

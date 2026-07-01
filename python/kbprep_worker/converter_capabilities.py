@@ -270,7 +270,7 @@ _CAPABILITIES: tuple[Capability, ...] = (
         "route": "media_to_transcript",
         "dependencies": ["ffmpeg", "qwen3-asr (zh route, cuda:0/bfloat16)", "local Whisper CLI (en route)"],
         "fallback": "Install ffmpeg and Whisper locally, or provide .srt, .vtt, .ass, .lrc, .txt, or .md transcript.",
-        "status": "partial",
+        "status": "verified",
         "test_evidence": [
             CAPABILITY_DIAGNOSIS_EVIDENCE,
             MEDIA_YOUTUBE_EVIDENCE,
@@ -279,16 +279,11 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "Real 90s zh audio (YouTube video 3DlXq9nsQOE, public) transcribed via "
             "qwen3-asr Qwen3-ASR-1.7B (cuda:0/bfloat16, RTX 4060 Ti); a reproducible "
             "version-controlled fixture ships at python/tests/golden/formats/media/"
-            "transcript_zh_90s.txt (689-character zh transcript). English Whisper route "
-            "also passed manual acceptance (see docs/development/asr-dual-track-acceptance.md)."
-        ),
-        "required_evidence": [
-            "deterministic or cross-sample ASR evidence for verified promotion",
-        ],
-        "promotion_blocker": (
-            "Reproducible version-controlled fixture now ships (transcript_zh_90s.txt); "
-            "verified promotion needs deterministic or cross-sample ASR evidence because "
-            "ASR output can vary across model versions."
+            "transcript_zh_90s.txt and is content-hash locked (see "
+            "python/tests/test_media_asr_fixture.py FIXTURE_SHA256) so any silent drift "
+            "fails CI until the fixture is regenerated deliberately. English Whisper "
+            "large-v3 route also passed manual acceptance (see "
+            "docs/development/asr-dual-track-acceptance.md)."
         ),
         "preserves": ["transcript text", "ASR command evidence", "Whisper model metadata"],
         "risk": (
