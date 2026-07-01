@@ -412,6 +412,83 @@ describe("standalone KBPrep CLI adapter", () => {
     }
   });
 
+  it("maps batch policy_affected rerun scope and affected identity to the worker payload", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-policy-affected-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs([
+        "--rerun",
+        "--batch-manifest",
+        manifest,
+        "--rerun-scope",
+        "policy-affected",
+        "--affected-document-id",
+        "doc-123",
+        "--affected-policy-snapshot-hash",
+        "abc123",
+        "--affected-source-identity",
+        '{"source_domain":"example.com"}',
+      ]);
+      const plan = buildCliPlan("prepare_batch", parsed.options);
+
+      expect(plan.command).toBe("prepare_batch");
+      expect(plan.input.rerun).toBe(true);
+      expect(plan.input.rerun_scope).toBe("policy_affected");
+      expect(plan.input.affected_document_id).toBe("doc-123");
+      expect(plan.input.affected_policy_snapshot_hash).toBe("abc123");
+      expect(plan.input.affected_source_identity).toEqual({ source_domain: "example.com" });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts policy_affected scope without affected identity (worker validates)", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-policy-affected-bare-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs([
+        "--rerun",
+        "--batch-manifest",
+        manifest,
+        "--rerun-scope",
+        "policy-affected",
+      ]);
+      const plan = buildCliPlan("prepare_batch", parsed.options);
+
+      expect(plan.input.rerun_scope).toBe("policy_affected");
+      expect(plan.input.affected_document_id).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects affected_source_identity that is not a JSON object", () => {
+    const root = mkdtempSync(join(tmpdir(), "kbprep-cli-batch-rerun-source-identity-"));
+    try {
+      const manifest = join(root, "batch_manifest.json");
+      writeFileSync(manifest, "{}", "utf-8");
+      const parsed = parseStandaloneArgs([
+        "--rerun",
+        "--batch-manifest",
+        manifest,
+        "--rerun-scope",
+        "policy-affected",
+        "--affected-document-id",
+        "doc-123",
+        "--affected-source-identity",
+        '["not","an","object"]',
+      ]);
+
+      expect(() => buildCliPlan("prepare_batch", parsed.options)).toThrow(
+        "--affected-source-identity must be",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("maps feedback options to a proposal-only Python worker command", () => {
     const parsed = parseStandaloneArgs([
       "--run-dir",

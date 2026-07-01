@@ -68,7 +68,7 @@ const HELP: Record<StandaloneCommand, string> = {
   prepare_batch: [
     "Usage: kbprep-batch --input <dir> --output <dir> [--profile lite|standard|obsidian_kb|curated_obsidian_kb] [--mode rules_only|rules_plus_review_pack] [--max-quality-iterations <n>] [--convert-jobs <n>] [--config-file <file>]",
     "       kbprep-batch --playlist <youtube-playlist-url> --output <dir> [--playlist-limit <n>] [--allow-youtube-media-fallback] [--config-file <file>]",
-    "       kbprep-batch --rerun --batch-manifest <batch_manifest.json> [--rerun-scope failed_only|pending_only|failed_and_pending|recommended] [--force] [--config-file <file>]",
+    "       kbprep-batch --rerun --batch-manifest <batch_manifest.json> [--rerun-scope failed_only|pending_only|failed_and_pending|recommended|policy_affected] [--affected-document-id <id>] [--affected-policy-snapshot-hash <hash>] [--affected-source-identity <json>] [--force] [--config-file <file>]",
     "",
     "Processes a directory or explicit YouTube playlist through the same agent-independent Python worker used by all callers. Rerun mode reprocesses only failed or pending children named by an existing batch manifest.",
   ].join("\n"),
@@ -227,6 +227,9 @@ export function buildCliPlan(command: StandaloneCommand, options: Record<string,
             rerun: true,
             batch_manifest_path: requireFilePath(options, "batch_manifest"),
             rerun_scope: readBatchRerunScope(options),
+            affected_document_id: readString(options, "affected_document_id"),
+            affected_policy_snapshot_hash: readString(options, "affected_policy_snapshot_hash"),
+            affected_source_identity: readOptionalJsonObject(options, "affected_source_identity"),
             force: readOptionalBoolean(options, "force"),
             profile: readString(options, "profile"),
             mode: readString(options, "mode"),
@@ -571,12 +574,39 @@ function readOptionalBoolean(options: Record<string, string | boolean>, key: str
   return readBoolean(options, key, false);
 }
 
+function readOptionalJsonObject(
+  options: Record<string, string | boolean>,
+  key: string,
+): Record<string, unknown> | undefined {
+  const raw = readString(options, key);
+  if (raw === undefined) return undefined;
+  const flag = `--${key.replace(/_/g, "-")}`;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${flag} must be a JSON object.`);
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${flag} must be a JSON object.`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
 function readBatchRerunScope(options: Record<string, string | boolean>): string {
   const raw = readString(options, "rerun_scope") ?? "recommended";
   const normalized = raw.replace(/-/g, "_");
-  const allowed = new Set(["recommended", "failed_only", "pending_only", "failed_and_pending"]);
+  const allowed = new Set([
+    "recommended",
+    "failed_only",
+    "pending_only",
+    "failed_and_pending",
+    "policy_affected",
+  ]);
   if (!allowed.has(normalized)) {
-    throw new Error("--rerun-scope must be recommended, failed_only, pending_only, or failed_and_pending.");
+    throw new Error(
+      "--rerun-scope must be recommended, failed_only, pending_only, failed_and_pending, or policy_affected.",
+    );
   }
   return normalized;
 }
