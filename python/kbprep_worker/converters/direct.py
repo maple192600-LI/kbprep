@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
 import re
@@ -116,10 +117,31 @@ def normalize_subtitle_transcript(text: str) -> str:
             continue
         if line.startswith(("NOTE", "STYLE", "REGION")):
             continue
+        if line.lower().startswith(("kind:", "language:")):
+            continue
         line = _strip_inline_html(line)
+        line = re.sub(r"<\d{1,2}:\d{2}:\d{2}\.\d+>", "", line)
+        line = html.unescape(line)
+        line = line.replace(">>", "")
         line = re.sub(r"^\[[^\]]{1,30}\]\s*", "", line)
+        line = line.strip()
         if line:
             lines.append(line)
+
+    deduped: list[str] = []
+    for line in lines:
+        if not line:
+            continue
+        previous = deduped[-1] if deduped else ""
+        if previous == line:
+            continue
+        if previous and line.startswith(previous):
+            deduped[-1] = line
+            continue
+        if previous and previous.startswith(line):
+            continue
+        deduped.append(line)
+    lines = deduped
 
     paragraphs: list[str] = []
     current = ""
