@@ -127,22 +127,43 @@ def normalize_subtitle_transcript(text: str) -> str:
         line = line.strip()
         if line:
             lines.append(line)
+    lines = _dedupe_rolling_cues(lines)
+    return _lines_to_transcript_markdown(lines)
 
+
+def _dedupe_rolling_cues(lines: list[str]) -> list[str]:
+    """Collapse YouTube auto-caption rolling-cue echoes.
+
+    Each cue repeats the previous finalised line before appending new words, so
+    raw text echoes 2-3 times. Keep paragraph breaks (so filler stays isolatable
+    for cleanup) but track the last meaningful line across blanks to collapse
+    exact repeats and prefix-overlapping extensions.
+    """
     deduped: list[str] = []
+    last_meaningful = ""
     for line in lines:
         if not line:
+            if deduped and deduped[-1] != "":
+                deduped.append("")
             continue
-        previous = deduped[-1] if deduped else ""
+        previous = last_meaningful
         if previous == line:
             continue
         if previous and line.startswith(previous):
-            deduped[-1] = line
+            for i in range(len(deduped) - 1, -1, -1):
+                if deduped[i] == previous:
+                    deduped[i] = line
+                    break
+            last_meaningful = line
             continue
         if previous and previous.startswith(line):
             continue
         deduped.append(line)
-    lines = deduped
+        last_meaningful = line
+    return deduped
 
+
+def _lines_to_transcript_markdown(lines: list[str]) -> str:
     paragraphs: list[str] = []
     current = ""
     for line in lines:
@@ -160,7 +181,6 @@ def normalize_subtitle_transcript(text: str) -> str:
             current = candidate
     if current:
         paragraphs.append(current.strip())
-
     return "# Transcript\n\n" + "\n\n".join(paragraphs) + "\n"
 
 
