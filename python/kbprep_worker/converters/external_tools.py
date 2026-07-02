@@ -355,6 +355,7 @@ def _youtube_subtitle_command(ytdlp: str, source_url: str, output_template: Path
         "--skip-download",
         "--write-subs",
         "--write-auto-subs",
+        "--ignore-errors",
         "--sub-langs",
         "zh-Hans,zh,en",
         "--sub-format",
