@@ -1,0 +1,6 @@
+{
+  "schema": "kbprep.youtube_subtitle_inventory_evidence.v1",
+  "id": "no-subtitle-example",
+  "subtitle_languages": [],
+  "automatic_caption_languages": []
+}

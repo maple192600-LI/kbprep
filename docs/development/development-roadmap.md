@@ -27,8 +27,8 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | --- | --- | --- |
 | design_source_alignment | implemented | Protected design, flowchart, and dev docs aligned. |
 | source_side_publish | implemented | Standard profile publishes source-side Markdown + assets; failure keeps prior output. |
-| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube/image optional routes stay partial (Wave 4); media was promoted to verified; route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
-| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube/image optional routes stay partial (Wave 4); media was promoted to verified; converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
+| conversion_quality_gate | implemented | Gate validates manifest, typed-node, source-span, transformation-ledger, and coverage-report evidence, reads complete route-wide IR semantics (relationships/assets/annotations) when the manifest declares them available, and uses complete typed-node/source-span text quality when coverage is complete. YouTube, image, and media routes are verified with real fixtures; YouTube cue-id precision and playlist real-network evidence stay future/partial; route-wide semantics, renderer/profile coverage, and universal fact-layer depth stay open in `prohibitedClaims`. |
+| canonical_ir_contract | implemented | Manifest plus typed_nodes/source_spans/transformation_ledger/relationships/assets/annotations artifacts, route-native precision (PDF bbox via MinerU content_list, DOCX run range, PPTX shape id, XLSX cell range) when converters provide evidence, C2 content-safe route-wide semantics, coverage reports listing missing native precision kinds without fabricating, and pre-clean gate consuming complete IR when coverage is complete. YouTube, image, and media routes are verified with real fixtures; YouTube cue-id precision and playlist real-network evidence stay future/partial; converter-native span breadth, full Markdown renderer/profile coverage, and universal fact-layer usage stay open as `prohibitedClaims` depth. |
 | document_type_classification | implemented | `document_classification.json` ships the complete DocumentTypeSnapshot contract: document_type, content_form, content_traits, classifier_version, schema version, confidence, evidence refs, and policy-use gating. |
 | cleaning_policy_snapshot | implemented | Worker records the compiled policy contract with active rule ids, dictionary ids, protection ids, disabled rule ids, conflict resolutions, preference selectors, section hashes, filtered accepted-rule fingerprints, and run metadata references. |
 | patch_clean_view | implemented | CleaningPatch generation writes `cleaning_patches.jsonl`; patch rejection gates write `cleaning_patch_gate.json` and `rejected_patches.jsonl`; Clean View assembly writes `clean_view.json`; DocumentCleaningGate writes `document_cleaning_gate.json` and turns rejected patch evidence into warnings without blocking safe output. |
@@ -37,7 +37,7 @@ Source of truth: `docs/development/kbprep-implementation-status.json` and
 | batch_playlist_rerun | partial | Batch + parent status manifest, failed/pending batch rerun, explicit YouTube playlist input, and playlist rerun evidence preservation exist; worker-level policy_affected rerun filters children by run-evidence identity, while Canonical IR id-level (node-id) narrowing still needs implementation and evidence; `policy_affected` is now exposed through the CLI. |
 | pdf_three_tier_routing | verified | B2-B4 routing is implemented: Tier 1 uses `pymupdf4llm`, Tier 2 uses MinerU `txt` or `auto`, and Tier 3 uses MinerU `ocr`; real Vault smoke now covers the six Phase B acceptance classes and rejects suspicious Tier 1 zero-hit distributions. |
 | media_local_transcript | verified | Local media detection, dependency failure reporting (ffmpeg/whisper), command evidence, and mocked golden transcript fixtures are in place; real ASR dual-track manual acceptance evidence recorded (zh fixture via qwen3-asr + en fixture via Whisper, transcript enters cleanup + final outputs, quality gates pass); a reproducible version-controlled zh fixture ships at python/tests/golden/formats/media/transcript_zh_90s.txt and is content-hash locked (FIXTURE_SHA256 in test_media_asr_fixture.py), so verified promotion is supported by locked real-sample evidence. |
-| youtube_url_routes | partial | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; successful subtitle reports preserve source URL, recorded-equivalent inventory evidence, selected language, subtitle/transcript artifact paths, and sanitized command evidence. Media fallback is explicit, downloads video/media through the `yt-dlp` Python package, and is covered with mocked fixtures. Real-network breadth, timeout behavior, dependency variance, and transcript-quality evidence are not verified. |
+| youtube_url_routes | verified | Direct YouTube URLs, explicit video ids, and local `.url` descriptors route subtitle-first; successful subtitle reports preserve source URL, recorded-equivalent inventory evidence, selected language, subtitle/transcript artifact paths, and sanitized command evidence. Media fallback is explicit, downloads video/media through the `yt-dlp` Python package, and is covered with mocked fixtures. Verified with real recordings: subtitle (CAQ2pfhoPcs en auto subs) + yt-dlp inventory (157 auto-caption languages) content-hash locked; no-subtitle/timeout/dependency/fallback covered by recorded mock. Playlist real-network evidence is future work; YouTube cue-id precision stays partial (Slice 3.6). |
 
 ## Guiding Principles
 
@@ -70,7 +70,7 @@ Slices:
 - **A2** Landed: `media_local_transcript` and `youtube_url_routes` are separate in
   the status JSON.
 - **A3** Landed: YouTube is represented in `capability-matrix.md` as a
-  partial optional route with named current evidence and promotion blockers.
+  verified optional route with real subtitle + inventory fixture evidence (promoted from partial after real recordings were hash-locked).
 - **A4** Landed: `implementation-status.mjs` checks required
   capability coverage and requires implemented/partial status evidence to
   reference code or tests.
@@ -258,9 +258,11 @@ Slices:
   timeout behavior, dependency variance, and transcript quality still need
   broader evidence before verified promotion.
 - **F3** Landed: `capability-matrix.md`, status JSON, README/operator guidance,
-  and golden format manifest keep YouTube partial; media was promoted to verified
-  after its zh ASR fixture was content-hash locked. YouTube stays partial until
-  broader real-network, dependency, timeout, and transcript-quality evidence lands.
+  and golden format manifest promote YouTube to verified after its subtitle
+  (CAQ2pfhoPcs en auto subs) and yt-dlp inventory (157 auto-caption languages)
+  fixtures were content-hash locked; no-subtitle/timeout/dependency/fallback
+  logic covered by recorded mock. Playlist real-network evidence and YouTube
+  cue-id precision stay future/partial.
 
 Acceptance: optional routes are clearly marked until verified; no promotion
 without named tests; dependency failure messages are explicit.
@@ -274,7 +276,7 @@ investment priority is:
 2. EPUB XHTML quality (default route, not PDF)
 3. PPTX lightweight body/outline cleanup
 4. XLSX lightweight sheet/table text
-5. YouTube evidence hardening (image OCR and media ASR routes are verified)
+5. YouTube playlist real-network evidence and cue-id precision (image, media, and YouTube single-video routes are verified)
 
 This is a **format-dimension** priority. It does not override the
 cross-cutting Phase C IR fact-layer work (which serves all formats); it
@@ -296,7 +298,7 @@ Phase C / M2 remaining IR fact-layer work
       │       └── BATCH2 policy/CIR affected batch targeting
       │
       └── optional-route evidence work can run in parallel:
-          media ASR fixtures (done), image OCR fixtures (done), YouTube/playlist evidence
+          media ASR (done), image OCR (done), YouTube single-video (done), playlist evidence (remaining)
 ```
 
 - Phase D is implemented against the current Canonical IR artifacts. Full
@@ -325,7 +327,7 @@ sample evidence agree.
 | M3 Policy Snapshot And Patch Cleanup | Phase D | implemented |
 | M4 Source-Side Publication | — | implemented |
 | M5 Feedback And Selective Rerun | feedback docs + proposal code + future rerun slices | implemented |
-| M6 Optional Source Expansion | Phase F | local media promoted to verified (zh ASR fixture hash-locked); YouTube stays partial pending broader real-network/timeout/dependency/transcript-quality evidence |
+| M6 Optional Source Expansion | Phase F | local media, image OCR, and YouTube single-video routes promoted to verified (real fixtures hash-locked); YouTube playlist real-network evidence and cue-id precision stay future/partial |
 
 Phase A-F is the delivery roadmap, not a strict one-to-one replacement for
 M1-M6. Phase B (PDF routing), Phase D (cleanup), and Phase E (job status)
@@ -458,12 +460,13 @@ Current truth:
 - `media_local_transcript` has local detection and an external transcript route,
   but capability status is still partial because real ASR fixtures and
   timing-quality evidence are missing.
-- `youtube_url_routes` is partial. Standalone CLI direct URL / explicit video id input,
+- `youtube_url_routes` is verified. Standalone CLI direct URL / explicit video id input,
   descriptor routing, accepted public URL-shape evidence, subtitle extraction,
   subtitle report inventory/language/artifact evidence, explicit media fallback,
-  and mocked failure fixtures exist; verified promotion
-  still needs broader real-network, timeout, dependency-variance, fallback, and
-  transcript-quality evidence.
+  and mocked failure fixtures exist; verified with real subtitle (CAQ2pfhoPcs en)
+  and yt-dlp inventory (157 auto-caption languages) fixtures content-hash locked,
+  no-subtitle/timeout/dependency/fallback covered by recorded mock. Playlist
+  real-network evidence and YouTube cue-id precision stay future/partial.
 - Image OCR route is verified: a real owner-provided English PNG fixture is
   OCR'd end-to-end (PyMuPDF wraps the PNG as PDF, MinerU auto/en extracts
   text), with the source image and extracted Markdown content-hash locked
@@ -472,26 +475,29 @@ Current truth:
 
 Required slices:
 
-- Add real or golden media ASR fixtures with stable transcript snapshots,
-  timing evidence, dependency failure tests, and final-output quality checks.
-- Promote local media only after those fixtures pass and the capability matrix
-  changes from experimental toward partial or verified.
-- Add YouTube timeout, dependency-variance, cache/artifact, and no-subtitle
-  fallback evidence against the existing partial URL contract and subtitle-first
-  route.
-- Add YouTube fixtures for subtitles, no subtitles, failure modes, playlist
-  expansion, playlist child publication, and final source-side publication.
+- Done: real media ASR fixture (zh 90s via Qwen3-ASR) with stable transcript
+  snapshot, timing evidence, dependency failure tests, and final-output quality
+  checks; local media promoted to verified.
+- Done: real image OCR fixture (English PNG via PyMuPDF + MinerU) content-hash
+  locked; image OCR promoted to verified.
+- Done: YouTube subtitle (CAQ2pfhoPcs en) + yt-dlp inventory (157 auto-caption
+  languages) + no-subtitle fixtures content-hash locked; timeout, dependency-
+  variance, and no-subtitle fallback covered by recorded mock; YouTube promoted
+  to verified. Remaining: playlist real-network evidence (Slice 3.5) and
+  YouTube cue-id precision (Slice 3.6).
 
-Execution: media ASR and image OCR fixtures are done; continue YouTube
-technical-contract work now in parallel with M2/M5/batch work when file ownership
-does not collide. Do not wait for M2 or M5 to begin implementation. Wait only
-before promoting the capability status to `verified` or final complete.
+Execution: media ASR, image OCR, and YouTube single-video fixtures are done
+(content-hash locked); media, image, and YouTube routes are verified. Remaining
+optional-route work is YouTube playlist real-network evidence (Slice 3.5) and
+cue-id precision (Slice 3.6), in parallel with M2/M5/batch work when file
+ownership does not collide.
 
-Acceptance: `youtube_url_routes` moves from `partial` to `verified` only after
-broader real-network fixtures, dependency variance, timeout behavior, media
-fallback evidence, and final quality-gate checks pass. M6 is complete only when
-every optional route in scope is either verified/partial with evidence or
-explicitly kept unsupported with owner-readable guidance.
+Acceptance: `youtube_url_routes` is verified with real subtitle + yt-dlp inventory
+fixtures content-hash locked and recorded-mock coverage for no-subtitle/timeout/
+dependency/fallback. Playlist real-network evidence (Slice 3.5) and YouTube
+cue-id precision (Slice 3.6) remain. M6 is complete only when every optional
+route in scope is either verified/partial with evidence or explicitly kept
+unsupported with owner-readable guidance.
 
 ### 5. Final Release Closure
 

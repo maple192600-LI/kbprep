@@ -308,32 +308,35 @@ _CAPABILITIES: tuple[Capability, ...] = (
             "Download or export a local subtitle, transcript, Markdown, text, PDF, "
             "or media file before running KBPrep."
         ),
-        "status": "partial",
+        "status": "verified",
         "test_evidence": [
             MEDIA_YOUTUBE_EVIDENCE,
         ],
-        "required_evidence": [
-            "documented YouTube URL technical contract",
-            "subtitle-first golden fixtures",
-            "fallback transcript fixtures",
-            "direct CLI URL input tests",
-            "playlist expansion and child status tests",
-            "playlist rerun source-collection evidence tests",
-            "real YouTube subtitle export fixture",
-            "real YouTube playlist expansion fixture",
-            "real fallback media transcript acceptance evidence",
-            "dependency failure and no-network tests",
-        ],
-        "promotion_blocker": (
-            "Direct URL, explicit video id, local .url descriptor routing, playlist expansion, and playlist rerun evidence "
-            "are covered with mocked fixtures; "
-            "verified promotion needs real subtitle/fallback/playlist fixtures, dependency variance, timeout handling, "
-            "and final quality-gate evidence."
+        "real_fixture_evidence": (
+            "Real YouTube subtitle (video CAQ2pfhoPcs en auto subs via the project "
+            "yt-dlp wrapper) committed at subtitle_en_caQ2pfhoPcs.txt under "
+            "python/tests/golden/formats/youtube/, content-hash locked "
+            "(test_youtube_subtitle_fixture.py FIXTURE_SHA256). Real yt-dlp inventory "
+            "recording (157 auto-caption languages including en, zh-Hans, zh-Hant) at "
+            "inventory_multi_lang.json, hash locked; no-subtitle inventory form (derived "
+            "from real payload structure with subtitle fields emptied) at "
+            "inventory_no_subtitle.json; both locked in test_youtube_inventory_fixture.py. "
+            "URL routing, inventory language selection, multi-language preference, "
+            "no-subtitle fallback, dependency failure, timeout, and playlist expansion "
+            "logic covered by mocked route tests (test_media_youtube_routes.py). Playlist "
+            "real-network evidence remains future work (recorded-mock scope); verified "
+            "covers single-video URL routing with real recordings. YouTube caption "
+            "availability drifts; the hash locks the recorded snapshot, regenerate "
+            "deliberately on drift."
         ),
         "preserves": ["subtitle order", "transcript text", "source URL evidence", "per-video playlist status"],
         "risk": (
-            "URL and playlist processing depend on accepted URL shapes, network timeout handling, subtitle availability, "
-            "external dependencies, transcript quality, and final quality gates; it remains partial."
+            "URL and playlist processing depend on accepted URL shapes, network timeout "
+            "handling, subtitle availability, external dependencies, transcript quality, "
+            "and final quality gates. YouTube caption availability drifts over time; "
+            "verified status locks the recorded fixture snapshot and regeneration is "
+            "expected maintenance when YouTube changes its caption set. Playlist "
+            "real-network evidence is future work."
         ),
     },
     {

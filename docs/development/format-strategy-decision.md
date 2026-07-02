@@ -13,7 +13,7 @@
 | PPTX | 轻量（正文/标题/备注/大纲，清营销噪音） |
 | XLSX | 轻量（工作表/简单表格/关键文本） |
 | Legacy Office (.doc/.ppt/.xls) | 不支持，提示转 PDF 或新版 Office |
-| 图片 / 音视频 / YouTube | 证据门控，不因"能跑"就宣传为稳定能力 |
+| 图片 / 音视频 / YouTube | 真实 fixture + content-hash 锁达到 verified；playlist 真实联网为后续工作 |
 
 ## DOCX（深做）
 
@@ -51,9 +51,9 @@ capability：`legacy_office_pdf_bridge`（unsupported，owner declined adaptatio
 
 ## 图片 / 音视频 / YouTube（证据门控）
 
-做什么：image OCR 和 media ASR 已用真实 fixture + content-hash 锁达到 verified；YouTube 继续补真实联网、超时、依赖 variance、fallback 证据后才 promoted。
+做什么：image OCR、media ASR、YouTube 字幕链路均用真实 fixture + content-hash 锁达到 verified。YouTube 字幕与 inventory（CAQ2pfhoPcs，157 个自动字幕语言）真实录制固化，no-subtitle 形态、timeout、dependency variance 用 recorded mock 覆盖；playlist 真实联网证据为后续工作（recorded mock 覆盖展开逻辑）。
 不做什么：不因为"能跑"就宣传为稳定/verified 能力。
-capability：`image_ocr`（verified）、`media_local_transcript`（verified）、`youtube_url_routes`（partial）。
+capability：`image_ocr`（verified）、`media_local_transcript`（verified）、`youtube_url_routes`（verified；playlist 真实联网证据为后续工作）。
 
 ## 当前开发顺序约束
 

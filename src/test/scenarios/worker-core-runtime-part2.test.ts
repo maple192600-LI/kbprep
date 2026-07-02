@@ -71,7 +71,7 @@ describe("kbprep worker pipeline - core/runtime part 2", () => {
           "youtube = get_capability_for_extension('.url')",
           "assert youtube['id'] == 'youtube_url_routes', youtube",
           "assert youtube['route'] == 'youtube_subtitle_then_media_transcript', youtube",
-          "assert youtube['status'] == 'partial', youtube",
+          "assert youtube['status'] == 'verified', youtube",
           "rows = capability_matrix_rows()",
           "assert any(row['route'] == 'office_xml' and row['status'] == 'partial' for row in rows), rows",
           "for row in rows:",

@@ -1,6 +1,6 @@
 # KBPrep Standalone CLI
 
-The standalone CLI is KBPrep's maintained agent-independent entry point. The stable core command surface is local-file oriented; YouTube direct URL and explicit `--youtube-video-id` input are partial optional routes that normalize into controlled local descriptors before entering the same quality pipeline.
+The standalone CLI is KBPrep's maintained agent-independent entry point. The stable core command surface is local-file oriented; YouTube direct URL and explicit `--youtube-video-id` input are verified optional routes that normalize into controlled local descriptors before entering the same quality pipeline.
 
 ## AI Review Backend
 

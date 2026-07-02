@@ -17,7 +17,7 @@ class GoldenFormatRouteTests(unittest.TestCase):
         self.assertEqual(by_capability["image_ocr"]["expected_status"], "verified")
         self.assertEqual(by_capability["legacy_office_pdf_bridge"]["expected_status"], "unsupported")
         self.assertEqual(by_capability["media_local_transcript"]["expected_status"], "verified")
-        self.assertEqual(by_capability["youtube_url_routes"]["expected_status"], "partial")
+        self.assertEqual(by_capability["youtube_url_routes"]["expected_status"], "verified")
         self.assertEqual(by_capability["mobi_unsupported"]["expected_status"], "unsupported")
 
         for sample in samples:

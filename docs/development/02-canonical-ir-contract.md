@@ -10,7 +10,7 @@ This stage supports the flowchart nodes for Canonical IR conversion, normalizati
 
 ## Current Shipped Boundary
 
-The current worker ships an implemented Canonical IR contract (YouTube/media/image optional routes remain partial, Wave 4). It writes
+The current worker ships an implemented Canonical IR contract (image/media/YouTube routes verified with real fixtures; YouTube cue-id precision remains future work). It writes
 `canonical_ir/manifest.json`, `document_manifest.json`, a validated
 `canonical_ir/typed_nodes.json` artifact, a validated
 `canonical_ir/source_spans.json` artifact,

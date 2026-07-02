@@ -105,7 +105,7 @@ class TestMediaYoutubeRoute(unittest.TestCase):
             self.assertEqual(result.report["route_decision"]["external_route"], "media_to_transcript")
             self.assertEqual(result.report["whisper_model"], "large-v3")
             self.assertEqual(result.artifact_path.read_text(encoding="utf-8").strip(), "Step 1: keep threshold=0.8.")
-            self.assertEqual(get_capability_for_extension(".mp4")["status"], "partial")
+            self.assertEqual(get_capability_for_extension(".mp4")["status"], "verified")
 
     def test_media_transcript_reports_missing_ffmpeg(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
